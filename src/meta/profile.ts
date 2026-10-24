@@ -1,3 +1,4 @@
+import { LOGIN_DAYS, freshLogin, loginReward, type LoginReward, type LoginState } from './login';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
 import { STAR1_TIME, STAR2_TIME, TIME_SCALE } from '../sim/data';
 import { Rng } from '../sim/math';
@@ -62,6 +63,7 @@ export interface SaveData {
   /** Claimed sector-chest bits per sector (same bit layout as stars). */
   starClaims: Record<number, number>;
   bestScore: Record<number, number>;
+  login: LoginState;
 }
 
 export interface RunRewards {
@@ -107,6 +109,7 @@ function fresh(): SaveData {
     missions: null,
     starClaims: {},
     bestScore: {},
+    login: freshLogin(),
   };
 }
 
@@ -127,7 +130,7 @@ export class Profile {
       const raw = this.storage?.getItem(KEY);
       if (raw) {
         const d = JSON.parse(raw) as SaveData;
-        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {} };
+        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin() };
       }
     } catch {
       /* corrupted save → start fresh */
@@ -534,14 +537,28 @@ export class Profile {
     return this.data.lastDaily !== now.toDateString();
   }
 
-  claimDaily(now = new Date()) {
+  /** Claim today's sign-in calendar reward. */
+  claimDaily(now = new Date()): (LoginReward & { day: number; item?: GearItem }) | null {
     if (!this.dailyAvailable(now)) return null;
+    const lg = this.data.login;
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    lg.streak = lg.last === yesterday.toDateString() ? lg.streak + 1 : 1;
+    lg.last = now.toDateString();
     this.data.lastDaily = now.toDateString();
-    const gold = 200 + this.data.unlocked * 120;
-    this.data.gold += gold;
-    this.data.keys += 1;
+    const day = lg.claimed % LOGIN_DAYS;
+    lg.claimed++;
+    const r = loginReward(day, this.data.unlocked);
+    this.grant(r);
+    let item: GearItem | undefined;
+    if (r.itemRarity !== undefined) {
+      item = this.rollItem(new Rng(now.getTime()), this.data.unlocked, true);
+      item.rarity = Math.max(item.rarity, r.itemRarity);
+      this.data.gear.push(item);
+      this.autoEquip(item);
+    }
     this.save();
-    return { gold, keys: 1 };
+    return { ...r, day, item };
   }
 
   // ------------------------------------------------------------------ missions + sector chests

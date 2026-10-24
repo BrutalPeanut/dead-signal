@@ -85,6 +85,21 @@ describe('profile', () => {
     expect(p.claimDaily(d)).not.toBeNull();
     expect(p.claimDaily(d)).toBeNull();
   });
+
+  it('sign-in calendar: 7-day cycle, day 7 is rare gear, missed days wait instead of resetting', () => {
+    const p = mk();
+    const day = (n: number) => new Date(2026, 9, 1 + n, 12);
+    const gear0 = p.data.gear.length;
+    for (let i = 0; i < 6; i++) expect(p.claimDaily(day(i))!.day).toBe(i);
+    expect(p.data.login.streak).toBe(6);
+    // skip two days: no reset of the calendar, streak restarts
+    const r7 = p.claimDaily(day(8))!;
+    expect(r7.day).toBe(6);
+    expect(r7.item!.rarity).toBeGreaterThanOrEqual(2);
+    expect(p.data.gear.length).toBe(gear0 + 1);
+    expect(p.data.login.streak).toBe(1);
+    expect(p.claimDaily(day(9))!.day).toBe(0); // next page
+  });
 });
 
 describe('missions and sector chests', () => {
