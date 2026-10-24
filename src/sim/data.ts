@@ -301,7 +301,7 @@ export function enemyMix(t: number): [EnemyKind, number][] {
 }
 
 /** Spawns per second. */
-export const spawnRate = (t: number) => 1.6 + t * 0.019 + (t * t) / 52000;
+export const spawnRate = (t: number) => 2.4 + t * 0.019 + (t * t) / 52000;
 
 /** Enemy HP multiplier over a run. */
 export const hpScale = (t: number) => 1 + t / 70 + (t * t) / 52000;
