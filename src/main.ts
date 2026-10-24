@@ -8,7 +8,7 @@ import { getChapter } from './sim/chapters';
 import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes';
 import { DT, Game } from './sim/game';
 import type { BaseStats, FxEvent } from './sim/types';
-import { haptic, setHaptics } from './ui/dom';
+import { haptic, setHaptics, toast } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
 import { Hud, chestModal, levelUpModal, pauseModal, reviveModal } from './ui/hud';
 import { introModal, resultsModal, settingsModal } from './ui/screens';
@@ -35,6 +35,7 @@ class App {
 
   constructor() {
     useSkin(this.profile.data.character);
+    this.profile.flushScores();
     const s = this.profile.data.settings;
     audio.setSfx(s.sfx);
     audio.setMusic(s.music);
@@ -231,6 +232,13 @@ class App {
       'results',
     );
     if (r.won) audio.evolve();
+    if (mode !== 'campaign') {
+      const label = mode === 'daily' ? "today's board" : 'the Endless board';
+      this.profile.postScore(mode, r.score ?? 0, r.time).then((rank) => {
+        if (rank) toast(`#${rank} on ${label}`, '#ffd34d');
+        else if (!this.profile.data.online.name) toast('Set a call sign in Ranks to join the leaderboard', '#8d97ab');
+      });
+    }
   }
 
   /** Run-state driven modals: level-ups, chests, revive, end of run. */
