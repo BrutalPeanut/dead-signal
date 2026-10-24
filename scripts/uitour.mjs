@@ -10,7 +10,7 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.waitForTimeout(600);
 await page.click('.modal .btn');
-await page.click('.deploy .btn');
+await page.click('.battle-row .go');
 // let it run in real time until the first level-up modal shows
 await page.waitForTimeout(3000);
 await page.evaluate(() => window.__ds.app.game.gainXp(12));

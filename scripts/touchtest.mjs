@@ -10,7 +10,7 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.waitForTimeout(500);
 await page.tap('.modal .btn');
-await page.tap('.deploy .btn');
+await page.tap('.battle-row .go');
 await page.waitForTimeout(400);
 const cdp = await ctx.newCDPSession(page);
 const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });

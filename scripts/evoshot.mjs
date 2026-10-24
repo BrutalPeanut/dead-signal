@@ -10,7 +10,7 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.waitForTimeout(500);
 await page.click('.modal .btn');
-await page.click('.deploy .btn');
+await page.click('.battle-row .go');
 await page.waitForTimeout(300);
 await page.evaluate((set) => {
   const g = window.__ds.app.game;

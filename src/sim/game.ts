@@ -52,6 +52,7 @@ export interface RunResult {
   level: number;
   bossKills: number;
   eliteKills: number;
+  evolutions?: number;
 }
 
 export class Game {
@@ -1065,6 +1066,7 @@ export class Game {
       level: this.level,
       bossKills: this.bossKills,
       eliteKills: this.eliteKills,
+      evolutions: this.weapons.filter((w) => w.evolved).length,
     };
   }
 

@@ -86,3 +86,47 @@ describe('profile', () => {
     expect(p.claimDaily(d)).toBeNull();
   });
 });
+
+describe('missions and sector chests', () => {
+  it('rolls 5 daily missions including kills and runs, stable within a day', () => {
+    const p = mk();
+    const d = new Date('2026-10-24T09:00:00');
+    const a = p.missions(d).list.map((m) => m.kind);
+    expect(a.length).toBe(5);
+    expect(a).toContain('kills');
+    expect(a).toContain('runs');
+    expect(p.missions(new Date('2026-10-24T22:00:00')).list.map((m) => m.kind)).toEqual(a);
+  });
+
+  it('tracks run progress and pays out once', () => {
+    const p = mk();
+    p.missions();
+    for (let i = 0; i < 3; i++) p.applyRun(0, { won: false, time: 200, kills: 600, gold: 0, level: 5, bossKills: 0, eliteKills: 1 }, i);
+    const list = p.missions().list;
+    const ri = list.findIndex((m) => m.kind === 'runs');
+    expect(list[ri].progress).toBe(3);
+    const g0 = p.data.gold;
+    expect(p.claimMission(ri)).not.toBeNull();
+    expect(p.data.gold).toBeGreaterThan(g0);
+    expect(p.claimMission(ri)).toBeNull();
+  });
+
+  it('survive missions track the best single run, not the sum', () => {
+    const p = mk();
+    const m = p.missions();
+    m.list[2] = { kind: 'survive', target: 480, progress: 0, claimed: false, reward: { scrap: 6 } };
+    p.applyRun(0, { won: false, time: 300, kills: 0, gold: 0, level: 1, bossKills: 0, eliteKills: 0 }, 1);
+    p.applyRun(0, { won: false, time: 300, kills: 0, gold: 0, level: 1, bossKills: 0, eliteKills: 0 }, 2);
+    expect(p.missions().list[2].progress).toBe(300);
+  });
+
+  it('sector chests unlock with stars and claim once', () => {
+    const p = mk();
+    expect(p.canClaimStar(0, 1)).toBe(false);
+    p.applyRun(0, { won: true, time: 600, kills: 5000, gold: 100, level: 25, bossKills: 2, eliteKills: 2 }, 1);
+    expect(p.starChestsReady()).toBe(3);
+    expect(p.claimStar(0, 4)?.keys).toBe(1);
+    expect(p.claimStar(0, 4)).toBeNull();
+    expect(p.starChestsReady()).toBe(2);
+  });
+});
