@@ -305,8 +305,8 @@ export class Hub {
           rail('missions', 'Missions', () => this.setTab('missions'), missionsLocked ? null : missionsReady || null, null, missionsLocked ? '.locked' : ''),
           rail('crate', 'Crates', () => this.setTab('supply'), d.keys || null),
         ),
-        this.modeTabs(),
       ),
+      this.modeTabs(),
       ...(this.mode === 'campaign' ? [] : this.modeCard()),
       this.mode !== 'campaign' ? null : h(
         'div.sector-card',
@@ -323,16 +323,16 @@ export class Hub {
           h('button.sc-arrow', { onclick: () => go(1), disabled: this.sector === CHAPTER_COUNT - 1, 'aria-label': 'Next sector', html: icon('chevR', 20) }),
         ),
         track,
+        locked
+          ? null
+          : h(
+              'div.sc-foot.' + (power >= ch.power ? 'ok' : power >= ch.power * 0.75 ? 'warn' : 'bad'),
+              h('span', 'Your power ', h('b', coin('power'), fmtNum(power))),
+              h('span', 'Recommended ', h('b', fmtNum(ch.power))),
+            ),
       ),
       this.mode !== 'campaign' ? null : h(
         'div.battle-row',
-        h(
-          'div.power-line.' + (power >= ch.power ? 'ok' : power >= ch.power * 0.75 ? 'warn' : 'bad'),
-          'Your power ',
-          h('b', coin('power'), fmtNum(power)),
-          ' · Recommended ',
-          h('b', fmtNum(ch.power)),
-        ),
         this.coachButton(),
         h(
           'button.btn.primary.big.go',
@@ -345,17 +345,6 @@ export class Hub {
           },
           locked ? h('span', h('i.lk', { html: icon('lock', 20) }), 'Locked') : h('span', 'BATTLE', h('small', `${BOSSES[ch.midBoss].name} · ${BOSSES[ch.finalBoss].name}`)),
         ),
-        missionsLocked
-          ? null
-          : h(
-              'button.mission-strip',
-              { onclick: () => this.setTab('missions') },
-              h('span.msi', { html: icon('missions', 18) }),
-              h('span.mst', 'Daily missions'),
-              h('span.msb', h('i', { style: { width: `${(p.missions().list.filter((x) => x.progress >= x.target).length / 5) * 100}%` } })),
-              h('b', `${p.missions().list.filter((x) => x.progress >= x.target).length}/5`),
-              missionsReady ? h('i.badge-n.inline', missionsReady) : null,
-            ),
       ),
     );
   }
@@ -418,10 +407,10 @@ export class Hub {
               ),
             ),
           ),
+          h('div.sc-foot', ds.best ? h('span', "Today's best ", h('b', ds.best.toLocaleString())) : h('span', 'Same run for everyone today'), h('span', ds.plays ? `${ds.plays} run${ds.plays === 1 ? '' : 's'}` : 'Standard kit')),
         ),
         h(
           'div.battle-row',
-          h('div.power-line', ds.best ? h('span', "Today's best ", h('b', ds.best.toLocaleString()), ` · ${ds.plays} run${ds.plays === 1 ? '' : 's'}`) : 'Same run for everyone today · standard kit, your gear stays home'),
           h(
             'button.btn.primary.big.go',
             { onclick: () => (haptic(20), this.onDeploy(ch.sector, 'daily')) },
@@ -445,7 +434,6 @@ export class Hub {
       ),
       h(
         'div.battle-row',
-        h('div.power-line', 'Your power ', h('b', coin('power'), fmtNum(p.power()))),
         h('button.btn.primary.big.go', { onclick: () => (haptic(20), this.onDeploy(2, 'endless')) }, h('span', 'ENDLESS', h('small', 'How long can you last?'))),
       ),
     ];

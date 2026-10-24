@@ -3175,8 +3175,8 @@ button {
     display: none;
   }
   .lobby-body .stage {
-    height: clamp(200px, calc(100vh - 384px), 470px);
-    height: clamp(200px, calc(100dvh - 384px), 470px);
+    height: clamp(200px, calc(100vh - 428px), 470px);
+    height: clamp(200px, calc(100dvh - 428px), 470px);
   }
 }
 
@@ -3472,4 +3472,171 @@ button {
 .res-stars .rs[style*='--tc'].on i {
   background: var(--tc);
   box-shadow: 0 0 14px var(--tc);
+}
+
+/* ============================================================ lobby v3 (face lift)
+   One visual language: glass circles on the stage, one card, one call to action. */
+
+.lobby-body .rail-btn {
+  width: 50px;
+}
+
+.lobby-body .rail-btn .ri {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(14, 18, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(4px);
+}
+
+.lobby-body .rail-btn .rl {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: #c9d2e3;
+}
+
+.lobby-body .rail-btn .badge-n {
+  top: -3px;
+  right: -1px;
+}
+
+.lobby-body .rail-btn .rring {
+  width: 44px;
+  height: 44px;
+}
+
+.lobby-body > .mode-tabs {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  margin: -48px auto 0;
+  width: min(100%, 300px);
+  justify-content: stretch;
+  background: rgba(10, 13, 20, 0.88);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+}
+
+.lobby-body > .mode-tabs .mt {
+  flex: 1;
+  justify-content: center;
+  padding: 7px 0;
+}
+
+.lobby-body .sector-card {
+  margin-top: 0;
+  border-radius: 18px;
+  padding: 10px 12px 12px;
+  background: linear-gradient(180deg, rgba(24, 30, 44, 0.96), rgba(14, 17, 26, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.lobby-body .sc-arrow {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lobby-body .sc-head {
+  grid-template-columns: 36px 1fr 36px;
+}
+
+.lobby-body .sc-name {
+  font-size: 28px;
+}
+
+.sc-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.sc-foot b {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text);
+  font-weight: 900;
+}
+
+.sc-foot.ok span:first-child b {
+  color: #43ffa4;
+}
+
+.sc-foot.warn span:first-child b {
+  color: #ffc94d;
+}
+
+.sc-foot.bad span:first-child b {
+  color: #ff5c7a;
+}
+
+.lobby-body .battle-row {
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.lobby-body .coach {
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: 12px;
+  border-width: 1px;
+  gap: 8px;
+}
+
+.lobby-body .coach .ch-bolt {
+  font-size: 18px;
+}
+
+.lobby-body .coach .ch-t {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.lobby-body .coach .ch-t small {
+  font-size: 9.5px;
+}
+
+.lobby-body .coach .ch-t b {
+  font-size: 13.5px;
+}
+
+.lobby-body .battle-row .btn.go {
+  width: 100%;
+  border-radius: 16px;
+}
+
+.lobby-body .mode-card .mc-mods {
+  margin-bottom: 2px;
+}
+
+@media (max-height: 700px) {
+  /* tiny screens: power already sits in the top bar */
+  .lobby-body .sector-card .sc-foot {
+    display: none;
+  }
+  .lobby-body .stage {
+    height: clamp(190px, calc(100vh - 398px), 470px);
+    height: clamp(190px, calc(100dvh - 398px), 470px);
+  }
+}
+
+@media (max-height: 640px) {
+  /* very short screens: one button per rail so the mode switcher never collides */
+  .lobby-body .rails.left .rail-btn:first-child,
+  .lobby-body .rails.right .rail-btn:last-child {
+    display: none;
+  }
 }

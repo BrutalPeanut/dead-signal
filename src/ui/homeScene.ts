@@ -68,7 +68,7 @@ export class HomeScene {
     this.ground = new Ground(ch.biome);
     this.boss = ch.finalBoss;
     this.walkers = [];
-    for (let k = 0; k < 6; k++) this.spawn(true);
+    for (let k = 0; k < 4; k++) this.spawn(true);
   }
 
   private spawn(scatter = false) {
@@ -78,7 +78,7 @@ export class HomeScene {
     this.walkers.push({
       kind: kinds[Math.floor(Math.random() * kinds.length)],
       x: scatter ? (dir > 0 ? 10 + Math.random() * 70 : W - 10 - Math.random() * 70) : startX,
-      y: 96 + Math.random() * 44,
+      y: 116 + Math.random() * 24,
       dir,
       ph: Math.random() * 6,
       speed: 14 + Math.random() * 10,
@@ -125,22 +125,28 @@ export class HomeScene {
     x.fillRect(left, -oy, right - left, vh + 1);
 
     // looming boss in the haze
-    const bx = W * 0.7;
-    const by = 90;
+    const bx = W * 0.66;
+    const by = 82;
     x.save();
     x.translate(bx, by);
     const breathe = 1 + Math.sin(this.t * 1.3) * 0.015;
-    x.scale(-0.68 * breathe, 0.68 * breathe);
-    x.globalAlpha = 0.92;
+    x.scale(-0.62 * breathe, 0.62 * breathe);
+    x.globalAlpha = 0.7;
     BOSS_DRAW[this.boss](x, { t: this.t, state: 0, phase2: false });
     x.restore();
     x.globalAlpha = 1;
     // haze over the boss for depth
     const haze = x.createLinearGradient(0, 40, 0, 120);
-    haze.addColorStop(0, 'rgba(20,10,30,0.15)');
-    haze.addColorStop(1, 'rgba(20,10,30,0.55)');
+    haze.addColorStop(0, 'rgba(14,10,24,0.3)');
+    haze.addColorStop(1, 'rgba(14,10,24,0.7)');
     x.fillStyle = haze;
-    x.fillRect(W * 0.5, 0, W * 0.5 + ox, 125);
+    x.fillRect(left, 0, right - left, 125);
+    // spotlight on the courier: the eye goes to the hero first
+    const spot = x.createRadialGradient(W * 0.5, 118, 4, W * 0.5, 100, 70);
+    spot.addColorStop(0, 'rgba(94,242,255,0.16)');
+    spot.addColorStop(1, 'rgba(94,242,255,0)');
+    x.fillStyle = spot;
+    x.fillRect(W * 0.5 - 80, 30, 160, 110);
     // signal rings from the boss
     x.globalCompositeOperation = 'lighter';
     for (let i = 0; i < 3; i++) {
@@ -154,8 +160,8 @@ export class HomeScene {
     x.globalCompositeOperation = 'source-over';
 
     // walkers
-    const hx = W * 0.44;
-    const hy = 112;
+    const hx = W * 0.5;
+    const hy = 114;
     for (const w of this.walkers) {
       if (w.dying > 0) continue;
       w.ph += dt * (w.speed / 7);
@@ -203,7 +209,7 @@ export class HomeScene {
     }
     this.bolts = this.bolts.filter((b) => b.t < 1);
     this.walkers = this.walkers.filter((w) => w.dying === 0 && w.x > Math.min(-40, left - 40) && w.x < Math.max(W + 40, right + 40) && !(w.dir > 0 ? w.x > hx - 8 : w.x < hx + 8));
-    while (this.walkers.length < 6) this.spawn();
+    while (this.walkers.length < 4) this.spawn();
 
     // draw actors sorted by depth, hero included
     const actors: { y: number; draw: () => void }[] = this.walkers.map((w) => ({
@@ -215,7 +221,7 @@ export class HomeScene {
         x.fill();
         x.save();
         x.translate(w.x, w.y);
-        x.scale(w.dir * 0.78, 0.78);
+        x.scale(w.dir * 0.72, 0.72);
         ENEMY_DRAW[w.kind](x, w.ph);
         x.restore();
         if (w.flash > 0) {
@@ -245,7 +251,7 @@ export class HomeScene {
         x.fill();
         x.save();
         x.translate(hx, hy);
-        x.scale(1.05, 1.05);
+        x.scale(1.2, 1.2);
         drawHero(x, { t: this.t, moving: false, aim: this.aim });
         x.restore();
       },
