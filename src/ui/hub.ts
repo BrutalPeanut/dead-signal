@@ -364,10 +364,19 @@ export class Hub {
       {
         onclick: () => {
           const label = c.label;
+          const d = this.p.data;
+          const before = { g: d.gold, s: d.scrap, k: d.keys };
           if (c.apply()) {
             audio.levelUp();
             haptic(25);
-            toast(`⚡ ${label}`, '#43ffa4');
+            if (c.kind === 'collect') {
+              const parts = [
+                d.gold > before.g ? `+${fmtNum(d.gold - before.g)} gold` : '',
+                d.scrap > before.s ? `+${d.scrap - before.s} scrap` : '',
+                d.keys > before.k ? `+${d.keys - before.k} key${d.keys - before.k > 1 ? 's' : ''}` : '',
+              ].filter(Boolean);
+              toast(`🎁 ${parts.join(' · ') || 'Rewards collected'}`, '#43ffa4');
+            } else toast(`⚡ ${label}`, '#43ffa4');
           }
         },
       },

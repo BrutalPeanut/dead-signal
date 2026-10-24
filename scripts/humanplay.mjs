@@ -11,9 +11,14 @@ const errs = [];
 page.on('pageerror', (e) => errs.push(String(e.stack || e)));
 await page.goto('http://localhost:5173/');
 await page.evaluate(() => localStorage.clear());
+if (process.env.SAVE) {
+  // start from a realistic mid-campaign save produced by progression.ts SAVE_AT=n
+  const json = (await import('node:fs')).readFileSync(process.env.SAVE, 'utf8');
+  await page.evaluate((j) => localStorage.setItem('deadsignal.save.v1', j), json);
+}
 await page.reload();
 await page.waitForTimeout(500);
-await page.tap('.modal .btn');
+await page.locator('.modal .btn').first().tap({ timeout: 3000 }).catch(() => {});
 if (sector > 0) await page.evaluate((s) => { const a = window.__ds.app; a.profile.data.unlocked = s; a.profile.save(); a.hub.sector = s; a.hub.refresh(); }, sector);
 await page.tap('.battle-row .go');
 const cdp = await ctx.newCDPSession(page);

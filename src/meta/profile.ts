@@ -23,7 +23,7 @@ import { dailyBonus, dateKey, MISSION_DEFS, rollDaily, starReward, type DailyMis
 import { MILESTONES, TRACKS, accountXpNeed, trackCap, trackCost, type TrackId } from './talents';
 
 export interface CoachAction {
-  kind: 'equip' | 'merge' | 'crate' | 'talent' | 'level';
+  kind: 'collect' | 'equip' | 'merge' | 'crate' | 'talent' | 'level';
   label: string;
   detail: string;
   apply: () => boolean;
@@ -350,8 +350,37 @@ export class Profile {
    * The single most valuable next upgrade, as a one-tap action. Drives the lobby's Power Up coach
    * so players who never open the menus still progress.
    */
+  /** Free rewards sitting unclaimed: missions, the daily bonus, sector chests, the daily gift, a full-ish relay. */
+  freeRewards(now = new Date()) {
+    const relay = this.relayPending(now.getTime());
+    const relayWorth = relay.hours >= 1;
+    return this.missionsClaimable() + this.starChestsReady() + (this.dailyAvailable(now) ? 1 : 0) + (relayWorth ? 1 : 0);
+  }
+
+  /** Claim every free reward at once; returns how many were collected. */
+  collectAll(now = new Date()): number {
+    let n = 0;
+    const m = this.missions(now);
+    m.list.forEach((_, i) => {
+      if (this.claimMission(i)) n++;
+    });
+    if (this.claimBonus()) n++;
+    for (const k of Object.keys(this.data.stars)) for (const b of [1, 2, 4] as const) if (this.claimStar(Number(k), b)) n++;
+    if (this.claimDaily(now)) n++;
+    if (this.relayPending(now.getTime()).hours >= 1) {
+      this.claimRelay(now.getTime());
+      n++;
+    }
+    return n;
+  }
+
   coach(): CoachAction | null {
     const d = this.data;
+    // 0. free stuff first: a red badge the player hasn't noticed is the cheapest power there is
+    const free = this.freeRewards();
+    if (free > 0) {
+      return { kind: 'collect', label: 'Collect free rewards', detail: `${free} ready`, apply: () => this.collectAll() > 0 };
+    }
     // 1. better gear sitting unequipped (weapons keep their own play style, so only upgrade within the same item)
     for (const s of SLOTS) {
       const cur = d.equipped[s] ? this.item(d.equipped[s]!) : undefined;
