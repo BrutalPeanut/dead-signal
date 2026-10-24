@@ -1,0 +1,18 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs';
+const [save, out] = process.argv.slice(2);
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--no-sandbox'] });
+const p = await b.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
+await p.goto('http://localhost:5173/');
+const s = JSON.parse(fs.readFileSync(save, 'utf8'));
+s.seenIntro = true; s.lastDaily = new Date().toDateString();
+await p.evaluate((j) => localStorage.setItem('deadsignal.save.v1', j), JSON.stringify(s));
+await p.reload(); await p.waitForTimeout(800);
+await p.evaluate(() => { const a = window.__ds.app; a.profile.pass().sp = 250 * 7 + 120; a.profile.pass().free = 0b11111; a.profile.save(); });
+await p.waitForTimeout(400);
+await p.screenshot({ path: out + '-lobby.png' });
+await p.locator('.rail-btn', { hasText: 'Pass' }).click(); await p.waitForTimeout(600);
+await p.screenshot({ path: out + '-sheet.png' });
+console.log(errs.join('\n') || 'no page errors');
+await b.close();

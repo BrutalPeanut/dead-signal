@@ -1,4 +1,5 @@
 import { CHARACTERS, charById } from './characters';
+import { PASS_TIERS, freshPass, passLevel, passReward, runSp, seasonOf, type PassReward, type PassState } from './pass';
 import { dailyBoard, ENDLESS_BOARD, submitScore, uuid, type Submission } from '../net/leaderboard';
 import { DAILY_TIERS, dailySeed, type RunMode } from '../sim/modes';
 import { LOGIN_DAYS, freshLogin, loginReward, type LoginReward, type LoginState } from './login';
@@ -71,6 +72,7 @@ export interface SaveData {
   endless: { best: number; bestScore: number; runs: number };
   character: string;
   online: { id: string; name: string; crew: string; pending: Submission[] };
+  pass: PassState;
 }
 
 export interface RunRewards {
@@ -126,6 +128,7 @@ function fresh(): SaveData {
     endless: { best: 0, bestScore: 0, runs: 0 },
     character: 'courier',
     online: { id: '', name: '', crew: '', pending: [] },
+    pass: freshPass(seasonOf().n),
   };
 }
 
@@ -146,7 +149,7 @@ export class Profile {
       const raw = this.storage?.getItem(KEY);
       if (raw) {
         const d = JSON.parse(raw) as SaveData;
-        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless, character: d.character ?? 'courier', online: d.online ?? fresh().online };
+        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless, character: d.character ?? 'courier', online: d.online ?? fresh().online, pass: d.pass ?? fresh().pass };
       }
     } catch {
       /* corrupted save → start fresh */
@@ -285,6 +288,73 @@ export class Profile {
     }
     this.save();
     return rank;
+  }
+
+  // ------------------------------------------------------------------ Signal Pass
+
+  /** Current season's pass; rolls over (auto-granting unclaimed free rewards) when a season ends. */
+  pass(now = new Date()): PassState {
+    const s = seasonOf(now).n;
+    const p = this.data.pass;
+    if (p.season !== s) {
+      for (let i = 0; i < passLevel(p.sp); i++) {
+        if (!(p.free & (1 << i))) this.grantPass(passReward(i, false, this.data.unlocked));
+        if (p.premium && !(p.prem & (1 << i))) this.grantPass(passReward(i, true, this.data.unlocked));
+      }
+      this.data.pass = freshPass(s);
+      this.save();
+    }
+    return this.data.pass;
+  }
+
+  addSp(n: number) {
+    this.pass().sp += Math.max(0, Math.round(n));
+  }
+
+  private grantPass(r: PassReward) {
+    this.grant(r);
+    if (r.itemRarity !== undefined) {
+      const it = this.rollItem(new Rng(Date.now() ^ (this.data.uidSeq * 7919)), this.data.unlocked, true);
+      it.rarity = r.itemRarity;
+      this.data.gear.push(it);
+      this.autoEquip(it);
+      return it;
+    }
+    return undefined;
+  }
+
+  canClaimPass(tier: number, premium: boolean) {
+    const p = this.pass();
+    if (tier >= passLevel(p.sp)) return false;
+    if (premium) return p.premium && !(p.prem & (1 << tier));
+    return !(p.free & (1 << tier));
+  }
+
+  claimPass(tier: number, premium: boolean): { reward: PassReward; item?: GearItem } | null {
+    if (!this.canClaimPass(tier, premium)) return null;
+    const p = this.pass();
+    if (premium) p.prem |= 1 << tier;
+    else p.free |= 1 << tier;
+    const reward = passReward(tier, premium, this.data.unlocked);
+    const item = this.grantPass(reward);
+    this.save();
+    return { reward, item };
+  }
+
+  passClaimable() {
+    const p = this.pass();
+    let n = 0;
+    for (let i = 0; i < passLevel(p.sp); i++) {
+      if (!(p.free & (1 << i))) n++;
+      if (p.premium && !(p.prem & (1 << i))) n++;
+    }
+    return n;
+  }
+
+  /** Premium track unlock. Wired for the store build's in-app purchase; not exposed on the web. */
+  unlockPremiumPass() {
+    this.pass().premium = true;
+    this.save();
   }
 
   charUnlocked(id: string) {
@@ -446,7 +516,7 @@ export class Profile {
   freeRewards(now = new Date()) {
     const relay = this.relayPending(now.getTime());
     const relayWorth = relay.hours >= 1;
-    return this.missionsClaimable() + this.starChestsReady() + (this.dailyAvailable(now) ? 1 : 0) + (relayWorth ? 1 : 0);
+    return this.missionsClaimable() + this.starChestsReady() + (this.dailyAvailable(now) ? 1 : 0) + (relayWorth ? 1 : 0) + this.passClaimable();
   }
 
   /** Claim every free reward at once; returns how many were collected. */
@@ -459,6 +529,10 @@ export class Profile {
     if (this.claimBonus()) n++;
     for (const k of Object.keys(this.data.stars)) for (const b of [1, 2, 4] as const) if (this.claimStar(Number(k), b)) n++;
     if (this.claimDaily(now)) n++;
+    for (let i = 0; i < PASS_TIERS; i++) {
+      if (this.claimPass(i, false)) n++;
+      if (this.claimPass(i, true)) n++;
+    }
     if (this.relayPending(now.getTime()).hours >= 1) {
       this.claimRelay(now.getTime());
       n++;
@@ -533,6 +607,7 @@ export class Profile {
   /** Shared bookkeeping for any finished run (stats, missions, account XP). */
   private bookRun(r: RunResult, xp: number) {
     const d = this.data;
+    this.addSp(runSp(r.time, r.kills, r.bossKills, r.won));
     d.stats.runs++;
     this.track('runs', 1);
     this.track('kills', r.kills);
@@ -577,6 +652,7 @@ export class Profile {
       if (score >= t.score && !(ds.tiers & (1 << i))) {
         ds.tiers |= 1 << i;
         tiersNew.push(t.name);
+        this.addSp(50);
         if (i === 0) gold += Math.round(250 * m);
         if (i === 1) (keys += 1), (scrap += 15);
         if (i === 2) (keys += 2), (gold += Math.round(500 * m));
@@ -661,6 +737,7 @@ export class Profile {
     d.gear.push(...items);
     for (const it of items) this.autoEquip(it);
     d.stats.runs++;
+    this.addSp(runSp(r.time, r.kills, r.bossKills, r.won));
     this.track('runs', 1);
     this.track('kills', r.kills);
     this.track('survive', r.time);
@@ -774,6 +851,7 @@ export class Profile {
     if (!ms || ms.claimed || ms.progress < ms.target) return null;
     ms.claimed = true;
     this.grant(ms.reward);
+    this.addSp(30);
     this.save();
     return ms.reward;
   }
