@@ -1960,7 +1960,9 @@ button {
 .lobby-body .stage {
   position: relative;
   margin: 0 -14px;
-  height: clamp(300px, 54vh, 470px);
+  /* Fit card + Power Up + BATTLE above the nav on short in-app browsers. */
+  height: clamp(200px, calc(100vh - 440px), 470px);
+  height: clamp(200px, calc(100dvh - 440px), 470px);
   aspect-ratio: auto;
   max-height: none;
   overflow: hidden;
@@ -3146,5 +3148,45 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .coach {
     animation: none;
+  }
+}
+
+@media (max-height: 700px) {
+  .battle-row {
+    gap: 6px;
+  }
+  .battle-row .btn.go {
+    font-size: 26px;
+    padding: 10px 20px 9px;
+  }
+  .coach {
+    padding: 6px 12px;
+  }
+  .lobby-body .rails {
+    gap: 12px;
+    top: calc(var(--safe-top) + 64px);
+  }
+}
+
+/* Short screens: the Missions rail button already covers the daily strip; drop it so nothing hides under the nav. */
+@media (max-height: 760px) {
+  .lobby-body .mission-strip,
+  .lobby-body .power-line {
+    display: none;
+  }
+  .lobby-body .stage {
+    height: clamp(200px, calc(100vh - 384px), 470px);
+    height: clamp(200px, calc(100dvh - 384px), 470px);
+  }
+}
+
+@media (max-height: 620px) {
+  .lobby-body .rail-btn .ri {
+    width: 40px;
+    height: 40px;
+  }
+  .lobby-body .rails {
+    gap: 10px;
+    top: calc(var(--safe-top) + 60px);
   }
 }

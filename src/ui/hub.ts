@@ -320,6 +320,13 @@ export class Hub {
       ),
       h(
         'div.battle-row',
+        h(
+          'div.power-line.' + (power >= ch.power ? 'ok' : power >= ch.power * 0.75 ? 'warn' : 'bad'),
+          'Your power ',
+          h('b', coin('power'), fmtNum(power)),
+          ' · Recommended ',
+          h('b', fmtNum(ch.power)),
+        ),
         this.coachButton(),
         h(
           'button.btn.primary.big.go',
@@ -343,13 +350,6 @@ export class Hub {
               h('b', `${p.missions().list.filter((x) => x.progress >= x.target).length}/5`),
               missionsReady ? h('i.badge-n.inline', missionsReady) : null,
             ),
-        h(
-          'div.power-line.' + (power >= ch.power ? 'ok' : power >= ch.power * 0.75 ? 'warn' : 'bad'),
-          'Your power ',
-          h('b', coin('power'), fmtNum(power)),
-          ' · Recommended ',
-          h('b', fmtNum(ch.power)),
-        ),
       ),
     );
   }
