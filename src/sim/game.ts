@@ -139,9 +139,9 @@ export class Game {
     this.addWeapon(base.startWeapon);
     this.recalc();
     // Opening wave so the first second already has targets (empty screens kill first impressions).
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * TAU + this.rng.range(-0.2, 0.2);
-      const d = 240 + this.rng.range(0, 80);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + this.rng.range(-0.2, 0.2);
+      const d = 270 + this.rng.range(0, 80);
       this.spawnEnemyAt('shambler', Math.cos(a) * d, Math.sin(a) * d, false);
     }
     if (base.startLevels > 0) {
@@ -340,7 +340,7 @@ export class Game {
       hp: d.hp * hpm,
       maxHp: d.hp * hpm,
       speed: d.speed * (elite ? 0.85 : 1) * this.rng.range(0.92, 1.08),
-      dmg: d.dmg * this.chapter.dmgMul * (elite ? 1.5 : 1) * (1 + this.time / 600),
+      dmg: d.dmg * this.chapter.dmgMul * (elite ? 1.5 : 1) * (1 + this.time / 750),
       xp: d.xp * (elite ? 20 : 1),
       mass: d.mass * (elite ? 4 : 1),
       elite,
@@ -383,8 +383,8 @@ export class Game {
     for (const e of this.enemies) if (e.alive && e.kind !== 'boss') this.killEnemy(e, false);
     this.shots.length = 0;
     const cr = Math.min(this.viewW, this.viewH) * 0.95 + 20;
-    this.cage = { x: this.px, y: this.py, r: Math.max(190, cr) };
-    const hp = def.hp * this.chapter.hpMul * hpScale(this.time) * (mid ? 0.55 : 1) * 0.45;
+    this.cage = { x: this.px, y: this.py, r: Math.max(215, cr) };
+    const hp = def.hp * this.chapter.hpMul * hpScale(this.time) * (mid ? 1.6 : 2.0) * 0.45;
     const b: Enemy = {
       id: this.newId(),
       kind: 'boss',
@@ -397,7 +397,7 @@ export class Game {
       hp,
       maxHp: hp,
       speed: def.speed,
-      dmg: def.dmg * this.chapter.dmgMul * (1 + this.time / 900),
+      dmg: def.dmg * this.chapter.dmgMul * (1 + this.time / 1200),
       xp: 60,
       mass: 40,
       elite: false,
@@ -631,8 +631,8 @@ export class Game {
     // drops
     this.addPickup('xp', e.x, e.y, e.xp);
     const r = this.rng.next();
-    if (r < 0.025) this.addPickup('gold', e.x + 6, e.y, Math.max(1, Math.round(this.rng.range(1, 3) * this.chapter.goldMul)));
-    else if (r < 0.028) this.addPickup('ration', e.x, e.y, 0);
+    if (r < 0.016) this.addPickup('gold', e.x + 6, e.y, Math.max(1, Math.round(this.rng.range(1, 3) * this.chapter.goldMul)));
+    else if (r < 0.019) this.addPickup('ration', e.x, e.y, 0);
   }
 
   // ------------------------------------------------------------------ projectiles

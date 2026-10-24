@@ -11,7 +11,8 @@
     "sim": "vite-node scripts/balance.ts",
     "progression": "vite-node scripts/progression.ts",
     "weapons": "vite-node scripts/weapons.ts",
-    "builds": "vite-node scripts/melee.ts"
+    "builds": "vite-node scripts/melee.ts",
+    "pacing": "vite-node scripts/pacing.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
