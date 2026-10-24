@@ -95,20 +95,20 @@ function hive(g: Game, b: Enemy, dt: number, chase: (m?: number) => void, nx: nu
   chase(0.8);
   if (b.stateT <= 0) {
     b.stateT = b.phase2 ? 2.0 : 2.7;
-    const n = b.phase2 ? 11 : 7;
-    const spread = b.phase2 ? 1.5 : 1.0;
+    const n = b.phase2 ? 9 : 6;
+    const spread = b.phase2 ? 1.4 : 1.0;
     const base = Math.atan2(ny, nx);
     for (let k = 0; k < n; k++) {
       const a = base - spread / 2 + (spread * k) / (n - 1);
-      g.shots.push({ x: b.x, y: b.y, vx: Math.cos(a) * 150, vy: Math.sin(a) * 150, r: 7, dmg: b.dmg, life: 3.2, kind: 'spore', alive: true });
+      g.shots.push({ x: b.x, y: b.y, vx: Math.cos(a) * 125, vy: Math.sin(a) * 125, r: 7, dmg: b.dmg * 0.8, life: 3.6, kind: 'spore', alive: true });
     }
   }
   b.shootCd -= dt;
   if (b.shootCd <= 0) {
     b.shootCd = b.phase2 ? 4.5 : 6;
     if (g.enemies.length < 70) {
-      for (let k = 0; k < 7; k++) {
-        const a = (k / 7) * TAU;
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * TAU;
         g.spawnEnemyAt('crawler', b.x + Math.cos(a) * 50, b.y + Math.sin(a) * 50, false);
       }
     }

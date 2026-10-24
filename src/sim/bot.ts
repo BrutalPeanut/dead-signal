@@ -8,7 +8,23 @@ import type { Offer } from './types';
  * Plays like a decent-but-not-great human: kites away from crowds, dodges telegraphs, grabs gems.
  */
 /** Bot temperament: how far it keeps from regular enemies (melee builds hold closer). */
-export const botStyle = { kite: 110 };
+export const botStyle = { kite: 110, human: false };
+
+/** Human-ish wrapper: decisions only every ~0.22s (reaction time) with a little aim wobble. */
+const humanState = { t: 0, mx: 0, my: 0, seed: 12345 };
+export function humanMove(g: Game): [number, number] {
+  humanState.t -= 1 / 60;
+  if (humanState.t <= 0) {
+    humanState.t = 0.18 + (((humanState.seed = (humanState.seed * 16807) % 2147483647) / 2147483647) * 0.1);
+    const [mx, my] = botMove(g);
+    const n = ((humanState.seed = (humanState.seed * 16807) % 2147483647) / 2147483647 - 0.5) * 0.7;
+    const a = Math.atan2(my, mx) + n;
+    const m = Math.hypot(mx, my);
+    humanState.mx = Math.cos(a) * m;
+    humanState.my = Math.sin(a) * m;
+  }
+  return [humanState.mx, humanState.my];
+}
 
 export function botMove(g: Game): [number, number] {
   let fx = 0;

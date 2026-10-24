@@ -67,7 +67,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     evoDesc: 'Rapid rail volleys that pierce everything in a line.',
     color: '#5ef2ff',
     levels: [
-      L(1.76, 0.85, 1, 5, 520, 1.2, 0),
+      L(1.76, 0.68, 1, 5, 520, 1.2, 0),
       L(2.03, 0.8, 2, 5, 540, 1.2, 0),
       L(2.29, 0.72, 2, 5, 560, 1.2, 1),
       L(2.56, 0.65, 3, 6, 580, 1.2, 1),
@@ -323,10 +323,11 @@ export function enemyMix(t: number): [EnemyKind, number][] {
 }
 
 /** Spawns per second. */
-export const spawnRate = (t: number) => 2.4 + t * 0.019 + (t * t) / 52000;
+/** Spawns per second: a gentle 60s build-up for a level-1 build, then a dense, rising horde. */
+export const spawnRate = (t: number) => (t < 60 ? 3.2 + t * 0.06 : 5 + t * 0.03 + (t * t) / 36000);
 
 /** Enemy HP multiplier over a run. */
 export const hpScale = (t: number) => 1 + t / 70 + (t * t) / 52000;
 
 /** Experience needed to go from level L to L+1. */
-export const xpToNext = (L: number) => Math.round(5 + 6 * L + 0.9 * L * L);
+export const xpToNext = (L: number) => Math.round(3 + 3.2 * L + 0.6 * L * L);
