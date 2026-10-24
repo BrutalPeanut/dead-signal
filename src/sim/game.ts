@@ -549,10 +549,16 @@ export class Game {
   }
 
   /** Deal damage to an enemy. Returns true if it died. */
+  /** Which weapon the next damage() call is attributed to (for balance analytics). */
+  src = 'other';
+  /** Effective damage dealt per source (overkill excluded). */
+  dmgBy: Record<string, number> = {};
+
   damage(e: Enemy, base: number, kbx = 0, kby = 0, kb = 0, color = '#ffffff'): boolean {
     if (!e.alive) return false;
     const crit = this.rng.chance(this.base.crit);
     const v = base * this.dmgMul * (crit ? this.base.critMul : 1) * this.rng.range(0.9, 1.1);
+    this.dmgBy[this.src] = (this.dmgBy[this.src] ?? 0) + Math.min(v, Math.max(0, e.hp));
     e.hp -= v;
     e.flash = 0.09;
     if (kb > 0 && e.mass < 30) {
@@ -636,6 +642,7 @@ export class Game {
         p.y = p.sy + (p.ty - p.sy) * k;
         if (p.life <= 0) {
           p.alive = false;
+          this.src = 'frag';
           if (p.kind === 'shell') this.explode(p.x, p.y, p.area, p.dmg, '#ff6a3d', p.evo);
           else this.pools.push({ x: p.x, y: p.y, r: p.area, life: p.extra, maxLife: p.extra, tick: 0, dmg: p.dmg, evo: p.evo });
         }
@@ -648,6 +655,7 @@ export class Game {
         p.vy *= 0.94;
         if (p.life <= 0) {
           p.alive = false;
+          this.src = 'frag';
           this.explode(p.x, p.y, p.area, p.dmg, '#ffb03d', false);
         }
         continue;
@@ -682,6 +690,7 @@ export class Game {
       p.y += p.vy * dt;
 
       // collisions
+      this.src = PROJ_SRC[p.kind];
       const pr = p.r;
       this.grid.query(p.x, p.y, pr + 40, (j) => {
         if (!p.alive) return;
@@ -732,6 +741,7 @@ export class Game {
 
   private updatePools(dt: number) {
     const es = this.enemies;
+    this.src = 'napalm';
     for (const pl of this.pools) {
       pl.life -= dt;
       pl.tick -= dt;
@@ -901,6 +911,7 @@ export class Game {
   }
 
   emp() {
+    this.src = 'emp';
     this.fx.push({ t: 'emp', x: this.px, y: this.py });
     this.fx.push({ t: 'shake', amt: 12 });
     for (const e of this.enemies) {
@@ -1064,6 +1075,16 @@ export class Game {
     return this.passives.map((p) => PASSIVES[p.id].name);
   }
 }
+
+const PROJ_SRC: Record<string, string> = {
+  bolt: 'pistol',
+  rail: 'pistol',
+  disc: 'disc',
+  drill: 'drill',
+  bomblet: 'frag',
+  shell: 'frag',
+  canister: 'napalm',
+};
 
 const WEAPON_COLOR: Record<string, string> = {
   bolt: '#5ef2ff',

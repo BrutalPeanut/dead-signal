@@ -88,6 +88,7 @@ export function updateWeapons(g: Game, dt: number) {
   for (const w of g.weapons) {
     const s = weaponStats(w);
     const dmg = s.dmg * atk;
+    g.src = w.id;
     switch (w.id) {
       case 'pistol': {
         w.timer -= dt;
@@ -139,7 +140,7 @@ export function updateWeapons(g: Game, dt: number) {
         }
         if (!bladesActive(w)) break;
         const pos = bladePositions(g, w, scratch);
-        const br = 13 * (w.evolved ? 1.3 : 1) * Math.sqrt(g.areaMul);
+        const br = 16 * (w.evolved ? 1.3 : 1) * Math.sqrt(g.areaMul);
         for (let k = 0; k < pos.length; k += 2) {
           const bx = pos[k];
           const by = pos[k + 1];
