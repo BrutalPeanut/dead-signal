@@ -53,7 +53,7 @@ export function buildOffers(
     } else if (passives.length < MAX_PASSIVE_SLOTS) {
       w = 1.1;
     } else continue;
-    if (neededPartners.has(id) && isNew) w *= 6;
+    if (neededPartners.has(id) && isNew) w *= 16;
     else if (wantedPartners.has(id) && isNew) w *= 1.6;
     cands.push({ o: { type: 'passive', id, level: lvl, isNew }, w });
   }
