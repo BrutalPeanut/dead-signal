@@ -140,7 +140,7 @@ export function activePerks(it: GearItem): Perk[] {
 /** Gold + scrap cost to level an item from `level` to `level+1`. */
 export function levelCost(level: number, rarity: number): { gold: number; scrap: number } {
   return {
-    gold: Math.round((25 + 14 * Math.pow(level, 1.45)) * (1 + rarity * 0.15)),
+    gold: Math.round((40 + 22 * Math.pow(level, 1.5)) * (1 + rarity * 0.15)),
     scrap: 1 + Math.floor(level / 4),
   };
 }

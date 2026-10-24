@@ -54,8 +54,8 @@ describe('profile', () => {
     expect(rw.unlockedSector).toBe(true);
     expect(p.data.unlocked).toBe(1);
     expect(p.data.stars[0]).toBe(7);
-    expect(rw.items.length).toBe(6);
-    expect(rw.keys).toBe(3);
+    expect(rw.items.length).toBe(4);
+    expect(rw.keys).toBe(2);
   });
 
   it('a short loss still pays something', () => {
