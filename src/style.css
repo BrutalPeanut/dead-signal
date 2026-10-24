@@ -3355,3 +3355,121 @@ button {
 .cal-day.today small {
   color: #ffb24d;
 }
+
+/* ------------------------------------------------------------ modes: lobby tabs + cards, HUD variants */
+
+.mode-tabs {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(10, 13, 20, 0.82);
+  border: 1px solid #34405c;
+  backdrop-filter: blur(6px);
+}
+
+.mode-tabs .mt {
+  position: relative;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mode-tabs .mt.on {
+  color: #1a0f00;
+  background: linear-gradient(180deg, #ffc46b, #ff8a1f);
+}
+
+.mode-tabs .mt.lock {
+  opacity: 0.5;
+}
+
+.mode-tabs .mt .dot.static {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+}
+
+.mode-card {
+  text-align: center;
+  padding: 12px 14px 14px;
+}
+
+.mode-card .sc-num {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: var(--cyan);
+}
+
+.mode-card .sc-name {
+  font-size: 26px;
+  font-weight: 900;
+  font-style: italic;
+  margin: 2px 0 4px;
+}
+
+.mc-mods {
+  font-size: 12.5px;
+  color: var(--dim);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.mc-best {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+  margin-top: 8px;
+}
+
+.mc-best div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mc-best small {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+}
+
+.mc-best b {
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.chest-track.tiers .ct-chest.tier .cc-box {
+  border-color: var(--tc);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tc) 40%, transparent);
+}
+
+.chest-track.tiers .ct-chest.tier .cc-l {
+  color: var(--tc);
+  white-space: nowrap;
+}
+
+.hud.m-daily .runbar .rb-mark.star,
+.hud.m-daily .runbar .rb-mark.boss,
+.hud.m-endless .runbar {
+  display: none;
+}
+
+.res-stars .rs[style*='--tc'].on i {
+  background: var(--tc);
+  box-shadow: 0 0 14px var(--tc);
+}

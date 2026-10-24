@@ -3,6 +3,7 @@ import type { RunRewards } from '../meta/profile';
 import type { RunResult } from '../sim/game';
 import { gearIcon } from '../render/icons';
 import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, type BossKind } from '../sim/data';
+import { DAILY_TIERS } from '../sim/modes';
 
 /** "What got me, and what do I do about it" — one line, shown on a loss. */
 export function deathTip(src?: string, boss?: string): [string, string] | null {
@@ -35,8 +36,8 @@ export function resultsModal(
   powerUp: string | null = null,
   onPowerUp: () => void = onContinue,
 ) {
-  const title = r.won ? 'SECTOR CLEARED' : 'SIGNAL LOST';
-  const color = r.won ? '#43ffa4' : '#ff3b5c';
+  const title = rw.mode === 'endless' ? (rw.newBest ? 'NEW RECORD' : 'SIGNAL LOST') : rw.mode === 'daily' ? (r.won ? 'CHALLENGE CLEARED' : 'CHALLENGE OVER') : r.won ? 'SECTOR CLEARED' : 'SIGNAL LOST';
+  const color = r.won || (rw.mode === 'endless' && rw.newBest) ? '#43ffa4' : '#ff3b5c';
   const rewards: HTMLElement[] = [
     h('div.reward', coin('gold'), `+${fmtNum(rw.gold)}`),
     h('div.reward', coin('xp'), `+${fmtNum(rw.xp)} XP`),
@@ -60,7 +61,18 @@ export function resultsModal(
     [2, `Survive ${fmtTime(STAR2_TIME).replace(/^0/, '')}`],
     [4, 'Clear'],
   ];
-  const stars = h(
+  const stars = rw.mode === 'daily'
+    ? h(
+        'div.res-stars',
+        DAILY_TIERS.map((t) => {
+          const has = r.score! >= t.score || (rw.tiersNew ?? []).includes(t.name);
+          const isNew = (rw.tiersNew ?? []).includes(t.name);
+          return h('div.rs' + (has ? '.on' : '') + (isNew ? '.new' : ''), { style: { '--tc': t.color } as any }, h('i'), h('small', `${t.name} ${Math.round(t.score / 1000)}K`), isNew ? h('b', 'NEW') : null);
+        }),
+      )
+    : rw.mode === 'endless'
+    ? null
+    : h(
     'div.res-stars',
     starDefs.map(([bit, label]) => {
       const had = !!(rw.starsBefore & bit);
@@ -70,7 +82,11 @@ export function resultsModal(
   );
   // the single most useful "what next" line
   let next = '';
-  if (r.won) next = rw.unlockedSector ? 'Next sector unlocked. Keep the streak going!' : 'Cleared again. Push your score higher!';
+  if (rw.mode === 'daily') {
+    const nt = DAILY_TIERS.find((t) => (r.score ?? 0) < t.score);
+    next = nt ? `${(nt.score - (r.score ?? 0)).toLocaleString()} points from ${nt.name}. Same run all day — try again!` : 'Gold tier! Come back tomorrow for a new challenge.';
+  } else if (rw.mode === 'endless') next = rw.newBest ? 'New personal best!' : `Best score ${rw.prevBest.toLocaleString()}. Push a little further!`;
+  else if (r.won) next = rw.unlockedSector ? 'Next sector unlocked. Keep the streak going!' : 'Cleared again. Push your score higher!';
   else if (r.time < STAR1_TIME) next = `${fmtTime(STAR1_TIME - r.time)} short of your first star. ${powerUp ? 'Go again!' : 'Upgrade in the Armory, then go again!'}`;
   else if (r.time < STAR2_TIME) next = `${fmtTime(STAR2_TIME - r.time)} short of the ${fmtTime(STAR2_TIME).replace(/^0/, '')} star!`;
   else next = `So close: ${fmtTime(RUN_LENGTH - r.time)} from clearing the sector!`;

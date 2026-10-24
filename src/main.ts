@@ -5,6 +5,7 @@ import { Profile } from './meta/profile';
 import { Renderer } from './render/renderer';
 import { botChoose, botMove } from './sim/bot';
 import { getChapter } from './sim/chapters';
+import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes';
 import { DT, Game } from './sim/game';
 import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics } from './ui/dom';
@@ -43,7 +44,7 @@ class App {
     this.hud = new Hud(() => this.pause());
     this.hub = new Hub(
       this.profile,
-      (sec) => this.startRun(sec),
+      (sec, mode) => this.startRun(sec, mode),
       () => this.openSettings(),
     );
     this.ui.append(this.hub.el);
@@ -88,21 +89,40 @@ class App {
     return g;
   }
 
-  startRun(sector: number) {
+  runMode: RunMode = 'campaign';
+
+  startRun(sector: number, mode: RunMode = 'campaign') {
     audio.unlock();
     this.sector = sector;
+    this.runMode = mode;
     this.mode = 'run';
     this.endT = -1;
-    const base = this.profile.baseStats();
-    // Sector 1 is the training ground: one free revive so first-timers can bank a win.
-    if (sector === 0) base.revives += 1;
-    this.game = new Game(getChapter(sector), base, Math.floor(Math.random() * 1e9));
-    this.hud.startRun(this.profile.data.best[sector] ?? 0);
+    let title = getChapter(sector).name.toUpperCase();
+    let sub = `Sector ${sector + 1} · survive 5:00`;
+    if (mode === 'daily') {
+      const ch = dailyChallenge();
+      const chapter = { ...getChapter(ch.sector), name: 'Daily Challenge', midBoss: ch.midBoss, finalBoss: ch.finalBoss };
+      this.game = new Game(chapter, this.profile.standardKit(), ch.seed, modsFor(ch));
+      this.hud.startRun(0, 'daily', this.profile.dailyState().best);
+      title = 'DAILY CHALLENGE';
+      sub = ch.mods.map((m) => m.name).join(' + ');
+    } else if (mode === 'endless') {
+      this.game = new Game(getChapter(sector), this.profile.baseStats(), Math.floor(Math.random() * 1e9), defaultMods('endless'));
+      this.hud.startRun(this.profile.data.endless.best, 'endless');
+      title = 'ENDLESS';
+      sub = 'How long can you last?';
+    } else {
+      const base = this.profile.baseStats();
+      // Sector 1 is the training ground: one free revive so first-timers can bank a win.
+      if (sector === 0) base.revives += 1;
+      this.game = new Game(getChapter(sector), base, Math.floor(Math.random() * 1e9));
+      this.hud.startRun(this.profile.data.best[sector] ?? 0);
+    }
     this.renderer.setGame(this.game);
     this.renderer.fx.parts.length = 0;
     this.renderer.fx.decals.length = 0;
     this.renderer.fx.banners.length = 0;
-    this.renderer.fx.banners.push({ text: getChapter(sector).name.toUpperCase(), sub: `Sector ${sector + 1} · survive 5:00`, color: '#5ef2ff', t: 2.6 });
+    this.renderer.fx.banners.push({ text: title, sub, color: mode === 'daily' ? '#ffd34d' : '#5ef2ff', t: 2.6 });
     this.hub.el.remove();
     this.hub.closeModal();
     this.ui.append(this.hud.el);
@@ -117,7 +137,7 @@ class App {
     this.hud.el.remove();
     this.mode = 'hub';
     this.paused = false;
-    this.hub.sector = goNext ? this.profile.data.unlocked : Math.min(this.profile.data.unlocked, Math.max(this.sector, this.hub.sector));
+    if (this.runMode === 'campaign') this.hub.sector = goNext ? this.profile.data.unlocked : Math.min(this.profile.data.unlocked, Math.max(this.sector, this.hub.sector));
     this.hub.tab = 'deploy';
     this.hub.refresh();
     this.ui.append(this.hub.el);
@@ -199,13 +219,14 @@ class App {
     const g = this.game;
     if (g.state !== 'won') g.state = 'dead';
     const r = g.result();
-    const rw = this.profile.applyRun(this.sector, r);
+    const mode = this.runMode;
+    const rw = mode === 'daily' ? this.profile.applyDaily(r) : mode === 'endless' ? this.profile.applyEndless(this.sector, r) : this.profile.applyRun(this.sector, r);
     this.input.release();
     // After a first clear, land on the newly unlocked sector, ready to go.
     const goNext = rw.unlockedSector;
     const coach = !r.won ? this.profile.coach() : null;
     this.showModal(
-      resultsModal(r, rw, `Sector ${this.sector + 1} · ${g.chapter.name}`, () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false)),
+      resultsModal(r, rw, mode === 'campaign' ? `Sector ${this.sector + 1} · ${g.chapter.name}` : mode === 'daily' ? `Daily Challenge · ${dailyChallenge().mods.map((m) => m.name).join(' + ')}` : 'Endless', () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false)),
       'results',
     );
     if (r.won) audio.evolve();

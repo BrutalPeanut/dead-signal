@@ -1,3 +1,4 @@
+import { DAILY_TIERS, dailySeed, type RunMode } from '../sim/modes';
 import { LOGIN_DAYS, freshLogin, loginReward, type LoginReward, type LoginState } from './login';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
 import { STAR1_TIME, STAR2_TIME, TIME_SCALE } from '../sim/data';
@@ -64,6 +65,8 @@ export interface SaveData {
   starClaims: Record<number, number>;
   bestScore: Record<number, number>;
   login: LoginState;
+  daily: { key: string; best: number; tiers: number; plays: number; bestEver: number };
+  endless: { best: number; bestScore: number; runs: number };
 }
 
 export interface RunRewards {
@@ -81,6 +84,9 @@ export interface RunRewards {
   prevBest: number;
   starsBefore: number;
   starsAfter: number;
+  /** Daily Challenge tiers reached for the first time today. */
+  tiersNew?: string[];
+  mode?: RunMode;
 }
 
 function fresh(): SaveData {
@@ -110,6 +116,8 @@ function fresh(): SaveData {
     starClaims: {},
     bestScore: {},
     login: freshLogin(),
+    daily: { key: '', best: 0, tiers: 0, plays: 0, bestEver: 0 },
+    endless: { best: 0, bestScore: 0, runs: 0 },
   };
 }
 
@@ -130,7 +138,7 @@ export class Profile {
       const raw = this.storage?.getItem(KEY);
       if (raw) {
         const d = JSON.parse(raw) as SaveData;
-        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin() };
+        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless };
       }
     } catch {
       /* corrupted save → start fresh */
@@ -206,6 +214,17 @@ export class Profile {
       startWeapon: weapon ? GEAR[weapon.def].startWeapon ?? 'pistol' : 'pistol',
       startLevels: this.milestone('startLevel') + p.startLevel,
       regen: p.regen,
+    };
+  }
+
+  /**
+   * Daily Challenge loadout: identical for everyone so family scores compare skill, not gear.
+   * Tuned so a decent run clears it about half the time (see scripts/modes.ts).
+   */
+  standardKit(): BaseStats {
+    return {
+      atk: 45, hp: 420, def: 0.05, crit: 0.08, critMul: 1.6, moveSpeed: 92, pickup: 52,
+      healMul: 1, goldMul: 1, rerolls: 2, revives: 0, startWeapon: 'pistol', startLevels: 0, regen: 0,
     };
   }
 
@@ -440,6 +459,95 @@ export class Profile {
   }
 
   // ------------------------------------------------------------------ runs
+
+  /** Shared bookkeeping for any finished run (stats, missions, account XP). */
+  private bookRun(r: RunResult, xp: number) {
+    const d = this.data;
+    d.stats.runs++;
+    this.track('runs', 1);
+    this.track('kills', r.kills);
+    this.track('survive', Math.min(r.time, 300));
+    this.track('boss', r.bossKills);
+    this.track('elite', r.eliteKills);
+    this.track('evolve', r.evolutions ?? 0);
+    d.stats.kills += r.kills;
+    d.stats.bossKills += r.bossKills;
+    let levelsGained = 0;
+    d.accountXp += xp;
+    while (d.accountXp >= accountXpNeed(d.accountLevel)) {
+      d.accountXp -= accountXpNeed(d.accountLevel);
+      d.accountLevel++;
+      levelsGained++;
+    }
+    return levelsGained;
+  }
+
+  dailyState(now = new Date()) {
+    const key = dailySeed(now).key;
+    if (this.data.daily.key !== key) this.data.daily = { key, best: 0, tiers: 0, plays: 0, bestEver: this.data.daily.bestEver };
+    return this.data.daily;
+  }
+
+  /** Daily Challenge: gold for playing, tier chests the first time each score tier is reached today. */
+  applyDaily(r: RunResult, now = new Date()): RunRewards {
+    const d = this.data;
+    const ds = this.dailyState(now);
+    const m = 1 + d.unlocked * 0.45;
+    const score = r.score ?? 0;
+    const prevBest = ds.best;
+    const newBest = score > prevBest;
+    ds.best = Math.max(ds.best, score);
+    ds.bestEver = Math.max(ds.bestEver, score);
+    ds.plays++;
+    let gold = Math.round((r.gold + 60 + (r.won ? 120 : 0)) * m);
+    let scrap = 3 + Math.floor(r.time / 60);
+    let keys = 0;
+    const tiersNew: string[] = [];
+    DAILY_TIERS.forEach((t, i) => {
+      if (score >= t.score && !(ds.tiers & (1 << i))) {
+        ds.tiers |= 1 << i;
+        tiersNew.push(t.name);
+        if (i === 0) gold += Math.round(250 * m);
+        if (i === 1) (keys += 1), (scrap += 15);
+        if (i === 2) (keys += 2), (gold += Math.round(500 * m));
+      }
+    });
+    d.gold += gold;
+    d.scrap += scrap;
+    d.keys += keys;
+    const xp = Math.round(r.time * 0.8 + r.bossKills * 60);
+    const levelsGained = this.bookRun(r, xp);
+    this.save();
+    return { gold, xp, keys, scrap, items: [], firstClear: false, newStars: 0, levelsGained, unlockedSector: false, score, newBest, prevBest, starsBefore: 0, starsAfter: 0, tiersNew, mode: 'daily' };
+  }
+
+  /** Endless: rewards scale with minutes survived and bosses felled; best time and score are kept. */
+  applyEndless(sector: number, r: RunResult, seed = Date.now()): RunRewards {
+    const d = this.data;
+    const ch = getChapter(sector);
+    const rng = new Rng(seed);
+    const mins = r.time / 60;
+    const gold = Math.round((r.gold + mins * 70 * ch.goldMul) * (1 + this.milestone('gold')));
+    const scrap = Math.round(2 + mins * 3 + r.bossKills * 4);
+    const keys = Math.floor(r.bossKills / 2);
+    const items: GearItem[] = [];
+    for (let i = 0; i < Math.min(3, Math.floor(r.bossKills / 2)); i++) items.push(this.rollItem(rng, sector, false));
+    d.gold += gold;
+    d.scrap += scrap;
+    d.keys += keys;
+    d.gear.push(...items);
+    for (const it of items) this.autoEquip(it);
+    const score = r.score ?? 0;
+    const prevBest = d.endless.bestScore;
+    const newBest = score > prevBest;
+    d.endless.bestScore = Math.max(prevBest, score);
+    d.endless.best = Math.max(d.endless.best, r.time);
+    d.endless.runs++;
+    const xp = Math.round(r.time + r.bossKills * 60);
+    const levelsGained = this.bookRun(r, xp);
+    this.save();
+    return { gold, xp, keys, scrap, items, firstClear: false, newStars: 0, levelsGained, unlockedSector: false, score, newBest, prevBest, starsBefore: 0, starsAfter: 0, mode: 'endless' };
+  }
 
   applyRun(sector: number, r: RunResult, seed = Date.now()): RunRewards {
     const d = this.data;
