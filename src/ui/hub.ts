@@ -642,7 +642,10 @@ export class Hub {
           if (c.apply()) {
             audio.levelUp();
             haptic(25);
-            if (c.kind === 'collect') {
+            if (c.kind === 'crate' && d.keys < before.k) {
+              const got = d.gear.slice(-(before.k - d.keys));
+              this.revealMany(got);
+            } else if (c.kind === 'collect') {
               const parts = [
                 d.gold > before.g ? `+${fmtNum(d.gold - before.g)} gold` : '',
                 d.scrap > before.s ? `+${d.scrap - before.s} scrap` : '',
@@ -1065,6 +1068,23 @@ export class Hub {
           },
           h('span', 'Open ', coin('key'), ` 1  (have ${d.keys})`),
         ),
+        d.keys > 1
+          ? h(
+              'button.btn.primary',
+              {
+                style: { marginTop: '8px' },
+                onclick: () => {
+                  const items = p.openAllCrates();
+                  if (items.length) {
+                    audio.pickup('chest');
+                    haptic(60);
+                    this.revealMany(items);
+                  }
+                },
+              },
+              h('span', 'Open all ', coin('key'), ` ${d.keys}`),
+            )
+          : null,
       ),
       h(
         'div.crate-card',
@@ -1166,6 +1186,65 @@ export class Hub {
           can ? `Claim Day ${today + 1}` : `Next reward in ${Math.floor(left / 3.6e6)}h ${Math.floor((left % 3.6e6) / 6e4)}m`,
         ),
         h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
+      ),
+    );
+    document.getElementById('ui')!.append(this.modal);
+  }
+
+  /** Results of "Open all": every item at once, best first, with the haul summarised. */
+  revealMany(items: GearItem[]) {
+    if (items.length === 1) return this.revealItem(items[0]);
+    this.closeModal();
+    const sorted = items.slice().sort((a, b) => b.rarity - a.rarity);
+    const best = sorted[0];
+    const counts = RARITIES.map((name, r) => [name, items.filter((i) => i.rarity === r).length] as const).filter(([, n]) => n > 0).reverse();
+    const bc = RARITY_COLORS[best.rarity];
+    const mergeable = this.p.data.gear.some((g) => this.p.mergeMates(g.uid).length >= MERGE_COUNT - 1);
+    this.modal = h(
+      'div.modal',
+      { onclick: () => this.closeModal() },
+      h(
+        'div.sheet.haul',
+        { onclick: (e: Event) => e.stopPropagation() },
+        h('h2', `${items.length} crates opened`),
+        h('div.haul-sum', counts.map(([name, n]) => h('span', { style: { color: RARITY_COLORS[RARITIES.indexOf(name)] } }, `${n} ${name}`))),
+        h(
+          'button.haul-best',
+          { style: { borderColor: bc, background: `radial-gradient(circle at 30% 50%, ${bc}33, transparent 70%)` }, onclick: () => this.itemSheet(best.uid) },
+          h('img', { src: gearIcon(GEAR[best.def].slot, bc, best.def) }),
+          h('div', h('small', { style: { color: bc } }, `BEST · ${RARITIES[best.rarity].toUpperCase()}`), h('b', GEAR[best.def].name)),
+        ),
+        h(
+          'div.haul-grid',
+          sorted.map((it, i) =>
+            h(
+              'button.item',
+              { onclick: () => this.itemSheet(it.uid), style: { borderColor: RARITY_COLORS[it.rarity], animationDelay: `${Math.min(i, 30) * 35}ms` } },
+              h('img', { src: gearIcon(GEAR[it.def].slot, RARITY_COLORS[it.rarity], it.def), alt: GEAR[it.def].name }),
+            ),
+          ),
+        ),
+        h(
+          'div.row',
+          { style: { marginTop: '10px' } },
+          mergeable
+            ? h(
+                'button.btn.cyan',
+                {
+                  onclick: () => {
+                    const n = this.p.mergeAll();
+                    audio.pickup('chest');
+                    haptic(30);
+                    toast(n ? `Merged ${n} time${n > 1 ? 's' : ''}` : 'Nothing to merge', '#43ffa4');
+                    this.closeModal();
+                    this.setTab('armory');
+                  },
+                },
+                'Merge all',
+              )
+            : h('button.btn', { onclick: () => (this.closeModal(), this.setTab('armory')) }, 'Armory'),
+          h('button.btn.primary', { onclick: () => this.closeModal() }, 'Nice'),
+        ),
       ),
     );
     document.getElementById('ui')!.append(this.modal);
