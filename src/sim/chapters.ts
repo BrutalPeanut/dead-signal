@@ -41,9 +41,12 @@ export const CHAPTER_COUNT = NAMES.length;
 export function getChapter(index: number): ChapterDef {
   const [name, biome] = NAMES[index % NAMES.length];
   const [midBoss, finalBoss] = BOSS_ORDER[index % BOSS_ORDER.length];
-  // Each sector is ~55% tougher; gear + talents + run skill have to keep up.
-  const hpMul = Math.pow(1.55, index);
-  const dmgMul = Math.pow(1.32, index);
+  // Each sector is ~50% tougher up to Sector 7, then ~36%: merging needs 3× the items per rarity,
+  // so late-game player power grows more slowly and a flat exponent turns into a wall.
+  const early = Math.min(index, 6);
+  const late = Math.max(0, index - 6);
+  const hpMul = Math.pow(1.5, early) * Math.pow(1.36, late);
+  const dmgMul = Math.pow(1.28, early) * Math.pow(1.2, late);
   return {
     index,
     name,
@@ -53,6 +56,6 @@ export function getChapter(index: number): ChapterDef {
     midBoss,
     finalBoss,
     goldMul: 1 + index * 0.45,
-    power: Math.round(300 * Math.pow(1.5, index)),
+    power: Math.round(300 * Math.pow(1.38, early) * Math.pow(1.25, late)),
   };
 }

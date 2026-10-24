@@ -347,11 +347,11 @@ export class Profile {
     d.best[sector] = Math.max(d.best[sector] ?? 0, r.time);
 
     let keys = r.won ? 1 : 0;
-    if (firstClear) keys += 2;
+    if (firstClear) keys += 1;
     keys += newStars > 0 && !firstClear ? 1 : 0;
 
     const items: GearItem[] = [];
-    const drops = (r.time >= 150 ? 1 : 0) + r.bossKills + r.eliteKills + (r.won ? 1 : 0);
+    const drops = r.bossKills + (r.eliteKills > 0 ? 1 : 0) + (r.won ? 1 : 0);
     for (let i = 0; i < drops; i++) items.push(this.rollItem(rng, sector, false));
     const scrap = Math.round(2 + r.time / 60 + r.eliteKills * 2 + r.bossKills * 4);
 

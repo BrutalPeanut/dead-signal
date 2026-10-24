@@ -611,8 +611,8 @@ export class Game {
     // drops
     this.addPickup('xp', e.x, e.y, e.xp);
     const r = this.rng.next();
-    if (r < 0.045) this.addPickup('gold', e.x + 6, e.y, Math.max(1, Math.round(this.rng.range(1, 3) * this.chapter.goldMul)));
-    else if (r < 0.048) this.addPickup('ration', e.x, e.y, 0);
+    if (r < 0.025) this.addPickup('gold', e.x + 6, e.y, Math.max(1, Math.round(this.rng.range(1, 3) * this.chapter.goldMul)));
+    else if (r < 0.028) this.addPickup('ration', e.x, e.y, 0);
   }
 
   // ------------------------------------------------------------------ projectiles

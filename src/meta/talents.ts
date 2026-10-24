@@ -16,8 +16,8 @@ export const TRACKS: Track[] = [
 ];
 
 /** Track level cap grows with account level so talents can't outrun the sectors. */
-export const trackCap = (accountLevel: number) => 4 + accountLevel * 3;
-export const trackCost = (lv: number) => Math.round(40 * Math.pow(1.16, lv));
+export const trackCap = (accountLevel: number) => 3 + accountLevel * 2;
+export const trackCost = (lv: number) => Math.round(60 * Math.pow(1.19, lv));
 
 export interface Milestone {
   level: number;
