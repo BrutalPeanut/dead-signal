@@ -3064,3 +3064,87 @@ button {
 .hud .bossbar {
   left: 196px;
 }
+
+/* ------------------------------------------------------------ power-up coach */
+
+.coach {
+  width: min(100%, 340px);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(67, 255, 164, 0.18), rgba(67, 255, 164, 0.06));
+  border: 1.5px solid rgba(67, 255, 164, 0.7);
+  box-shadow: 0 0 18px rgba(67, 255, 164, 0.18);
+  text-align: left;
+  animation: coachPulse 2s ease-in-out infinite;
+}
+
+.coach .ch-bolt {
+  font-size: 22px;
+  filter: drop-shadow(0 0 6px #43ffa4);
+}
+
+.coach .ch-t {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.coach .ch-t small {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #43ffa4;
+}
+
+.coach .ch-t b {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coach .ch-d {
+  font-size: 12px;
+  font-weight: 800;
+  color: #c8ffe4;
+  white-space: nowrap;
+}
+
+@keyframes coachPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(67, 255, 164, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(67, 255, 164, 0.45);
+  }
+}
+
+.res-powerup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.res-powerup small {
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.res-powerup .rp-hint {
+  font-size: 13px;
+  font-weight: 700;
+  color: #c8ffe4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach {
+    animation: none;
+  }
+}

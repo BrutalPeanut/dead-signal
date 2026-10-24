@@ -5,7 +5,14 @@ import { gearIcon } from '../render/icons';
 import { RUN_LENGTH, STAR1_TIME, STAR2_TIME } from '../sim/data';
 import { coin, fmtNum, fmtTime, h } from './dom';
 
-export function resultsModal(r: RunResult, rw: RunRewards, sectorName: string, onContinue: () => void) {
+export function resultsModal(
+  r: RunResult,
+  rw: RunRewards,
+  sectorName: string,
+  onContinue: () => void,
+  powerUp: string | null = null,
+  onPowerUp: () => void = onContinue,
+) {
   const title = r.won ? 'SECTOR CLEARED' : 'SIGNAL LOST';
   const color = r.won ? '#43ffa4' : '#ff3b5c';
   const rewards: HTMLElement[] = [
@@ -65,7 +72,15 @@ export function resultsModal(r: RunResult, rw: RunRewards, sectorName: string, o
     ),
     h('div.rewards', rewards),
     h('div.next-goal', next),
-    h('div.actions', h('button.btn.primary.big', { onclick: onContinue }, 'Continue')),
+    powerUp
+      ? h(
+          'div.res-powerup',
+          h('small', 'Power up before your next try'),
+          h('button.btn.cyan.big', { onclick: onPowerUp }, '⚡ Power Up'),
+          h('div.rp-hint', powerUp),
+          h('button.btn.ghost.small', { onclick: onContinue }, 'Continue'),
+        )
+      : h('div.actions', h('button.btn.primary.big', { onclick: onContinue }, 'Continue')),
   );
 }
 

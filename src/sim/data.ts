@@ -308,7 +308,7 @@ export const MIDBOSS_TIME = 300;
 export const STAR1_TIME = RUN_LENGTH * 0.5;
 export const STAR2_TIME = RUN_LENGTH * 0.8;
 /** XP gem multiplier: half the run time, most of the level-ups. */
-export const XP_MUL = 1.2;
+export const XP_MUL = 1.05;
 
 export interface HordeEvent {
   t: number;
