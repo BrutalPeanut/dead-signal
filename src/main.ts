@@ -317,7 +317,8 @@ class App {
   }
 
   private frame = (now: number) => {
-    const dt = Math.min(0.1, (now - this.last) / 1000);
+    // rAF timestamps can predate a performance.now() stored mid-frame (e.g. on resume): never step backwards
+    const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
     if (this.mode === 'run' && !this.paused && this.game.state === 'play') this.renderer.adapt(now - this.last);
     this.last = now;
     const g = this.game;

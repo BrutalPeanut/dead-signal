@@ -226,7 +226,7 @@ export class Renderer {
         ctx.stroke();
         ctx.fillStyle = 'rgba(255,40,80,0.35)';
         ctx.beginPath();
-        ctx.arc(tg.x, tg.y, tg.r * prog, 0, Math.PI * 2);
+        ctx.arc(tg.x, tg.y, Math.max(0, tg.r * prog), 0, Math.PI * 2);
         ctx.fill();
       } else {
         ctx.save();
@@ -245,7 +245,7 @@ export class Renderer {
             ctx.strokeStyle = 'rgba(255,60,90,0.4)';
             ctx.setLineDash([6, 6]);
             ctx.beginPath();
-            ctx.arc(0, 0, tg.len * 0.6, 0, tg.sweep * tg.active, tg.sweep < 0);
+            ctx.arc(0, 0, Math.max(0, tg.len * 0.6), 0, tg.sweep * tg.active, tg.sweep < 0);
             ctx.stroke();
             ctx.setLineDash([]);
           }
@@ -486,7 +486,7 @@ export class Renderer {
     ctx.strokeStyle = 'rgba(94,242,255,0.8)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 10 + p.drop * 6, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, Math.max(0, 10 + p.drop * 6), 0, Math.PI * 2);
     ctx.stroke();
     // parachute + crate
     ctx.save();
@@ -696,7 +696,7 @@ export class Renderer {
         ctx.stroke();
         ctx.fillStyle = '#fff2c8';
         ctx.beginPath();
-        ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+        ctx.arc(0, 0, Math.max(0, r * 0.35), 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       } else {
@@ -782,12 +782,12 @@ export class Renderer {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.arc(0, 0, r * 0.75, 0, Math.PI * 1.4);
+          ctx.arc(0, 0, Math.max(0, r * 0.75), 0, Math.PI * 1.4);
           ctx.stroke();
           ctx.strokeStyle = col;
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(0, 0, r * 0.75, Math.PI * 1.5, Math.PI * 1.9);
+          ctx.arc(0, 0, Math.max(0, r * 0.75), Math.PI * 1.5, Math.PI * 1.9);
           ctx.stroke();
           ctx.restore();
           break;
@@ -839,7 +839,7 @@ export class Renderer {
       ctx.strokeStyle = '#120d14';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r * 0.7, 0, Math.PI * 2);
+      ctx.arc(s.x, s.y, Math.max(0, s.r * 0.7), 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }

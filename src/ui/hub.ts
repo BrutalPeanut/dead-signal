@@ -15,12 +15,12 @@ import {
 } from '../meta/gear';
 import { RELAY_CAP_H, type Profile } from '../meta/profile';
 import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
-import { drawHero, ENEMY_DRAW, BOSS_DRAW } from '../render/art';
-import { Ground } from '../render/ground';
+import { drawHero } from '../render/art';
 import { gearIcon, skillIcon } from '../render/icons';
 import { BOSSES, WEAPONS } from '../sim/data';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
 import { coin, fmtNum, fmtTime, h, haptic, toast } from './dom';
+import { HomeScene } from './homeScene';
 
 export type Tab = 'deploy' | 'armory' | 'talents' | 'supply';
 
@@ -34,6 +34,7 @@ export class Hub {
   private heroCanvas: HTMLCanvasElement | null = null;
   private t = 0;
   private modal: HTMLElement | null = null;
+  private scene = new HomeScene();
 
   constructor(private p: Profile, private onDeploy: (sector: number) => void, private onSettings: () => void) {
     this.sector = p.data.unlocked;
@@ -60,6 +61,7 @@ export class Hub {
 
   tick(dt: number) {
     this.t += dt;
+    if (this.tab === 'deploy') this.scene.tick(dt);
     const c = this.heroCanvas;
     if (c && c.isConnected) {
       const x = c.getContext('2d')!;
@@ -143,51 +145,56 @@ export class Hub {
     const locked = this.sector > d.unlocked;
     const stars = d.stars[this.sector] ?? 0;
     const power = this.p.power();
-    const art = h('canvas');
-    requestAnimationFrame(() => paintSectorArt(art as HTMLCanvasElement, this.sector));
-    const prev = () => {
-      if (this.sector > 0) {
-        this.sector--;
-        audio.click();
-        this.renderBody();
-      }
-    };
-    const next = () => {
-      if (this.sector < CHAPTER_COUNT - 1) {
-        this.sector++;
-        audio.click();
-        this.renderBody();
-      }
+    this.scene.setSector(this.sector);
+    const select = (i: number) => {
+      if (i === this.sector) return;
+      this.sector = i;
+      audio.click();
+      haptic(8);
+      this.renderBody();
     };
     const relay = this.p.relayPending();
+    const daily = this.p.dailyAvailable();
+    const powerCls = power >= ch.power ? 'ok' : power >= ch.power * 0.75 ? 'warn' : 'bad';
+    const route = h(
+      'div.route',
+      Array.from({ length: CHAPTER_COUNT }, (_, i) => {
+        const st = d.stars[i] ?? 0;
+        const lock = i > d.unlocked;
+        const cls = ['node', i === this.sector ? 'sel' : '', lock ? 'lock' : '', st & 4 ? 'clear' : '', i === d.unlocked ? 'next' : ''].filter(Boolean).join('.');
+        return h(
+          'button.' + cls,
+          { onclick: () => select(i), 'aria-label': `Sector ${i + 1}` },
+          h('b', lock ? '🔒' : i + 1),
+          h('span.pips', [1, 2, 4].map((bit) => h(st & bit ? 'i.on' : 'i'))),
+        );
+      }),
+    );
+    requestAnimationFrame(() => route.querySelector('.sel')?.scrollIntoView({ inline: 'center', block: 'nearest' }));
     return h(
-      'div',
-      h('div.title', h('div.logo', 'DEAD SIGNAL'), h('div.tag', 'survive the broadcast')),
+      'div.home',
       h(
-        'div.sector',
+        'div.stage',
+        this.scene.canvas,
+        h('div.logo-sm', 'DEAD SIGNAL'),
         h(
-          'div.art',
-          art,
-          h('div.num', `SECTOR ${this.sector + 1}`),
+          'div.stage-info',
+          h('div.sec', `SECTOR ${this.sector + 1} · ${ch.biome.toUpperCase()}`),
           h('div.nm', ch.name),
-          this.sector > 0 ? h('button.arrow.l', { onclick: prev }, '‹') : null,
-          this.sector < CHAPTER_COUNT - 1 ? h('button.arrow.r', { onclick: next }, '›') : null,
+          h('div.stars', [1, 2, 4].map((bit) => h(stars & bit ? 'i.on' : 'i'))),
         ),
-        h(
-          'div.info',
-          h('div.stars', [1, 2, 4].map((b) => h(stars & b ? 'i.on' : 'i'))),
-          h('div', { style: { fontSize: '12px', color: 'var(--dim)' } }, d.best[this.sector] ? `Best ${fmtTime(d.best[this.sector])}` : 'Not attempted'),
-          h(
-            'div.rec',
-            'Recommended',
-            h('b', { style: { color: power >= ch.power ? 'var(--green)' : power >= ch.power * 0.75 ? 'var(--gold)' : 'var(--red)' } }, coin('power'), fmtNum(ch.power)),
-          ),
-        ),
+      ),
+      route,
+      h(
+        'div.brief',
+        h('div.chip', h('small', '5:00'), BOSSES[ch.midBoss].name),
+        h('div.chip.final', h('small', '10:00'), BOSSES[ch.finalBoss].name),
+        h('div.chip.pow.' + powerCls, h('small', 'Rec. power'), coin('power'), fmtNum(ch.power)),
       ),
       h(
         'div.deploy',
         h(
-          'button.btn.primary.big',
+          'button.btn.primary.big.go',
           {
             disabled: locked,
             onclick: () => {
@@ -195,25 +202,37 @@ export class Hub {
               this.onDeploy(this.sector);
             },
           },
-          locked ? '🔒 Locked' : 'Deploy',
+          locked ? `🔒 Clear Sector ${this.sector}` : h('span', 'Deploy', h('small', d.best[this.sector] ? `Best ${fmtTime(d.best[this.sector])}` : 'Survive 10:00')),
         ),
       ),
-      locked ? h('div.locked', `Clear Sector ${this.sector} to unlock.`) : h('div.help', `Bosses: ${BOSSES[ch.midBoss].name} at 5:00 · ${BOSSES[ch.finalBoss].name} at 10:00`),
       h(
-        'div.minicards',
+        'div.tiles',
         h(
-          'button.mini',
+          'button.tile' + (relay.hours >= 1 ? '.ready' : ''),
           { onclick: () => this.setTab('supply') },
-          h('div.h', 'Signal Relay'),
-          h('div.v', coin('gold'), fmtNum(relay.gold), coin('scrap'), relay.scrap),
+          h('div.ti-h', 'Relay'),
+          h('div.ti-v', coin('gold'), fmtNum(relay.gold)),
           h('div.relay-meter', h('i', { style: { width: `${(relay.hours / RELAY_CAP_H) * 100}%` } })),
         ),
         h(
-          'button.mini',
-          { onclick: () => this.setTab('armory') },
-          h('div.h', 'Loadout'),
-          h('div.v', h('img', { src: skillIcon(this.p.baseStats().startWeapon), style: { width: '28px', height: '28px' } }), WEAPONS[this.p.baseStats().startWeapon].name),
+          'button.tile' + (daily ? '.ready' : ''),
+          { onclick: () => this.setTab('supply') },
+          h('div.ti-h', 'Daily'),
+          h('div.ti-v', daily ? 'Ready!' : 'Claimed'),
         ),
+        h(
+          'button.tile' + (d.keys > 0 ? '.ready' : ''),
+          { onclick: () => this.setTab('supply') },
+          h('div.ti-h', 'Crates'),
+          h('div.ti-v', coin('key'), d.keys),
+        ),
+      ),
+      h(
+        'button.loadline',
+        { onclick: () => this.setTab('armory') },
+        h('img', { src: skillIcon(this.p.baseStats().startWeapon) }),
+        h('span', 'Starting weapon: ', h('b', WEAPONS[this.p.baseStats().startWeapon].name)),
+        h('span.arrow', '›'),
       ),
     );
   }
@@ -554,37 +573,4 @@ export class Hub {
     );
     document.getElementById('ui')!.append(this.modal);
   }
-}
-
-/** Little diorama for the sector card: floor, a few infected, and the final boss looming. */
-function paintSectorArt(c: HTMLCanvasElement, sector: number) {
-  const ch = getChapter(sector);
-  const w = (c.width = c.clientWidth * 2 || 800);
-  const hh = (c.height = c.clientHeight * 2 || 300);
-  const x = c.getContext('2d')!;
-  const scale = hh / 150;
-  const g = new Ground(ch.biome);
-  g.setScale(scale);
-  x.save();
-  x.scale(scale, scale);
-  g.draw(x, w / scale / 2, 75, w / scale / 2, 75);
-  x.restore();
-  const grad = x.createLinearGradient(0, 0, 0, hh);
-  grad.addColorStop(0, 'rgba(8,10,16,0.15)');
-  grad.addColorStop(1, 'rgba(8,10,16,0.85)');
-  x.fillStyle = grad;
-  x.fillRect(0, 0, w, hh);
-  const kinds = Object.keys(ENEMY_DRAW);
-  for (let i = 0; i < 7; i++) {
-    x.save();
-    x.translate(w * (0.08 + i * 0.09) + ((i * 37) % 20), hh * (0.55 + ((i * 53) % 30) / 100));
-    x.scale(scale * 1.3, scale * 1.3);
-    ENEMY_DRAW[kinds[(i + sector) % kinds.length]](x, i * 1.3);
-    x.restore();
-  }
-  x.save();
-  x.translate(w * 0.8, hh * 0.62);
-  x.scale(-scale * 1.05, scale * 1.05);
-  BOSS_DRAW[ch.finalBoss](x, { t: 1, state: 0, phase2: false });
-  x.restore();
 }

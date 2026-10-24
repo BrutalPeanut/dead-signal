@@ -232,13 +232,13 @@ export class Fx {
         ctx.globalAlpha = Math.min(1, a * 1.6);
         ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * (0.5 + a * 0.5), 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, Math.max(0, p.size * (0.5 + a * 0.5)), 0, Math.PI * 2);
         ctx.fill();
       } else if (p.k === PK.Smoke) {
         ctx.globalAlpha = a * 0.8;
         ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * (1.6 - a * 0.6), 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, Math.max(0, p.size * (1.6 - a * 0.6)), 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -259,7 +259,7 @@ export class Fx {
         ctx.strokeStyle = p.color;
         ctx.lineWidth = 3 + a * 5;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * (1 - a * a), 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, Math.max(0, p.size * (1 - a * a)), 0, Math.PI * 2);
         ctx.stroke();
       } else if (p.k === PK.Flash) {
         ctx.globalAlpha = a;
@@ -278,7 +278,7 @@ export class Fx {
       ctx.fillStyle = sl.evo ? '#ffb3c6' : '#ff5470';
       ctx.beginPath();
       ctx.arc(sl.x, sl.y, sl.r, a0, a1);
-      ctx.arc(sl.x, sl.y, sl.r * 0.62, a1, a0, true);
+      ctx.arc(sl.x, sl.y, Math.max(0, sl.r * 0.62), a1, a0, true);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
