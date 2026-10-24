@@ -10,7 +10,8 @@
     "test": "vitest run",
     "sim": "vite-node scripts/balance.ts",
     "progression": "vite-node scripts/progression.ts",
-    "weapons": "vite-node scripts/weapons.ts"
+    "weapons": "vite-node scripts/weapons.ts",
+    "builds": "vite-node scripts/melee.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

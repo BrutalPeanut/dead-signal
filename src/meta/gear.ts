@@ -66,6 +66,16 @@ export const GEAR: Record<string, GearDef> = {
     perks: [p('atkPct', 0.1, '+10% ATK'), p('crit', 0.05, '+5% crit chance'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
     flavor: 'Mining tech. The infected are softer than rock.',
   },
+  sawhalo: {
+    id: 'sawhalo', slot: 'weapon', name: 'Saw Halo', base: 9.5, stat: 'atk', startWeapon: 'blades',
+    perks: [p('atkPct', 0.1, '+10% ATK'), p('def', 0.04, '+4% damage reduction'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
+    flavor: 'A ring of salvaged sawblades on a gyroscope. Get close.',
+  },
+  riftcleaver: {
+    id: 'riftcleaver', slot: 'weapon', name: 'Rift Cleaver', base: 10, stat: 'atk', startWeapon: 'cleaver',
+    perks: [p('atkPct', 0.1, '+10% ATK'), p('hpPct', 0.1, '+10% max HP'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
+    flavor: 'Industrial plasma cutter, safety interlock removed.',
+  },
   scout: {
     id: 'scout', slot: 'visor', name: 'Scout Visor', base: 4, stat: 'atk',
     perks: [p('crit', 0.05, '+5% crit chance'), p('pickup', 0.15, '+15% pickup range'), p('crit', 0.08, '+8% crit chance'), p('critMul', 0.3, '+30% crit damage')],

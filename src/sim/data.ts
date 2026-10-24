@@ -8,7 +8,8 @@ export type WeaponId =
   | 'field'
   | 'disc'
   | 'napalm'
-  | 'drill';
+  | 'drill'
+  | 'cleaver';
 
 export type PassiveId =
   | 'chip'
@@ -18,7 +19,8 @@ export type PassiveId =
   | 'medkit'
   | 'magnet'
   | 'gel'
-  | 'boots';
+  | 'boots'
+  | 'adrenal';
 
 export interface WeaponLevel {
   dmg: number; // multiplier on player ATK
@@ -79,18 +81,18 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     name: 'Orbit Blades',
     evoName: 'Halo Saw',
     partner: 'plating',
-    desc: 'Plasma blades orbit you, shredding anything close.',
+    desc: 'Plasma blades orbit you nonstop, shredding anything close.',
     evoDesc: 'A permanent ring of eight saws.',
     color: '#ffb84d',
     levels: [
-      L(2.47, 4.0, 2, 74, 3.4, 4.0, 0),
-      L(2.73, 3.8, 3, 78, 3.6, 4.4, 0),
-      L(3.12, 3.6, 3, 86, 3.8, 4.8, 0),
-      L(3.51, 3.4, 4, 90, 4.0, 5.2, 0),
-      L(4.16, 3.2, 5, 96, 4.3, 5.6, 0),
+      L(1.98, 4.0, 2, 74, 3.4, 4.0, 0),
+      L(2.18, 3.8, 3, 78, 3.6, 4.4, 0),
+      L(2.5, 3.6, 3, 86, 3.8, 4.8, 0),
+      L(2.81, 3.4, 4, 90, 4.0, 5.2, 0),
+      L(3.33, 3.2, 5, 96, 4.3, 5.6, 0),
     ],
     evo: L(3.8, 0, 8, 104, 4.8, 9999, 0),
-    levelText: ['', '+1 blade', 'Wider orbit, longer uptime', '+1 blade', '+1 blade, +dmg'],
+    levelText: ['', '+1 blade', 'Wider orbit, faster spin', '+1 blade', '+1 blade, +dmg'],
   },
   arc: {
     id: 'arc',
@@ -133,7 +135,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     name: 'Plasma Field',
     evoName: 'Event Horizon',
     partner: 'medkit',
-    desc: 'A burning aura that damages and slows nearby infected.',
+    desc: 'A burning aura that slows nearby infected and softens their hits.',
     evoDesc: 'A huge singularity that drags infected inward.',
     color: '#43ffa4',
     levels: [
@@ -200,6 +202,25 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     evo: L(2.8, 0, 4, 18, 470, 9999, 999),
     levelText: ['', 'Longer, faster', '+1 drill', 'Longer, +dmg', '+1 drill'],
   },
+  cleaver: {
+    id: 'cleaver',
+    name: 'Plasma Cleaver',
+    evoName: 'Rift Reaper',
+    partner: 'adrenal',
+    desc: 'Sweeps a plasma blade through anything in front of you.',
+    evoDesc: 'Full-circle reaping slashes that hurl the horde back.',
+    color: '#ff5470',
+    // area = reach, extra = half-angle of the sweep (radians), count = swings per activation
+    levels: [
+      L(2.99, 1.05, 1, 64, 0, 0, 0, 1.0),
+      L(3.45, 0.98, 1, 68, 0, 0, 0, 1.1),
+      L(3.91, 0.9, 2, 72, 0, 0, 0, 1.15),
+      L(4.48, 0.82, 2, 76, 0, 0, 0, 1.25),
+      L(5.29, 0.74, 2, 82, 0, 0, 0, 1.35),
+    ],
+    evo: L(6.21, 0.6, 2, 96, 0, 0, 0, Math.PI),
+    levelText: ['', 'Longer reach, +dmg', 'Swings twice', 'Wider sweep, +dmg', 'Faster, +dmg'],
+  },
 };
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];
@@ -221,6 +242,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   magnet: { id: 'magnet', name: 'Magnet Core', desc: '+30% pickup range', color: '#ff4fd8', partnerOf: 'disc' },
   gel: { id: 'gel', name: 'Thermal Gel', desc: '+12% duration, +8% projectile speed', color: '#ff9a1f', partnerOf: 'napalm' },
   boots: { id: 'boots', name: 'Thruster Boots', desc: '+8% move speed', color: '#ffe14d', partnerOf: 'drill' },
+  adrenal: { id: 'adrenal', name: 'Adrenal Pump', desc: 'Kills heal 0.06% max HP', color: '#ff5470', partnerOf: 'cleaver' },
 };
 
 export const PASSIVE_IDS = Object.keys(PASSIVES) as PassiveId[];

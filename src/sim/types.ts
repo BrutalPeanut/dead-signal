@@ -151,6 +151,7 @@ export type FxEvent =
   | { t: 'playerHit'; amt: number }
   | { t: 'banner'; text: string; sub: string; color: string }
   | { t: 'shoot'; weapon: WeaponId }
+  | { t: 'slash'; x: number; y: number; a: number; r: number; arc: number; evo: boolean }
   | { t: 'emp'; x: number; y: number }
   | { t: 'heal'; amt: number }
   | { t: 'evolve'; weapon: WeaponId }

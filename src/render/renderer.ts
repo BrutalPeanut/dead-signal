@@ -226,7 +226,7 @@ export class Renderer {
         ctx.stroke();
         ctx.fillStyle = 'rgba(255,40,80,0.35)';
         ctx.beginPath();
-        ctx.arc(tg.x, tg.y, tg.r * prog, 0, Math.PI * 2);
+        ctx.arc(tg.x, tg.y, Math.max(0, tg.r * prog), 0, Math.PI * 2);
         ctx.fill();
       } else {
         ctx.save();
@@ -245,7 +245,7 @@ export class Renderer {
             ctx.strokeStyle = 'rgba(255,60,90,0.4)';
             ctx.setLineDash([6, 6]);
             ctx.beginPath();
-            ctx.arc(0, 0, tg.len * 0.6, 0, tg.sweep * tg.active, tg.sweep < 0);
+            ctx.arc(0, 0, Math.max(0, tg.len * 0.6), 0, tg.sweep * tg.active, tg.sweep < 0);
             ctx.stroke();
             ctx.setLineDash([]);
           }
@@ -315,32 +315,49 @@ export class Renderer {
       }
       switch (p.kind) {
         case 'xp': {
+          // XP shards: the most important pickup, so they get the brightest, most distinct treatment:
+          // saturated mint/cyan/violet with a dark outline, a white core, a halo and a twinkle.
           const tier = p.value >= 25 ? 2 : p.value >= 5 ? 1 : 0;
-          const col = ['#43ff8a', '#4dc3ff', '#c06bff'][tier];
-          const s = [3.2, 4.2, 5.6][tier] + Math.min(4, Math.log10(p.value + 1) * (tier === 2 ? 1.5 : 0));
+          const col = ['#3dffa0', '#38d6ff', '#c77dff'][tier];
+          const s = [4.6, 5.6, 7][tier] + (tier === 2 ? Math.min(4, Math.log10(p.value + 1) * 1.5) : 0);
+          const tw = 0.75 + 0.25 * Math.sin(t * 6 + p.x * 0.37 + p.y * 0.21);
+          const y = p.y + Math.sin(t * 3 + p.x) * 0.8;
           ctx.globalCompositeOperation = 'lighter';
-          ctx.globalAlpha = 0.5;
+          ctx.globalAlpha = 0.75 * tw;
           const gl = this.sprites.glow(col);
-          ctx.drawImage(gl, p.x - s * 2.2, p.y - s * 2.2, s * 4.4, s * 4.4);
+          ctx.drawImage(gl, p.x - s * 2.6, y - s * 2.6, s * 5.2, s * 5.2);
           ctx.globalAlpha = 1;
           ctx.globalCompositeOperation = 'source-over';
-          ctx.fillStyle = col;
-          ctx.strokeStyle = '#0c1a12';
-          ctx.lineWidth = 1;
           ctx.beginPath();
-          ctx.moveTo(p.x, p.y - s);
-          ctx.lineTo(p.x + s * 0.7, p.y);
-          ctx.lineTo(p.x, p.y + s);
-          ctx.lineTo(p.x - s * 0.7, p.y);
+          ctx.moveTo(p.x, y - s);
+          ctx.lineTo(p.x + s * 0.68, y);
+          ctx.lineTo(p.x, y + s);
+          ctx.lineTo(p.x - s * 0.68, y);
+          ctx.closePath();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#05140c';
+          ctx.stroke();
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.9)';
+          ctx.beginPath();
+          ctx.moveTo(p.x, y - s * 0.8);
+          ctx.lineTo(p.x + s * 0.3, y - s * 0.1);
+          ctx.lineTo(p.x, y + s * 0.2);
+          ctx.lineTo(p.x - s * 0.22, y - s * 0.1);
           ctx.closePath();
           ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = 'rgba(255,255,255,0.7)';
-          ctx.beginPath();
-          ctx.moveTo(p.x, p.y - s);
-          ctx.lineTo(p.x + s * 0.35, p.y - s * 0.2);
-          ctx.lineTo(p.x, p.y);
-          ctx.fill();
+          if (tw > 0.97) {
+            // occasional sparkle
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(p.x - s * 1.4, y - s * 0.6);
+            ctx.lineTo(p.x - s * 0.6, y - s * 0.6);
+            ctx.moveTo(p.x - s, y - s);
+            ctx.lineTo(p.x - s, y - s * 0.2);
+            ctx.stroke();
+          }
           break;
         }
         case 'gold': {
@@ -469,7 +486,7 @@ export class Renderer {
     ctx.strokeStyle = 'rgba(94,242,255,0.8)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 10 + p.drop * 6, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, Math.max(0, 10 + p.drop * 6), 0, Math.PI * 2);
     ctx.stroke();
     // parachute + crate
     ctx.save();
@@ -560,7 +577,7 @@ export class Renderer {
     ctx.drawImage(sp.img, sp.ox, sp.oy, sp.w, sp.h);
     if (e.flash > 0) {
       // translucent white overlay: readable hit feedback without turning tanky targets into blobs
-      ctx.globalAlpha = e.elite ? 0.4 : 0.7;
+      ctx.globalAlpha = e.elite ? 0.25 : 0.7;
       ctx.drawImage(sp.white, sp.ox, sp.oy, sp.w, sp.h);
       ctx.globalAlpha = 1;
     }
@@ -679,7 +696,7 @@ export class Renderer {
         ctx.stroke();
         ctx.fillStyle = '#fff2c8';
         ctx.beginPath();
-        ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+        ctx.arc(0, 0, Math.max(0, r * 0.35), 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       } else {
@@ -765,12 +782,12 @@ export class Renderer {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.arc(0, 0, r * 0.75, 0, Math.PI * 1.4);
+          ctx.arc(0, 0, Math.max(0, r * 0.75), 0, Math.PI * 1.4);
           ctx.stroke();
           ctx.strokeStyle = col;
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(0, 0, r * 0.75, Math.PI * 1.5, Math.PI * 1.9);
+          ctx.arc(0, 0, Math.max(0, r * 0.75), Math.PI * 1.5, Math.PI * 1.9);
           ctx.stroke();
           ctx.restore();
           break;
@@ -822,7 +839,7 @@ export class Renderer {
       ctx.strokeStyle = '#120d14';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r * 0.7, 0, Math.PI * 2);
+      ctx.arc(s.x, s.y, Math.max(0, s.r * 0.7), 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }

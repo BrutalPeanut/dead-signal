@@ -216,7 +216,7 @@ const PAINT: Record<Biome, (ctx: C, rng: Rng, cx: number, cy: number) => void> =
       }
     }
     for (let i = 0; i < 3; i++) crack(ctx, rng, 'rgba(60,70,80,0.55)', 0.8);
-    for (let i = 0; i < 2; i++) goo(ctx, rng, 'rgba(90,170,40,0.5)', 'rgba(200,255,120,0.8)');
+    for (let i = 0; i < 2; i++) goo(ctx, rng, 'rgba(150,90,30,0.45)', 'rgba(255,190,90,0.7)');
     for (let i = 0; i < 4; i++) {
       ctx.save();
       ctx.translate(rng.range(0, CHUNK), rng.range(0, CHUNK));

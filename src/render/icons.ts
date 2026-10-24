@@ -148,6 +148,36 @@ const SKILL_GLYPHS: Record<string, (x: C, col: string) => void> = {
     x.roundRect(10, 24, 10, 16, 2);
     glyph(x, '#5a6478');
   },
+  cleaver(x, col) {
+    x.beginPath();
+    x.moveTo(12, 50);
+    x.quadraticCurveTo(20, 14, 54, 10);
+    x.quadraticCurveTo(34, 24, 26, 54);
+    x.closePath();
+    glyph(x, col);
+    x.beginPath();
+    x.roundRect(8, 46, 14, 8, 3);
+    glyph(x, '#5a6478');
+  },
+  adrenal(x, col) {
+    x.beginPath();
+    x.moveTo(32, 54);
+    x.bezierCurveTo(8, 38, 8, 14, 22, 14);
+    x.bezierCurveTo(28, 14, 32, 20, 32, 22);
+    x.bezierCurveTo(32, 20, 36, 14, 42, 14);
+    x.bezierCurveTo(56, 14, 56, 38, 32, 54);
+    glyph(x, col);
+    x.strokeStyle = '#fff';
+    x.lineWidth = 3;
+    x.beginPath();
+    x.moveTo(16, 32);
+    x.lineTo(24, 32);
+    x.lineTo(28, 24);
+    x.lineTo(34, 40);
+    x.lineTo(38, 30);
+    x.lineTo(48, 30);
+    x.stroke();
+  },
   chip(x, col) {
     x.beginPath();
     x.arc(32, 32, 18, 0, Math.PI * 2);
@@ -389,6 +419,8 @@ const GEAR_GLYPH: Record<string, (x: C, col: string) => void> = {
   thrower: SKILL_GLYPHS.disc,
   tube: SKILL_GLYPHS.frag,
   drillrig: SKILL_GLYPHS.drill,
+  sawhalo: SKILL_GLYPHS.blades,
+  riftcleaver: SKILL_GLYPHS.cleaver,
   optic(x, col) {
     SLOT_GLYPHS.visor(x, col);
     x.beginPath();
