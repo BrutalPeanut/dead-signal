@@ -15,6 +15,7 @@ import {
 } from '../meta/gear';
 import { RELAY_CAP_H, type Profile } from '../meta/profile';
 import { LOGIN_DAYS, loginReward } from '../meta/login';
+import { DAILY_TIERS, ENDLESS_BOSS_EVERY, dailyChallenge, type RunMode } from '../sim/modes';
 import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
 import { drawHero } from '../render/art';
 import { gearIcon } from '../render/icons';
@@ -63,7 +64,9 @@ export class Hub {
   private modal: HTMLElement | null = null;
   private scene = new HomeScene();
 
-  constructor(private p: Profile, private onDeploy: (sector: number) => void, private onSettings: () => void) {
+  mode: RunMode = 'campaign';
+
+  constructor(private p: Profile, private onDeploy: (sector: number, mode: RunMode) => void, private onSettings: () => void) {
     this.sector = p.data.unlocked;
     this.top = h('div.topbar');
     this.body = h('div.hub-body');
@@ -302,8 +305,10 @@ export class Hub {
           rail('missions', 'Missions', () => this.setTab('missions'), missionsLocked ? null : missionsReady || null, null, missionsLocked ? '.locked' : ''),
           rail('crate', 'Crates', () => this.setTab('supply'), d.keys || null),
         ),
+        this.modeTabs(),
       ),
-      h(
+      ...(this.mode === 'campaign' ? [] : this.modeCard()),
+      this.mode !== 'campaign' ? null : h(
         'div.sector-card',
         h(
           'div.sc-head',
@@ -319,7 +324,7 @@ export class Hub {
         ),
         track,
       ),
-      h(
+      this.mode !== 'campaign' ? null : h(
         'div.battle-row',
         h(
           'div.power-line.' + (power >= ch.power ? 'ok' : power >= ch.power * 0.75 ? 'warn' : 'bad'),
@@ -335,7 +340,7 @@ export class Hub {
             disabled: locked,
             onclick: () => {
               haptic(20);
-              this.onDeploy(this.sector);
+              this.onDeploy(this.sector, 'campaign');
             },
           },
           locked ? h('span', h('i.lk', { html: icon('lock', 20) }), 'Locked') : h('span', 'BATTLE', h('small', `${BOSSES[ch.midBoss].name} · ${BOSSES[ch.finalBoss].name}`)),
@@ -353,6 +358,97 @@ export class Hub {
             ),
       ),
     );
+  }
+
+  static readonly MODE_UNLOCK: Record<RunMode, number> = { campaign: 0, daily: 1, endless: 3 };
+
+  private modeTabs() {
+    const d = this.p.data;
+    const tab = (m: RunMode, label: string) => {
+      const need = Hub.MODE_UNLOCK[m];
+      const lock = d.unlocked < need;
+      const dot = m === 'daily' && !lock && this.p.dailyState().plays === 0;
+      return h(
+        'button.mt' + (this.mode === m ? '.on' : '') + (lock ? '.lock' : ''),
+        {
+          onclick: () => {
+            if (lock) {
+              audio.click();
+              toast(`Clear Sector ${need} to unlock ${label}`, '#8d97ab');
+              return;
+            }
+            this.mode = m;
+            audio.click();
+            haptic(8);
+            this.renderBody();
+          },
+        },
+        lock ? h('i.lk', { html: icon('lock', 12) }) : null,
+        label,
+        dot ? h('i.dot.static') : null,
+      );
+    };
+    return h('div.mode-tabs', tab('campaign', 'Campaign'), tab('daily', 'Daily'), tab('endless', 'Endless'));
+  }
+
+  /** Sector-card + battle-row equivalents for Daily Challenge and Endless. */
+  private modeCard(): HTMLElement[] {
+    const p = this.p;
+    const d = p.data;
+    if (this.mode === 'daily') {
+      const ch = dailyChallenge();
+      const ds = p.dailyState();
+      const top = DAILY_TIERS[DAILY_TIERS.length - 1].score;
+      const dateTxt = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      return [
+        h(
+          'div.sector-card.mode-card',
+          h('div.sc-num', `DAILY CHALLENGE · ${dateTxt.toUpperCase()}`),
+          h('div.sc-name', ch.mods.map((m) => m.name).join(' + ')),
+          h('div.mc-mods', ch.mods.map((m) => h('div', m.desc))),
+          h(
+            'div.chest-track.tiers',
+            h('div.ct-bar', h('i', { style: { width: `${Math.min(1, ds.best / top) * 100}%` } })),
+            DAILY_TIERS.map((t, i) =>
+              h(
+                'div.ct-chest.tier' + (ds.tiers & (1 << i) ? '.open' : ''),
+                { style: { left: `${(t.score / top) * 100}%`, '--tc': t.color } as any },
+                h('span.cc-box'),
+                h('span.cc-l', `${t.name} ${Math.round(t.score / 1000)}K`),
+              ),
+            ),
+          ),
+        ),
+        h(
+          'div.battle-row',
+          h('div.power-line', ds.best ? h('span', "Today's best ", h('b', ds.best.toLocaleString()), ` · ${ds.plays} run${ds.plays === 1 ? '' : 's'}`) : 'Same run for everyone today · standard kit, your gear stays home'),
+          h(
+            'button.btn.primary.big.go',
+            { onclick: () => (haptic(20), this.onDeploy(ch.sector, 'daily')) },
+            h('span', 'CHALLENGE', h('small', `${BOSSES[ch.midBoss].name} · ${BOSSES[ch.finalBoss].name}`)),
+          ),
+        ),
+      ];
+    }
+    const e = d.endless;
+    return [
+      h(
+        'div.sector-card.mode-card',
+        h('div.sc-num', 'ENDLESS · NO TIME LIMIT'),
+        h('div.sc-name', 'Last Signal'),
+        h('div.mc-mods', h('div', `Survive as long as you can. A boss every ${fmtTime(ENDLESS_BOSS_EVERY).replace(/^0/, '')}, each dropping a chest.`), h('div', 'Uses your gear · it only gets harder')),
+        h(
+          'div.mc-best',
+          h('div', h('small', 'BEST TIME'), h('b', e.best ? fmtTime(e.best) : '—')),
+          h('div', h('small', 'BEST SCORE'), h('b', e.bestScore ? fmtNum(e.bestScore) : '—')),
+        ),
+      ),
+      h(
+        'div.battle-row',
+        h('div.power-line', 'Your power ', h('b', coin('power'), fmtNum(p.power()))),
+        h('button.btn.primary.big.go', { onclick: () => (haptic(20), this.onDeploy(2, 'endless')) }, h('span', 'ENDLESS', h('small', 'How long can you last?'))),
+      ),
+    ];
   }
 
   /** One-tap "Power Up" coach: the single best next upgrade, applied in place. */

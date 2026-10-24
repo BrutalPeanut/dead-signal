@@ -11,6 +11,10 @@ import { coin, fmtNum, fmtTime, h } from './dom';
  * changes, so the DOM stays cheap even at 60fps.
  */
 export class Hud {
+  private timerSub = h('small', '');
+  private dailyBest = 0;
+  private endlessBest = 0;
+  private beatShown = false;
   el: HTMLElement;
   private xpFill: HTMLElement;
   private lvl: HTMLElement;
@@ -70,7 +74,7 @@ export class Hud {
           this.score,
           h('div.score-sub', h('span', '☠ ', this.kills), h('span', coin('gold'), this.gold)),
         ),
-        h('div.timer', this.timer, h('small', ` / ${fmtTime(RUN_LENGTH)}`)),
+        h('div.timer', this.timer, this.timerSub),
         h('button.pause', { onclick: onPause, 'aria-label': 'Pause' }, 'II'),
       ),
       h(
@@ -101,9 +105,18 @@ export class Hud {
   }
 
   /** Called at run start with this sector's best survival time (for the BEST marker). */
-  startRun(best: number) {
+  private mode: 'campaign' | 'daily' | 'endless' = 'campaign';
+
+  startRun(best: number, mode: 'campaign' | 'daily' | 'endless' = 'campaign', bestScore = 0) {
+    this.mode = mode;
+    this.el.classList.toggle('m-daily', mode === 'daily');
+    this.el.classList.toggle('m-endless', mode === 'endless');
+    this.timerSub.textContent = mode === 'endless' ? (best > 0 ? ` BEST ${fmtTime(best)}` : '') : ` / ${fmtTime(RUN_LENGTH)}`;
+    this.dailyBest = bestScore;
+    this.endlessBest = mode === 'endless' ? best : 0;
+    this.beatShown = false;
     this.toasts.replaceChildren();
-    this.runBest.style.display = best > 5 && best < RUN_LENGTH ? '' : 'none';
+    this.runBest.style.display = mode === 'campaign' && best > 5 && best < RUN_LENGTH ? '' : 'none';
     this.runBest.style.left = `${(best / RUN_LENGTH) * 100}%`;
     for (const m of this.runMarks) m.classList.remove('hit');
   }
@@ -126,8 +139,12 @@ export class Hud {
     this.set('sc', this.score, g.score().toLocaleString());
     this.xpFill.style.width = `${Math.min(100, (g.xp / g.xpNeed) * 100).toFixed(1)}%`;
     this.set('lvl', this.lvl, `LV ${g.level}`);
-    this.set('t', this.timer, fmtTime(Math.min(g.time, RUN_LENGTH)));
+    this.set('t', this.timer, fmtTime(this.mode === 'endless' ? g.time : Math.min(g.time, RUN_LENGTH)));
     this.set('k', this.kills, fmtNum(g.kills));
+    if (!this.beatShown && ((this.mode === 'daily' && this.dailyBest > 0 && g.score() > this.dailyBest) || (this.mode === 'endless' && this.endlessBest > 30 && g.time > this.endlessBest))) {
+      this.beatShown = true;
+      this.toast(this.mode === 'daily' ? "NEW BEST TODAY!" : 'NEW BEST TIME!', '#ffd34d', true);
+    }
     this.set('g', this.gold, fmtNum(g.gold));
 
     const key = g.weapons.map((w) => `${w.id}${w.level}${w.evolved ? 'e' : ''}`).join() + '|' + g.passives.map((p) => p.id + p.level).join();

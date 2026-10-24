@@ -43,6 +43,7 @@ import type {
 } from './types';
 import { updateWeapons, weaponStats } from './weapons';
 import { updateBoss } from './bosses';
+import { ENDLESS_BOSS_EVERY, ENDLESS_HORDE_EVERY, ENDLESS_HORDE_KINDS, defaultMods, type GameMods } from './modes';
 
 export const DT = 1 / 60;
 const MAX_ENEMIES = 420;
@@ -58,6 +59,7 @@ export interface RunResult {
   eliteKills: number;
   evolutions?: number;
   score?: number;
+  mode?: 'campaign' | 'daily' | 'endless';
   /** What landed the final hit on a loss (enemy kind or boss attack), for the death tip. */
   killedBy?: string;
   killedByBoss?: string;
@@ -136,15 +138,35 @@ export class Game {
   pickupR = 46;
   regen = 0;
 
-  constructor(chapter: ChapterDef, base: BaseStats, seed = Date.now()) {
+  readonly mods: GameMods;
+  /** Past 5:00 in Endless, toughness climbs on a curve so even maxed builds eventually fall (~10-15 min). */
+  endlessRamp() {
+    if (!this.endless || this.time <= RUN_LENGTH) return 1;
+    const x = (this.time - RUN_LENGTH) / 240;
+    return 1 + x * x;
+  }
+  get endless() {
+    return this.mods.mode === 'endless';
+  }
+  private endlessBossT = MIDBOSS_TIME / TIME_SCALE + ENDLESS_BOSS_EVERY;
+  private endlessHordeT = 0;
+  private endlessBossIdx = 0;
+  private endlessEliteT = 0;
+
+  constructor(chapter: ChapterDef, base: BaseStats, seed = Date.now(), mods: GameMods = defaultMods()) {
     this.rng = new Rng(seed);
     this.chapter = chapter;
+    this.mods = mods;
+    // modifiers that change the player's kit are folded into a copy of the base stats
+    base = { ...base, hp: Math.round(base.hp * mods.playerHp), atk: base.atk * mods.playerDmg, pickup: base.pickup * mods.pickup };
+    if (mods.startWeapon) base.startWeapon = mods.startWeapon;
     this.base = base;
     this.maxHp = base.hp;
     this.hp = base.hp;
     this.rerolls = base.rerolls;
     this.revives = base.revives;
     this.addWeapon(base.startWeapon);
+    for (const w of mods.extraWeapons) if (!this.weapons.some((x) => x.id === w)) this.addWeapon(w);
     this.recalc();
     // Opening wave so the first second already has targets (empty screens kill first impressions).
     for (let i = 0; i < 6; i++) {
@@ -280,10 +302,23 @@ export class Game {
         this.hordeIdx++;
       }
     } else if (h && bossActive && t >= h.t) this.hordeIdx++; // skip hordes during bosses
+    if (this.endless && !h && !bossActive) {
+      // past the scripted table: a fresh horde every ENDLESS_HORDE_EVERY mission-seconds
+      if (!this.endlessHordeT) this.endlessHordeT = Math.max(t, HORDES[HORDES.length - 1].t) + ENDLESS_HORDE_EVERY;
+      if (t >= this.endlessHordeT) {
+        const n = Math.floor(this.endlessHordeT / ENDLESS_HORDE_EVERY);
+        const kind = ENDLESS_HORDE_KINDS[n % ENDLESS_HORDE_KINDS.length];
+        this.fx.push({ t: 'banner', text: 'HORDE INCOMING', sub: 'The signal is getting louder', color: '#ff3b5c' });
+        this.spawnHorde(kind, kind === 'brute' ? 16 : 60 + n * 2, 2);
+        this.endlessHordeT += ENDLESS_HORDE_EVERY;
+      }
+    }
 
-    const et = ELITE_TIMES[this.eliteIdx];
+    let et: number | undefined = ELITE_TIMES[this.eliteIdx];
+    if (et === undefined && this.endless) et = this.endlessEliteT ||= ELITE_TIMES[ELITE_TIMES.length - 1] + 300;
     if (et !== undefined && t >= et) {
       this.eliteIdx++;
+      if (this.endless && this.eliteIdx > ELITE_TIMES.length) this.endlessEliteT += 300;
       if (!bossActive) {
         const kinds: EnemyKind[] = ['brute', 'shambler', 'bloater'];
         this.spawnEnemy(this.rng.pick(kinds), true);
@@ -295,13 +330,20 @@ export class Game {
       this.midBossSpawned = true;
       this.spawnBoss(this.chapter.midBoss, true);
     }
-    if (!this.finalBossSpawned && this.time >= RUN_LENGTH) {
+    if (this.endless) {
+      // a boss every 2:30, cycling the roster; each one drops a big chest instead of ending the run
+      if (this.midBossSpawned && !bossActive && this.time >= this.endlessBossT) {
+        const kinds = [this.chapter.finalBoss, this.chapter.midBoss, 'colossus', 'warden', 'hive'] as const;
+        this.spawnBoss(kinds[this.endlessBossIdx++ % kinds.length], true);
+        this.endlessBossT += ENDLESS_BOSS_EVERY;
+      }
+    } else if (!this.finalBossSpawned && this.time >= RUN_LENGTH) {
       this.finalBossSpawned = true;
       this.spawnBoss(this.chapter.finalBoss, false);
     }
 
-    if (!bossActive && this.time < RUN_LENGTH) {
-      this.spawnAcc += spawnRate(t) * dt;
+    if (!bossActive && (this.time < RUN_LENGTH || this.endless)) {
+      this.spawnAcc += spawnRate(t) * this.mods.spawn * dt;
       while (this.spawnAcc >= 1) {
         this.spawnAcc -= 1;
         if (this.enemies.length >= MAX_ENEMIES) break;
@@ -346,7 +388,7 @@ export class Game {
 
   spawnEnemyAt(kind: EnemyKind, x: number, y: number, elite: boolean): Enemy {
     const d = ENEMIES[kind];
-    const hpm = hpScale(this.T) * this.chapter.hpMul * (elite ? 14 : 1);
+    const hpm = hpScale(this.T) * this.chapter.hpMul * this.mods.enemyHp * this.endlessRamp() * (elite ? 14 : 1);
     const e: Enemy = {
       id: this.newId(),
       kind,
@@ -357,8 +399,8 @@ export class Game {
       r: d.r * (elite ? 1.5 : 1),
       hp: d.hp * hpm,
       maxHp: d.hp * hpm,
-      speed: d.speed * (elite ? 0.85 : 1) * this.rng.range(0.92, 1.08),
-      dmg: d.dmg * this.chapter.dmgMul * (elite ? 1.5 : 1) * (1 + this.T / 750),
+      speed: d.speed * this.mods.enemySpeed * (elite ? 0.85 : 1) * this.rng.range(0.92, 1.08),
+      dmg: d.dmg * this.chapter.dmgMul * this.mods.enemyDmg * (elite ? 1.5 : 1) * (1 + this.T / 750),
       xp: d.xp * (elite ? 20 : 1),
       mass: d.mass * (elite ? 4 : 1),
       elite,
@@ -405,7 +447,7 @@ export class Game {
     this.shots.length = 0;
     const cr = Math.min(this.viewW, this.viewH) * 0.95 + 20;
     this.cage = { x: this.px, y: this.py, r: Math.max(215, cr) };
-    const hp = def.hp * this.chapter.hpMul * hpScale(this.T) * (mid ? 1.3 : 1.5) * 0.45;
+    const hp = def.hp * this.chapter.hpMul * this.mods.enemyHp * this.endlessRamp() * hpScale(this.T) * (mid ? 1.3 : 1.5) * 0.45;
     const b: Enemy = {
       id: this.newId(),
       kind: 'boss',
@@ -418,7 +460,7 @@ export class Game {
       hp,
       maxHp: hp,
       speed: def.speed,
-      dmg: def.dmg * this.chapter.dmgMul * (1 + this.T / 1200),
+      dmg: def.dmg * this.chapter.dmgMul * this.mods.enemyDmg * (1 + this.T / 1200),
       xp: 60,
       mass: 40,
       elite: false,
@@ -968,7 +1010,7 @@ export class Game {
   }
 
   gainXp(v: number) {
-    this.xp += v * XP_MUL;
+    this.xp += v * XP_MUL * this.mods.xp;
     while (this.xp >= this.xpNeed) {
       this.xp -= this.xpNeed;
       this.level++;
@@ -1089,7 +1131,8 @@ export class Game {
   result(): RunResult {
     return {
       won: this.state === 'won',
-      time: Math.min(this.time, RUN_LENGTH),
+      time: this.endless ? this.time : Math.min(this.time, RUN_LENGTH),
+      mode: this.mods.mode,
       kills: this.kills,
       gold: this.gold,
       level: this.level,
@@ -1106,7 +1149,7 @@ export class Game {
 
   /** Run score: everything the player did, so every run produces a number to beat. */
   score(): number {
-    const t = Math.min(this.time, RUN_LENGTH);
+    const t = this.endless ? this.time : Math.min(this.time, RUN_LENGTH);
     return Math.round(this.kills * 10 + t * 10 + this.eliteKills * 300 + this.bossKills * 1500 + (this.state === 'won' ? 5000 : 0));
   }
 
@@ -1125,7 +1168,11 @@ export class Game {
     const tm = Game.TIME_MS[this.nextTimeMs];
     if (tm && this.time >= tm[0]) {
       this.nextTimeMs++;
-      this.fx.push({ t: 'toast', text: tm[1], color: tm[2], big: tm[3] });
+      // stars and the countdown only mean something in the campaign
+      if (this.mods.mode === 'campaign' || tm[0] === 60) this.fx.push({ t: 'toast', text: tm[1], color: tm[2], big: tm[3] });
+    }
+    if (this.endless && this.time >= 120 && Math.floor(this.time / 60) !== Math.floor((this.time - DT) / 60)) {
+      this.fx.push({ t: 'toast', text: `${Math.floor(this.time / 60)}:00 survived`, color: '#5ef2ff', big: true });
     }
     const km = Game.KILL_MS[this.nextKillMs];
     if (km && this.kills >= km) {
