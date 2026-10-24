@@ -121,6 +121,10 @@ export class Audio {
       case 'drill':
         this.tone(140, 0.2, 'sawtooth', 0.04, 260);
         break;
+      case 'cleaver':
+        this.noiseHit(0.14, 0.12, 'bandpass', 1400, 0, this.sfxBus, 1.5);
+        this.tone(300, 0.12, 'sawtooth', 0.04, 120);
+        break;
       case 'blades':
         this.tone(400, 0.25, 'sine', 0.05, 900);
         break;

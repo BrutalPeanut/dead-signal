@@ -37,7 +37,7 @@ import type {
   Telegraph,
   WeaponState,
 } from './types';
-import { updateWeapons } from './weapons';
+import { updateWeapons, weaponStats } from './weapons';
 import { updateBoss } from './bosses';
 
 export const DT = 1 / 60;
@@ -81,6 +81,7 @@ export class Game {
   revives: number;
   aim = 0; // facing angle of player's gun
   hurtT = 0;
+  contactWindow = 0;
   moving = false;
 
   weapons: WeaponState[] = [];
@@ -448,6 +449,10 @@ export class Game {
 
   private updateEnemies(dt: number) {
     const es = this.enemies;
+    if (this.contactWindow > 0) this.contactWindow -= dt;
+    const fw = this.weapons.find((w) => w.id === 'field');
+    const fieldR = fw ? weaponStats(fw).area * this.areaMul : 0;
+    const fieldDamp = fw ? (fw.evolved ? 0.4 : 0.25) : 0;
     const px = this.px;
     const py = this.py;
     const despawnR2 = Math.pow(Math.max(this.viewW, this.viewH) * 2.4, 2);
@@ -519,11 +524,15 @@ export class Game {
         });
       }
 
-      // contact damage
+      // contact damage (short shared window so a swarm can't land every hit on the same frame;
+      // infected inside a Plasma Field hit softer, which is what lets melee builds stand their ground)
       const cr = e.r + 10;
-      if (e.contactCd <= 0 && dist2(e.x, e.y, px, py) < cr * cr) {
+      const d2p = dist2(e.x, e.y, px, py);
+      if (e.contactCd <= 0 && this.contactWindow <= 0 && d2p < cr * cr) {
         e.contactCd = 0.6;
-        this.hurtPlayer(e.dmg);
+        this.contactWindow = 0.12;
+        const damp = fieldR > 0 && d2p < fieldR * fieldR ? fieldDamp : 0;
+        this.hurtPlayer(e.dmg * (1 - damp));
       }
 
       if (this.cage && e.kind !== 'boss') {
@@ -578,7 +587,11 @@ export class Game {
   killEnemy(e: Enemy, counted: boolean) {
     if (!e.alive) return;
     e.alive = false;
-    if (counted) this.kills++;
+    if (counted) {
+      this.kills++;
+      const ad = this.passiveLevel('adrenal');
+      if (ad > 0 && this.hp > 0) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.0006 * ad * this.base.healMul);
+    }
     this.fx.push({ t: 'death', x: e.x, y: e.y, kind: e.boss ?? e.kind, elite: e.elite, r: e.r });
 
     if (e.kind === 'boss') {

@@ -55,16 +55,18 @@ export interface Banner {
   t: number;
 }
 
+// Infected bleed dark signal-magenta/maroon tones on purpose: green belongs to XP shards only,
+// so loot never camouflages in the gore.
 const GOO: Record<string, string> = {
-  shambler: '#6fbf3a',
-  runner: '#9b2a3a',
-  crawler: '#8a5cc2',
-  brute: '#6fbf3a',
-  spitter: '#9dff4a',
-  bloater: '#c4e64a',
-  warden: '#ff3bd4',
-  hive: '#c6ff4a',
-  colossus: '#ff3bd4',
+  shambler: '#6b2350',
+  runner: '#8a2236',
+  crawler: '#5a3a8a',
+  brute: '#5e1f48',
+  spitter: '#7a3d1e',
+  bloater: '#8a6a1a',
+  warden: '#b0208e',
+  hive: '#6a2a7a',
+  colossus: '#b0208e',
 };
 
 export class Fx {
@@ -72,6 +74,7 @@ export class Fx {
   floaters: Floater[] = [];
   arcs: Arc[] = [];
   decals: Decal[] = [];
+  slashes: { x: number; y: number; a: number; r: number; arc: number; evo: boolean; life: number }[] = [];
   shake = 0;
   flash = 0;
   flashColor = '#ffffff';
@@ -104,7 +107,7 @@ export class Fx {
             this.floaters.push({ x: e.x + (Math.random() - 0.5) * 8, y: e.y, v: fmt(e.v), crit: e.crit, life: e.crit ? 0.8 : 0.55 });
           break;
         case 'death': {
-          const c = GOO[e.kind] ?? '#6fbf3a';
+          const c = GOO[e.kind] ?? '#6b2350';
           const big = e.elite || e.r > 25;
           this.decals.push({ x: e.x, y: e.y + e.r * 0.5, r: e.r * (big ? 1.6 : 1.1) * (0.8 + Math.random() * 0.4), color: c, life: 9, rot: Math.random() * 3 });
           if (this.decals.length > 140) this.decals.shift();
@@ -171,6 +174,10 @@ export class Fx {
         case 'airdrop':
           this.banners.push({ text: '', sub: 'Supply drop inbound', color: '#5ef2ff', t: 1.8 });
           break;
+        case 'slash':
+          this.slashes.push({ ...e, life: 0.2 });
+          this.shake = Math.max(this.shake, e.evo ? 2.5 : 1.2);
+          break;
         case 'shoot':
           break;
       }
@@ -192,6 +199,8 @@ export class Fx {
       f.y -= 38 * dt;
     }
     this.floaters = this.floaters.filter((f) => f.life > 0);
+    for (const sl of this.slashes) sl.life -= dt;
+    this.slashes = this.slashes.filter((sl) => sl.life > 0);
     for (const a of this.arcs) a.life -= dt;
     this.arcs = this.arcs.filter((a) => a.life > 0);
     for (const d of this.decals) d.life -= dt;
@@ -258,6 +267,25 @@ export class Fx {
         const s = p.size * 2.6;
         ctx.drawImage(g, p.x - s, p.y - s, s * 2, s * 2);
       }
+    }
+    for (const sl of this.slashes) {
+      // crescent that sweeps through its arc and fades
+      const k = 1 - sl.life / 0.2;
+      const half = Math.min(sl.arc, Math.PI);
+      const a0 = sl.a - half;
+      const a1 = sl.a - half + half * 2 * Math.min(1, k * 1.8);
+      ctx.globalAlpha = Math.max(0, 1 - k * 0.9);
+      ctx.fillStyle = sl.evo ? '#ffb3c6' : '#ff5470';
+      ctx.beginPath();
+      ctx.arc(sl.x, sl.y, sl.r, a0, a1);
+      ctx.arc(sl.x, sl.y, sl.r * 0.62, a1, a0, true);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sl.x, sl.y, sl.r, a0, a1);
+      ctx.stroke();
     }
     for (const arc of this.arcs) {
       const a = arc.life / 0.16;

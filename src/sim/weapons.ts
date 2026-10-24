@@ -20,8 +20,8 @@ export function bladePositions(g: Game, w: WeaponState, out: number[] = []): num
   return out;
 }
 
-export function bladesActive(w: WeaponState) {
-  return w.evolved || w.active > 0;
+export function bladesActive(_w: WeaponState) {
+  return true;
 }
 
 type ProjInit = Partial<Projectile> & Pick<Projectile, 'kind' | 'x' | 'y' | 'dmg'>;
@@ -125,20 +125,8 @@ export function updateWeapons(g: Game, dt: number) {
       }
 
       case 'blades': {
+        // Blades are always on: downtime is what made melee builds collapse under swarms.
         w.angle += s.speed * dt;
-        if (!w.evolved) {
-          if (w.active > 0) {
-            w.active -= dt;
-            if (w.active <= 0) w.timer = s.cd * g.cdMul;
-          } else {
-            w.timer -= dt;
-            if (w.timer <= 0) {
-              w.active = s.dur * g.durMul;
-              g.fx.push({ t: 'shoot', weapon: 'blades' });
-            }
-          }
-        }
-        if (!bladesActive(w)) break;
         const pos = bladePositions(g, w, scratch);
         const br = 16 * (w.evolved ? 1.3 : 1) * Math.sqrt(g.areaMul);
         for (let k = 0; k < pos.length; k += 2) {
@@ -337,6 +325,54 @@ export function updateWeapons(g: Game, dt: number) {
           });
         }
         g.fx.push({ t: 'shoot', weapon: 'napalm' });
+        break;
+      }
+
+      case 'cleaver': {
+        w.timer -= dt;
+        if (w.timer > 0) break;
+        const reach = s.area * Math.sqrt(g.areaMul);
+        // only swing when something is in reach: a melee weapon shouldn't whiff into empty air
+        let tgt: Enemy | null = null;
+        let bd = (reach + 30) ** 2;
+        g.grid.query(g.px, g.py, reach + 30, (j) => {
+          const e = g.enemies[j];
+          if (!e.alive) return;
+          const d = dist2(e.x, e.y, g.px, g.py) * (e.kind === 'boss' ? 0.5 : 1);
+          if (d < bd) {
+            bd = d;
+            tgt = e;
+          }
+        });
+        if (!tgt) {
+          w.timer = 0.08;
+          break;
+        }
+        w.timer = s.cd * g.cdMul;
+        const t0 = tgt as Enemy;
+        const base = Math.atan2(t0.y - g.py, t0.x - g.px);
+        for (let k = 0; k < s.count; k++) {
+          // second swing goes the opposite way: covers your back
+          const a = k === 0 ? base : base + Math.PI;
+          const half = s.extra;
+          g.grid.query(g.px, g.py, reach + 30, (j) => {
+            const e = g.enemies[j];
+            if (!e.alive) return;
+            const dx = e.x - g.px;
+            const dy = e.y - g.py;
+            const d = Math.hypot(dx, dy) || 1;
+            if (d > reach + e.r) return;
+            if (half < Math.PI) {
+              let da = Math.atan2(dy, dx) - a;
+              da = Math.atan2(Math.sin(da), Math.cos(da));
+              if (Math.abs(da) > half + e.r / d) return;
+            }
+            g.damage(e, dmg, dx / d, dy / d, 300, '#ff5470');
+          });
+          g.fx.push({ t: 'slash', x: g.px, y: g.py, a, r: reach, arc: half, evo: w.evolved });
+          if (k === 0) g.aim = a;
+        }
+        g.fx.push({ t: 'shoot', weapon: 'cleaver' });
         break;
       }
 

@@ -7,6 +7,9 @@ import type { Offer } from './types';
  * A simple autopilot used for headless balance runs (and the menu attract-mode).
  * Plays like a decent-but-not-great human: kites away from crowds, dodges telegraphs, grabs gems.
  */
+/** Bot temperament: how far it keeps from regular enemies (melee builds hold closer). */
+export const botStyle = { kite: 110 };
+
 export function botMove(g: Game): [number, number] {
   let fx = 0;
   let fy = 0;
@@ -15,7 +18,7 @@ export function botMove(g: Game): [number, number] {
     const dx = g.px - e.x;
     const dy = g.py - e.y;
     const d2 = dx * dx + dy * dy;
-    const R = e.kind === 'boss' ? 170 : 110;
+    const R = e.kind === 'boss' ? 170 : botStyle.kite;
     if (d2 > R * R) continue;
     const d = Math.sqrt(d2) || 1;
     const w = (e.kind === 'boss' ? 4 : 1) * (1 - d / R) ** 2;
@@ -91,7 +94,23 @@ export function botMove(g: Game): [number, number] {
   return [fx / m, fy / m];
 }
 
+/** Optional build preference: ids listed first are strongly favoured (for build-comparison tests). */
+export const botPrefs: { ids: string[] } = { ids: [] };
+
 export function botChoose(g: Game, offers: Offer[]): number {
+  if (botPrefs.ids.length) {
+    let best = -1;
+    let rank = 1e9;
+    offers.forEach((o, i) => {
+      const id = (o as { id?: string }).id;
+      const r = id ? botPrefs.ids.indexOf(id) : -1;
+      if (r >= 0 && r < rank) {
+        rank = r;
+        best = i;
+      }
+    });
+    if (best >= 0) return best;
+  }
   const owned = new Set(g.weapons.map((w) => w.id));
   const partners = new Set(g.weapons.map((w) => WEAPONS[w.id].partner));
   let bi = 0;
