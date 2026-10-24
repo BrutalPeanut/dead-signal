@@ -3217,3 +3217,31 @@ button {
   color: var(--text);
   line-height: 1.35;
 }
+
+/* topbar: the name block yields space to the wallet instead of sliding under it */
+.hub.lobby .topbar .acct {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.hub.lobby .topbar .acct .who {
+  min-width: 0;
+}
+
+.hub.lobby .topbar .acct .who .pw {
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  /* narrow phones: keep power, drop the name and the decorative "+" so nothing collides */
+  .hub.lobby .topbar .acct .who .nm {
+    display: none;
+  }
+  .hub.lobby .topbar .wallet .plus {
+    display: none;
+  }
+}
+
+.acct .ava .lvb {
+  z-index: 2;
+}

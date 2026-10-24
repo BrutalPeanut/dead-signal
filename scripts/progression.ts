@@ -70,6 +70,12 @@ const deaths: Record<string, { n: number; last: Record<string, number>; dmg: Rec
 const t0 = performance.now();
 for (let run = 1; run <= maxRuns && p.data.unlocked < CHAPTER_COUNT; run++) {
   const sector = p.data.unlocked;
+  if (process.env.SAVE_AT && sector >= Number(process.env.SAVE_AT)) {
+    // snapshot a realistic save at this point of the journey (for real-time human playtests)
+    (await import('node:fs')).writeFileSync(process.env.SAVE_FILE ?? 'save.json', JSON.stringify(p.data));
+    console.log(`saved profile at S${sector + 1}`);
+    break;
+  }
   const base = p.baseStats();
   const g = new Game(getChapter(sector), base, rng.int(1, 1e9));
   let steps = 0;
