@@ -20,6 +20,7 @@ import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
 import { drawHero } from '../render/art';
 import { setHeroSkin } from '../render/hero';
 import { CHARACTERS, charById } from '../meta/characters';
+import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../meta/pass';
 import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
 import { gearIcon } from '../render/icons';
 import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, WEAPONS } from '../sim/data';
@@ -254,7 +255,6 @@ export class Hub {
       this.renderBody();
     };
     const relay = p.relayPending();
-    const missionsReady = p.missionsClaimable();
     const missionsLocked = this.locked('missions');
     const rail = (ico: string, label: string, onclick: () => void, badge: string | number | null, extra?: HTMLElement | null, cls = '') =>
       h(
@@ -266,6 +266,9 @@ export class Hub {
         badge ? h('i.badge-n', badge) : null,
       );
     const relayFrac = relay.hours / RELAY_CAP_H;
+    const ps = p.pass();
+    const passFrac = (ps.sp % SP_PER_TIER) / SP_PER_TIER;
+    const passRing = h('span.rring.pass', { html: `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="${Math.round(passFrac * 100)} 100"/></svg>` });
     const relayRing = h('span.rring', { html: `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="${Math.round(relayFrac * 100)} 100"/></svg>` });
 
     // sector chest track
@@ -321,7 +324,9 @@ export class Hub {
         ),
         h(
           'div.rails.right',
-          rail('missions', 'Missions', () => this.setTab('missions'), missionsLocked ? null : missionsReady || null, null, missionsLocked ? '.locked' : ''),
+          missionsLocked
+            ? rail('missions', 'Missions', () => this.setTab('missions'), null, null, '.locked')
+            : rail('pass', 'Pass', () => this.passSheet(), p.passClaimable() || null, passRing),
           rail('crate', 'Crates', () => this.setTab('supply'), d.keys || null),
         ),
       ),
@@ -458,6 +463,66 @@ export class Hub {
         h('button.btn.primary.big.go', { onclick: () => (haptic(20), this.onDeploy(2, 'endless')) }, h('span', 'ENDLESS', h('small', 'How long can you last?'))),
       ),
     ];
+  }
+
+  /** Signal Pass: season track with free + premium rewards. */
+  passSheet() {
+    this.closeModal();
+    const p = this.p;
+    const ps = p.pass();
+    const se = seasonOf();
+    const lvl = passLevel(ps.sp);
+    const cell = (i: number, prem: boolean) => {
+      const r = passReward(i, prem, p.data.unlocked);
+      const done = prem ? !!(ps.prem & (1 << i)) : !!(ps.free & (1 << i));
+      const ready = p.canClaimPass(i, prem);
+      const locked = prem && !ps.premium;
+      return h(
+        'button.ps-cell' + (prem ? '.prem' : '') + (done ? '.done' : '') + (ready ? '.ready' : '') + (locked ? '.locked' : ''),
+        {
+          onclick: () => {
+            const got = p.claimPass(i, prem);
+            if (got) {
+              audio.pickup('chest');
+              haptic(25);
+              if (got.item) this.revealItem(got.item);
+              else {
+                this.toastReward(got.reward, '#ffd34d');
+                this.passSheet();
+              }
+            } else if (locked) toast('Signal Pass+ arrives with the app store release', '#8d97ab');
+            else if (!done) toast(`Reach tier ${i + 1} to claim`, '#8d97ab');
+          },
+        },
+        r.itemRarity !== undefined ? h('span.cal-item', { style: { borderColor: RARITY_COLORS[r.itemRarity], color: RARITY_COLORS[r.itemRarity] } }, '?') : null,
+        r.gold ? h('span', coin('gold'), fmtNum(r.gold)) : null,
+        r.scrap ? h('span', coin('scrap'), r.scrap) : null,
+        r.keys ? h('span', coin('key'), r.keys) : null,
+        done ? h('i.cal-ok', '✓') : locked ? h('i.ps-lock', { html: icon('lock', 12) }) : null,
+      );
+    };
+    const rows = Array.from({ length: PASS_TIERS }, (_, i) =>
+      h('div.ps-row' + (i < lvl ? '.reached' : ''), cell(i, false), h('b.ps-tier', i + 1), cell(i, true)),
+    );
+    const sheet = h(
+      'div.sheet.pass',
+      { onclick: (e: Event) => e.stopPropagation() },
+      h('div.ps-head', h('small', `SEASON ${se.number} · ${se.daysLeft} DAYS LEFT`), h('h2', `Signal Pass: ${se.name}`)),
+      h(
+        'div.ps-prog',
+        h('b', `Tier ${lvl}`),
+        h('div.ps-bar', h('i', { style: { width: `${lvl >= PASS_TIERS ? 100 : ((ps.sp % SP_PER_TIER) / SP_PER_TIER) * 100}%` } })),
+        h('small', lvl >= PASS_TIERS ? 'Maxed!' : `${ps.sp % SP_PER_TIER} / ${SP_PER_TIER} SP`),
+      ),
+      h('div.help', { style: { margin: '2px 0 8px' } }, 'Earn Signal Points from every run, daily missions and Daily Challenge tiers.'),
+      h('div.ps-cols', h('span', 'FREE'), h('span'), h('span.prem', 'PASS+')),
+      h('div.ps-list', rows),
+      ps.premium ? null : h('button.btn.big', { style: { width: '100%', marginTop: '10px' }, disabled: true }, 'Signal Pass+ · coming with the app'),
+      h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
+    );
+    this.modal = h('div.modal', { onclick: () => this.closeModal() }, sheet);
+    document.getElementById('ui')!.append(this.modal);
+    requestAnimationFrame(() => sheet.querySelector('.ps-cell.ready, .ps-row:not(.reached)')?.scrollIntoView({ block: 'center' }));
   }
 
   private lbButton(mode: 'daily' | 'endless') {
