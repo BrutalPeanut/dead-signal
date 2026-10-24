@@ -391,7 +391,7 @@ export class Renderer {
 
   private drawPowerup(ctx: CanvasRenderingContext2D, p: Pickup, t: number) {
     const bob = Math.sin(t * 3 + p.x) * 2;
-    const col = p.kind === 'ration' ? '#43ffa4' : p.kind === 'magnet' ? '#ff4fd8' : '#5ef2ff';
+    const col = p.kind === 'ration' ? '#43ffa4' : p.kind === 'magnet' ? '#ff4fd8' : '#ff8a2a';
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.6 + Math.sin(t * 5) * 0.2;
     ctx.drawImage(this.sprites.glow(col), p.x - 20, p.y - 20 + bob, 40, 40);
@@ -426,22 +426,50 @@ export class Renderer {
       ctx.fillRect(-7.3, -2.5, 3.6, 3);
       ctx.fillRect(3.7, -2.5, 3.6, 3);
     } else {
-      // EMP charge: battery cell with bolt
-      ctx.fillStyle = '#23324a';
+      // Bomb: classic round black bomb with a fuse cap, curling fuse and a flickering spark.
+      const body = ctx.createRadialGradient(-2.4, -1.6, 0.6, 0, 1, 8);
+      body.addColorStop(0, '#6a6e78');
+      body.addColorStop(0.45, '#2a2c33');
+      body.addColorStop(1, '#0c0d10');
+      ctx.fillStyle = body;
       ctx.beginPath();
-      ctx.roundRect(-5, -8, 10, 16, 2);
+      ctx.arc(0, 1, 7.2, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#5ef2ff';
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
       ctx.beginPath();
-      ctx.moveTo(1, -6);
-      ctx.lineTo(-3, 1);
-      ctx.lineTo(0, 1);
-      ctx.lineTo(-1, 6);
-      ctx.lineTo(3, -1);
-      ctx.lineTo(0, -1);
+      ctx.ellipse(-2.6, -1.8, 1.6, 1, -0.6, 0, Math.PI * 2);
+      ctx.fill();
+      // fuse cap
+      ctx.fillStyle = '#4a4e58';
+      ctx.beginPath();
+      ctx.roundRect(1.6, -7.6, 4.4, 3.4, 1);
+      ctx.fill();
+      ctx.stroke();
+      // fuse
+      ctx.strokeStyle = '#c8a46a';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(4, -7.6);
+      ctx.quadraticCurveTo(6.5, -11, 4.6, -12.4);
+      ctx.stroke();
+      // spark
+      const fl = 0.7 + 0.3 * Math.sin(t * 30 + p.x);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255,190,60,${0.9 * fl})`;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + t * 6;
+        const r = i % 2 ? 1.2 : 3.2 * fl;
+        ctx.lineTo(4.6 + Math.cos(a) * r, -12.6 + Math.sin(a) * r);
+      }
       ctx.closePath();
       ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(4.6, -12.6, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
     }
     ctx.restore();
   }
