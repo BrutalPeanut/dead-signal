@@ -14,6 +14,7 @@ import {
   type Slot,
 } from '../meta/gear';
 import { RELAY_CAP_H, type Profile } from '../meta/profile';
+import { LOGIN_DAYS, loginReward } from '../meta/login';
 import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
 import { drawHero } from '../render/art';
 import { gearIcon } from '../render/icons';
@@ -294,7 +295,7 @@ export class Hub {
         h(
           'div.rails.left',
           rail('relay', 'Relay', () => this.setTab('supply'), relay.hours >= 1 ? '!' : null, relayRing),
-          rail('daily', 'Daily', () => this.setTab('supply'), p.dailyAvailable() ? 1 : null),
+          rail('daily', 'Daily', () => this.calendar(), p.dailyAvailable() ? 1 : null),
         ),
         h(
           'div.rails.right',
@@ -789,24 +790,81 @@ export class Hub {
       ),
       h(
         'div.crate-card',
-        h('div.section-h', { style: { justifyContent: 'center', margin: '0' } }, 'Daily Ration'),
-        h('div.help', { style: { marginTop: '6px', marginBottom: '10px' } }, 'Gold and a crate key, once a day.'),
-        h(
-          'button.btn',
-          {
-            disabled: !p.dailyAvailable(),
-            onclick: () => {
-              const r = p.claimDaily();
-              if (r) {
-                audio.pickup('chest');
-                toast(`+${fmtNum(r.gold)} gold, +1 key`, '#5ef2ff');
-              }
-            },
-          },
-          p.dailyAvailable() ? 'Claim' : 'Come back tomorrow',
-        ),
+        h('div.section-h', { style: { justifyContent: 'center', margin: '0' } }, 'Sign-in Calendar'),
+        h('div.help', { style: { marginTop: '6px', marginBottom: '10px' } }, `Day ${(d.login.claimed % LOGIN_DAYS) + 1} of 7 · Day 7 is a guaranteed Rare item`),
+        h('button.btn' + (p.dailyAvailable() ? '.primary' : ''), { onclick: () => this.calendar() }, p.dailyAvailable() ? 'Claim today' : 'View calendar'),
       ),
     );
+  }
+
+  /** Open the sign-in calendar automatically once per day, the first time the lobby is shown. */
+  private autoCalendarFor = '';
+  maybeCalendar() {
+    const today = new Date().toDateString();
+    if (this.autoCalendarFor === today || !this.p.dailyAvailable() || !this.p.data.seenIntro || this.p.data.stats.runs < 1) return;
+    if (document.querySelector('#ui > .modal')) return;
+    this.autoCalendarFor = today;
+    this.calendar();
+  }
+
+  calendar() {
+    this.closeModal();
+    const p = this.p;
+    const lg = p.data.login;
+    const today = lg.claimed % LOGIN_DAYS;
+    const can = p.dailyAvailable();
+    const cycleStart = lg.claimed - today; // claims before this 7-day page
+    const tiles = Array.from({ length: LOGIN_DAYS }, (_, i) => {
+      const r = loginReward(i, p.data.unlocked);
+      const done = cycleStart + i < lg.claimed;
+      const isToday = i === today && can;
+      const big = i === LOGIN_DAYS - 1;
+      return h(
+        'div.cal-day' + (done ? '.done' : '') + (isToday ? '.today' : '') + (big ? '.big' : ''),
+        h('small', `Day ${i + 1}`),
+        h(
+          'div.cal-rw',
+          r.itemRarity !== undefined ? h('span.cal-item', { style: { borderColor: RARITY_COLORS[r.itemRarity], color: RARITY_COLORS[r.itemRarity] } }, '?') : null,
+          r.gold ? h('span', coin('gold'), fmtNum(r.gold)) : null,
+          r.scrap ? h('span', coin('scrap'), r.scrap) : null,
+          r.keys ? h('span', coin('key'), r.keys) : null,
+        ),
+        big ? h('b.cal-tag', { style: { color: RARITY_COLORS[2] } }, 'RARE GEAR') : null,
+        done ? h('i.cal-ok', '✓') : null,
+      );
+    });
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0);
+    const left = Math.max(0, midnight.getTime() - Date.now());
+    const claim = () => {
+      const r = p.claimDaily();
+      if (!r) return;
+      audio.pickup('chest');
+      haptic(40);
+      if (r.item) this.revealItem(r.item);
+      else {
+        this.toastReward(r, '#5ef2ff');
+        this.calendar();
+      }
+    };
+    this.modal = h(
+      'div.modal',
+      { onclick: () => this.closeModal() },
+      h(
+        'div.sheet.cal',
+        { onclick: (e: Event) => e.stopPropagation() },
+        h('h2', 'Sign-in Calendar'),
+        h('div.cal-sub', lg.streak > 1 ? `🔥 ${lg.streak}-day streak` : 'A reward every day you play', ' · missed days just wait for you'),
+        h('div.cal-grid', tiles),
+        h(
+          'button.btn.big' + (can ? '.primary' : ''),
+          { style: { width: '100%', marginTop: '12px' }, disabled: !can, onclick: claim },
+          can ? `Claim Day ${today + 1}` : `Next reward in ${Math.floor(left / 3.6e6)}h ${Math.floor((left % 3.6e6) / 6e4)}m`,
+        ),
+        h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
+      ),
+    );
+    document.getElementById('ui')!.append(this.modal);
   }
 
   revealItem(it: GearItem) {

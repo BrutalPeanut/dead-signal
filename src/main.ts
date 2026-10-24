@@ -72,7 +72,7 @@ class App {
         }),
         'intro',
       );
-    }
+    } else setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
     requestAnimationFrame(this.frame);
   }
 
@@ -125,6 +125,7 @@ class App {
     this.renderer.setGame(this.game);
     audio.bossMode = false;
     audio.intensity = 0.2;
+    setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 500);
   }
 
   pause() {
