@@ -8,6 +8,10 @@ import {
   MIDBOSS_TIME,
   PASSIVES,
   RUN_LENGTH,
+  STAR1_TIME,
+  STAR2_TIME,
+  TIME_SCALE,
+  XP_MUL,
   WEAPONS,
   enemyMix,
   hpScale,
@@ -106,7 +110,7 @@ export class Game {
   private hordeIdx = 0;
   private warnedHorde = -1;
   private eliteIdx = 0;
-  private airdropT = 32;
+  private airdropT = 20;
   midBossSpawned = false;
   finalBossSpawned = false;
   boss: Enemy | null = null;
@@ -182,6 +186,15 @@ export class Game {
     this.weapons.push({ id, level: 1, evolved: false, timer: 0.4, active: 0, angle: 0, sourceId: this.newId() });
   }
 
+  /** Mission clock: drives pacing tables; runs TIME_SCALE× faster than real time. */
+  get T() {
+    // starts at real-time speed for a gentle opening, reaches full speed (TIME_SCALE×) by 1:00
+    const t = this.time;
+    const ramp = 60;
+    if (t >= ramp) return t * TIME_SCALE;
+    return t + ((TIME_SCALE - 1) * t * t) / ramp;
+  }
+
   // ------------------------------------------------------------------ main update
 
   /** Advance one fixed step. mx,my is the movement intent (-1..1). */
@@ -249,7 +262,7 @@ export class Game {
   // ------------------------------------------------------------------ spawning / pacing
 
   private director(dt: number) {
-    const t = this.time;
+    const t = this.T;
     const bossActive = !!this.boss;
 
     // Horde warnings 4s ahead, spawn on time.
@@ -279,12 +292,12 @@ export class Game {
       this.midBossSpawned = true;
       this.spawnBoss(this.chapter.midBoss, true);
     }
-    if (!this.finalBossSpawned && t >= RUN_LENGTH) {
+    if (!this.finalBossSpawned && this.time >= RUN_LENGTH) {
       this.finalBossSpawned = true;
       this.spawnBoss(this.chapter.finalBoss, false);
     }
 
-    if (!bossActive && t < RUN_LENGTH) {
+    if (!bossActive && this.time < RUN_LENGTH) {
       this.spawnAcc += spawnRate(t) * dt;
       while (this.spawnAcc >= 1) {
         this.spawnAcc -= 1;
@@ -303,7 +316,7 @@ export class Game {
     // Airdrops on a timer — the fix for "rations never show up".
     this.airdropT -= dt;
     if (this.airdropT <= 0) {
-      this.airdropT = 38;
+      this.airdropT = 22;
       this.spawnAirdrop();
     }
   }
@@ -330,7 +343,7 @@ export class Game {
 
   spawnEnemyAt(kind: EnemyKind, x: number, y: number, elite: boolean): Enemy {
     const d = ENEMIES[kind];
-    const hpm = hpScale(this.time) * this.chapter.hpMul * (elite ? 14 : 1);
+    const hpm = hpScale(this.T) * this.chapter.hpMul * (elite ? 14 : 1);
     const e: Enemy = {
       id: this.newId(),
       kind,
@@ -342,7 +355,7 @@ export class Game {
       hp: d.hp * hpm,
       maxHp: d.hp * hpm,
       speed: d.speed * (elite ? 0.85 : 1) * this.rng.range(0.92, 1.08),
-      dmg: d.dmg * this.chapter.dmgMul * (elite ? 1.5 : 1) * (1 + this.time / 750),
+      dmg: d.dmg * this.chapter.dmgMul * (elite ? 1.5 : 1) * (1 + this.T / 750),
       xp: d.xp * (elite ? 20 : 1),
       mass: d.mass * (elite ? 4 : 1),
       elite,
@@ -365,16 +378,19 @@ export class Game {
   }
 
   private spawnHorde(kind: EnemyKind, count: number, rings: number) {
-    // Rings close in from outside the view with a guaranteed gap so it's escapable, not a death sentence.
+    // Rings close in from outside the view with a guaranteed gap so it's escapable, not a death
+    // sentence. Horde members are a swarm to plow through: 65% HP. Both rings share one gap.
+    const gapA = this.rng.range(0, TAU);
     for (let ring = 0; ring < rings; ring++) {
       const R = Math.max(this.viewW, this.viewH) + 30 + ring * 60;
-      const gapA = this.rng.range(0, TAU);
       for (let i = 0; i < count; i++) {
         const a = (i / count) * TAU;
         const diff = Math.abs(((a - gapA + Math.PI * 3) % TAU) - Math.PI);
-        if (diff < 0.32) continue;
+        if (diff < 0.45) continue;
         if (this.enemies.length >= MAX_ENEMIES + 80) break;
-        this.spawnEnemyAt(kind, this.px + Math.cos(a) * R, this.py + Math.sin(a) * R, false);
+        const e = this.spawnEnemyAt(kind, this.px + Math.cos(a) * R, this.py + Math.sin(a) * R, false);
+        e.hp *= 0.65;
+        e.maxHp *= 0.65;
       }
     }
   }
@@ -386,7 +402,7 @@ export class Game {
     this.shots.length = 0;
     const cr = Math.min(this.viewW, this.viewH) * 0.95 + 20;
     this.cage = { x: this.px, y: this.py, r: Math.max(215, cr) };
-    const hp = def.hp * this.chapter.hpMul * hpScale(this.time) * (mid ? 1.6 : 2.0) * 0.45;
+    const hp = def.hp * this.chapter.hpMul * hpScale(this.T) * (mid ? 1.3 : 1.5) * 0.45;
     const b: Enemy = {
       id: this.newId(),
       kind: 'boss',
@@ -399,7 +415,7 @@ export class Game {
       hp,
       maxHp: hp,
       speed: def.speed,
-      dmg: def.dmg * this.chapter.dmgMul * (1 + this.time / 1200),
+      dmg: def.dmg * this.chapter.dmgMul * (1 + this.T / 1200),
       xp: 60,
       mass: 40,
       elite: false,
@@ -941,7 +957,7 @@ export class Game {
   }
 
   gainXp(v: number) {
-    this.xp += v;
+    this.xp += v * XP_MUL;
     while (this.xp >= this.xpNeed) {
       this.xp -= this.xpNeed;
       this.level++;
@@ -1078,17 +1094,16 @@ export class Game {
   /** Run score: everything the player did, so every run produces a number to beat. */
   score(): number {
     const t = Math.min(this.time, RUN_LENGTH);
-    return Math.round(this.kills * 10 + t * 5 + this.eliteKills * 300 + this.bossKills * 1500 + (this.state === 'won' ? 5000 : 0));
+    return Math.round(this.kills * 10 + t * 10 + this.eliteKills * 300 + this.bossKills * 1500 + (this.state === 'won' ? 5000 : 0));
   }
 
   private nextTimeMs = 0;
   private nextKillMs = 0;
   private static TIME_MS: [number, string, string, boolean][] = [
     [60, '1:00 survived', '#5ef2ff', false],
-    [180, '3:00 survived', '#5ef2ff', false],
-    [300, '★ STAR EARNED · 5:00', '#ffd34d', true],
-    [480, '★ STAR EARNED · 8:00', '#ffd34d', true],
-    [540, 'ONE MINUTE LEFT', '#43ffa4', true],
+    [STAR1_TIME, '★ STAR EARNED · 2:30', '#ffd34d', true],
+    [STAR2_TIME, '★ STAR EARNED · 4:00', '#ffd34d', true],
+    [RUN_LENGTH - 30, '30 SECONDS LEFT', '#43ffa4', true],
   ];
   private static KILL_MS = [100, 500, 1000, 2500, 5000, 10000, 20000];
 

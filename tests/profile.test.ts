@@ -114,10 +114,10 @@ describe('missions and sector chests', () => {
   it('survive missions track the best single run, not the sum', () => {
     const p = mk();
     const m = p.missions();
-    m.list[2] = { kind: 'survive', target: 480, progress: 0, claimed: false, reward: { scrap: 6 } };
-    p.applyRun(0, { won: false, time: 300, kills: 0, gold: 0, level: 1, bossKills: 0, eliteKills: 0 }, 1);
-    p.applyRun(0, { won: false, time: 300, kills: 0, gold: 0, level: 1, bossKills: 0, eliteKills: 0 }, 2);
-    expect(p.missions().list[2].progress).toBe(300);
+    m.list[2] = { kind: 'survive', target: 240, progress: 0, claimed: false, reward: { scrap: 6 } };
+    p.applyRun(0, { won: false, time: 200, kills: 0, gold: 0, level: 1, bossKills: 0, eliteKills: 0 }, 1);
+    p.applyRun(0, { won: false, time: 200, kills: 0, gold: 0, level: 1, bossKills: 0, eliteKills: 0 }, 2);
+    expect(p.missions().list[2].progress).toBe(200);
   });
 
   it('sector chests unlock with stars and claim once', () => {

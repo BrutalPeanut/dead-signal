@@ -13,24 +13,27 @@ await page.screenshot({ path: 'screens/mot-lobby.png' });
 await page.click('.battle-row .go');
 await page.waitForTimeout(300);
 // play to just before the first star, then let the real loop cross 5:00
-await page.evaluate(() => { window.__ds.advance(297); window.__ds.app.game.base.hp = 1e6; window.__ds.app.game.hp = 1e6; window.__ds.app.game.maxHp = 1e6; });
+await page.evaluate(() => { window.__ds.advance(147); window.__ds.app.game.base.hp = 1e6; window.__ds.app.game.hp = 1e6; window.__ds.app.game.maxHp = 1e6; });
 await page.waitForTimeout(100);
 for (let i = 0; i < 40; i++) {
   const st = await page.evaluate(() => { const g = window.__ds.app.game; if (g.state === 'levelup') g.choose(0); if (g.state === 'chest') g.closeChest(); return g.time; });
-  if (st > 301.2) break;
+  if (st > 151.2) break;
   await page.waitForTimeout(200);
 }
 await page.screenshot({ path: 'screens/mot-hud.png' });
 // near-miss loss at ~4:12 on a fresh run
 await page.evaluate(() => { const a = window.__ds.app; a.closeModal?.(); });
-await page.evaluate(() => { const a = window.__ds.app; a.game.state = 'play'; a.game.time = 252; a.game.hp = -1; a.game.revives = 0; a.game.base.revives = 0; });
+await page.evaluate(() => { const a = window.__ds.app; a.game.state = 'play'; a.game.time = 126; a.game.hp = -1; a.game.revives = 0; a.game.base.revives = 0; });
 await page.waitForTimeout(2500);
 await page.screenshot({ path: 'screens/mot-loss.png' });
-await page.evaluate(() => document.querySelector('.modal .btn.primary')?.click());
-await page.waitForTimeout(500);
+// leave results (clicking through any stray modal) and start a fresh run
+for (let i = 0; i < 6 && !(await page.$('.battle-row .go')); i++) {
+  await page.evaluate(() => document.querySelector('.modal .btn.primary, .modal .btn')?.click());
+  await page.waitForTimeout(400);
+}
 await page.click('.battle-row .go');
 await page.waitForTimeout(300);
-await page.evaluate(() => { const g = window.__ds.app.game; g.base.hp = 1e6; g.hp = 1e6; g.maxHp = 1e6; g.base.atk = 400; window.__ds.advance(640); });
+await page.evaluate(() => { const g = window.__ds.app.game; g.base.hp = 1e6; g.hp = 1e6; g.maxHp = 1e6; g.base.atk = 400; window.__ds.advance(330); });
 await page.waitForTimeout(3000);
 await page.screenshot({ path: 'screens/mot-win.png' });
 console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'clean');

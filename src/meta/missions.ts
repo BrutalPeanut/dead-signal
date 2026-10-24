@@ -37,7 +37,7 @@ const g = (s: number) => Math.round(80 * (1 + s * 0.5));
 export const MISSION_DEFS: Record<MissionKind, MissionDef> = {
   kills: { kind: 'kills', mode: 'sum', text: (n) => `Defeat ${n.toLocaleString()} infected`, target: (s) => 1500 + s * 500, reward: (s) => ({ gold: g(s) }) },
   runs: { kind: 'runs', mode: 'sum', text: (n) => `Deploy ${n} times`, target: () => 3, reward: (s) => ({ gold: g(s), scrap: 4 }) },
-  survive: { kind: 'survive', mode: 'max', text: (n) => `Survive ${Math.floor(n / 60)}:00 in one run`, target: () => 480, reward: (s) => ({ scrap: 6 + s }) },
+  survive: { kind: 'survive', mode: 'max', text: (n) => `Survive ${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')} in one run`, target: () => 240, reward: (s) => ({ scrap: 6 + s }) },
   boss: { kind: 'boss', mode: 'sum', text: (n) => `Defeat ${n} boss${n > 1 ? 'es' : ''}`, target: () => 2, reward: (s) => ({ gold: g(s) * 1.5 }) },
   elite: { kind: 'elite', mode: 'sum', text: (n) => `Defeat ${n} elites`, target: () => 3, reward: (s) => ({ scrap: 5 + s }) },
   crate: { kind: 'crate', mode: 'sum', text: () => 'Open a supply crate', target: () => 1, reward: (s) => ({ gold: g(s) }) },

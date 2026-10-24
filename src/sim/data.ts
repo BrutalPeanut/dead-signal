@@ -293,8 +293,22 @@ export const BOSSES: Record<BossKind, BossDef> = {
 
 // ---------------------------------------------------------------- run pacing
 
-export const RUN_LENGTH = 600; // seconds
+/** Real run length in seconds. */
+export const RUN_LENGTH = 300;
+/**
+ * The run's pacing tables (spawns, enemy mix, hordes, elites, HP scaling) are authored on a
+ * 0–600 "mission clock"; the sim advances it TIME_SCALE× faster than real time, so a 5-minute run
+ * still builds from a trickle to a packed horde.
+ */
+export const MISSION_LENGTH = 600;
+export const TIME_SCALE = MISSION_LENGTH / RUN_LENGTH;
+/** Mission time of the mid-boss (real time = this / TIME_SCALE). */
 export const MIDBOSS_TIME = 300;
+/** Real-time star thresholds (half and 80% of the run). */
+export const STAR1_TIME = RUN_LENGTH * 0.5;
+export const STAR2_TIME = RUN_LENGTH * 0.8;
+/** XP gem multiplier: half the run time, most of the level-ups. */
+export const XP_MUL = 1.2;
 
 export interface HordeEvent {
   t: number;
