@@ -2905,3 +2905,162 @@ button {
 .hud .hud-toasts {
   top: 31%;
 }
+
+/* ------------------------------------------------------------ attack / support slots */
+
+.hud .skills .line {
+  align-items: center;
+}
+
+.hud .skills .ltag {
+  width: 18px;
+  height: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  margin-right: 2px;
+  line-height: 1;
+}
+
+.hud .skills .ltag b {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.hud .skills .ltag small {
+  font-size: 7px;
+  font-weight: 800;
+  opacity: 0.85;
+  margin-top: 1px;
+}
+
+.line.atk .ltag {
+  background: rgba(255, 106, 61, 0.22);
+  color: #ffb08a;
+  border: 1px solid rgba(255, 106, 61, 0.55);
+}
+
+.line.sup .ltag {
+  background: rgba(77, 163, 255, 0.2);
+  color: #9fcbff;
+  border: 1px solid rgba(77, 163, 255, 0.55);
+}
+
+.sk.empty {
+  border-radius: 7px;
+  border: 1.5px dashed rgba(200, 210, 228, 0.28);
+  background: rgba(10, 12, 18, 0.35);
+}
+
+.hud .skills .sk {
+  width: 24px;
+  height: 24px;
+}
+
+/* big loadout (level-up + pause) */
+.loadout-big {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(100%, 420px);
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(14, 18, 27, 0.75);
+  border: 1px solid var(--line);
+}
+
+.loadout-big .line {
+  display: grid;
+  grid-template-columns: 74px repeat(6, 1fr);
+  gap: 5px;
+  align-items: center;
+}
+
+.loadout-big .ltag {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  padding: 2px 8px;
+  border-radius: 8px;
+  line-height: 1.1;
+}
+
+.loadout-big .ltag b {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.loadout-big .ltag small {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.loadout-big .sk {
+  position: relative;
+  aspect-ratio: 1;
+}
+
+.loadout-big .sk img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.loadout-big .sk b {
+  position: absolute;
+  right: -1px;
+  bottom: -3px;
+  font-size: 10px;
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+}
+
+/* category chip on level-up cards */
+.ctag-row {
+  margin-bottom: 2px;
+}
+
+.ctag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.ctag.atk {
+  background: rgba(255, 106, 61, 0.18);
+  color: #ffb08a;
+  border: 1px solid rgba(255, 106, 61, 0.5);
+}
+
+.ctag.sup {
+  background: rgba(77, 163, 255, 0.16);
+  color: #9fcbff;
+  border: 1px solid rgba(77, 163, 255, 0.5);
+}
+
+.ctag.misc {
+  background: rgba(67, 255, 164, 0.14);
+  color: #8fffc8;
+  border: 1px solid rgba(67, 255, 164, 0.45);
+}
+
+@media (max-height: 720px) {
+  .loadout-big {
+    padding: 6px 8px;
+    margin-bottom: 8px;
+  }
+  .modal .card {
+    padding: 9px 12px;
+  }
+}
+
+.hud .bossbar {
+  left: 196px;
+}
