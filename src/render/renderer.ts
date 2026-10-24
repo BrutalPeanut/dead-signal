@@ -25,6 +25,31 @@ export class Renderer {
   private sctx = this.scratch.getContext('2d')!;
   private vignette: HTMLCanvasElement | null = null;
   joystick: { ox: number; oy: number; x: number; y: number } | null = null;
+  /** Upper bound on pixel density; lowered automatically when frames run long. */
+  dprCap = 2;
+  private slowT = 0;
+  private fastT = 0;
+
+  /** Adaptive resolution: drop density after ~1.5s of slow frames, recover after ~8s of fast ones. */
+  adapt(frameMs: number) {
+    if (frameMs > 22) {
+      this.slowT += frameMs / 1000;
+      this.fastT = 0;
+    } else if (frameMs < 15) {
+      this.fastT += frameMs / 1000;
+      this.slowT = Math.max(0, this.slowT - frameMs / 2000);
+    }
+    const native = Math.min(window.devicePixelRatio || 1, 2);
+    if (this.slowT > 1.5 && this.dprCap > 1) {
+      this.dprCap = Math.max(1, this.dprCap - 0.5);
+      this.slowT = 0;
+      this.resize();
+    } else if (this.fastT > 8 && this.dprCap < native) {
+      this.dprCap = Math.min(native, this.dprCap + 0.5);
+      this.fastT = 0;
+      this.resize();
+    }
+  }
 
   constructor(readonly canvas: HTMLCanvasElement, private game: Game) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
@@ -44,7 +69,7 @@ export class Renderer {
   }
 
   resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.dprCap);
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;
     this.cssW = w;
@@ -119,7 +144,7 @@ export class Renderer {
     const t = this.time;
     for (const p of this.game.pools) {
       const a = Math.min(1, p.life / 0.4) * Math.min(1, (p.maxLife - p.life) / 0.15 + 0.2);
-      ctx.globalAlpha = a * 0.85;
+      ctx.globalAlpha = a * (p.evo || this.game.pools.length > 14 ? 0.55 : 0.85);
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
       g.addColorStop(0, p.evo ? '#fff2a8' : '#ffd36a');
       g.addColorStop(0.5, p.evo ? 'rgba(255,90,30,0.75)' : 'rgba(255,120,30,0.6)');
@@ -626,35 +651,47 @@ export class Renderer {
     const pos = bladePositions(g, w, []);
     const r = 11 * (w.evolved ? 1.3 : 1) * Math.sqrt(g.areaMul);
     const col = w.evolved ? '#ffe9a8' : '#ffb84d';
-    ctx.globalCompositeOperation = 'lighter';
     for (let k = 0; k < pos.length; k += 2) {
       const x = pos[k];
       const y = pos[k + 1];
       const a = Math.atan2(y - g.py, x - g.px) + Math.PI / 2;
-      ctx.globalAlpha = 0.5;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.45;
       ctx.drawImage(this.sprites.glow(col), x - r * 2, y - r * 2, r * 4, r * 4);
       ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(a + this.time * (w.evolved ? 20 : 0));
-      ctx.fillStyle = col;
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = '#2a1600';
       ctx.beginPath();
       if (w.evolved) {
-        // saw disc
+        // saw disc: toothed steel ring with a hot core
         for (let i = 0; i < 16; i++) {
           const aa = (i / 16) * Math.PI * 2;
-          const rr = i % 2 ? r * 0.75 : r;
+          const rr = i % 2 ? r * 0.72 : r;
           ctx.lineTo(Math.cos(aa) * rr, Math.sin(aa) * rr);
         }
+        ctx.closePath();
+        ctx.fillStyle = '#ffb84d';
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fff2c8';
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
       } else {
         ctx.moveTo(-r, 0);
         ctx.quadraticCurveTo(0, -r * 1.1, r, 0);
         ctx.quadraticCurveTo(0, -r * 0.4, -r, 0);
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.stroke();
       }
-      ctx.fill();
       ctx.restore();
     }
-    ctx.globalCompositeOperation = 'source-over';
   }
 
   private drawProjectiles(ctx: CanvasRenderingContext2D) {

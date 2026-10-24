@@ -103,6 +103,7 @@ class App {
     this.hub.closeModal();
     this.ui.append(this.hud.el);
     this.input.enabled = true;
+    this.input.moved = false;
     audio.bossMode = false;
     audio.intensity = 0;
   }
@@ -317,6 +318,7 @@ class App {
 
   private frame = (now: number) => {
     const dt = Math.min(0.1, (now - this.last) / 1000);
+    if (this.mode === 'run' && !this.paused && this.game.state === 'play') this.renderer.adapt(now - this.last);
     this.last = now;
     const g = this.game;
 
@@ -361,7 +363,10 @@ class App {
     this.playSounds(this.game.fx);
     this.renderer.joystick = this.mode === 'run' ? this.input.stick : null;
     this.renderer.render(this.mode === 'run' && (this.paused || this.game.state !== 'play') ? 0 : dt);
-    if (this.mode === 'run') this.hud.update(this.game, this.renderer.fx.banners);
+    if (this.mode === 'run') {
+      this.hud.update(this.game, this.renderer.fx.banners);
+      this.hud.showHint(!this.input.moved && this.game.time < 12 && this.profile.data.stats.runs < 3);
+    }
     requestAnimationFrame(this.frame);
   };
 }
