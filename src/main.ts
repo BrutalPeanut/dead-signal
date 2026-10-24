@@ -84,7 +84,7 @@ class App {
     };
     const g = new Game({ ...getChapter(sector), hpMul: 1, dmgMul: 1 }, base, Math.floor(Math.random() * 1e9));
     // fast-forward a bit so the screen is busy
-    g.time = 60;
+    g.time = 30;
     return g;
   }
 
@@ -102,7 +102,7 @@ class App {
     this.renderer.fx.parts.length = 0;
     this.renderer.fx.decals.length = 0;
     this.renderer.fx.banners.length = 0;
-    this.renderer.fx.banners.push({ text: getChapter(sector).name.toUpperCase(), sub: `Sector ${sector + 1} · survive 10:00`, color: '#5ef2ff', t: 2.6 });
+    this.renderer.fx.banners.push({ text: getChapter(sector).name.toUpperCase(), sub: `Sector ${sector + 1} · survive 5:00`, color: '#5ef2ff', t: 2.6 });
     this.hub.el.remove();
     this.hub.closeModal();
     this.ui.append(this.hud.el);
@@ -341,7 +341,7 @@ class App {
         this.acc -= DT;
         if (g.state === 'levelup') g.choose(botChoose(g, g.offers));
         else if (g.state === 'chest') g.closeChest();
-        else if (g.state !== 'play' || g.time > 560) {
+        else if (g.state !== 'play' || g.time > 280) {
           this.game = this.demoGame(this.hub.sector);
           this.renderer.setGame(this.game);
           break;
@@ -363,7 +363,7 @@ class App {
         }
         if (n >= 6) this.acc = 0;
       } else this.acc = 0;
-      audio.intensity = Math.min(1, g.time / 480);
+      audio.intensity = Math.min(1, g.time / 240);
       audio.bossMode = !!g.boss;
       this.syncRunUi();
       if (this.endT >= 0) {

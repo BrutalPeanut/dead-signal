@@ -2,6 +2,7 @@ import { GEAR, RARITIES, RARITY_COLORS } from '../meta/gear';
 import type { RunRewards } from '../meta/profile';
 import type { RunResult } from '../sim/game';
 import { gearIcon } from '../render/icons';
+import { RUN_LENGTH, STAR1_TIME, STAR2_TIME } from '../sim/data';
 import { coin, fmtNum, fmtTime, h } from './dom';
 
 export function resultsModal(r: RunResult, rw: RunRewards, sectorName: string, onContinue: () => void) {
@@ -26,8 +27,8 @@ export function resultsModal(r: RunResult, rw: RunRewards, sectorName: string, o
   }
   // stars: earned before (dim gold), earned this run (bright + "NEW"), not yet (grey)
   const starDefs: [number, string][] = [
-    [1, 'Survive 5:00'],
-    [2, 'Survive 8:00'],
+    [1, `Survive ${fmtTime(STAR1_TIME).replace(/^0/, '')}`],
+    [2, `Survive ${fmtTime(STAR2_TIME).replace(/^0/, '')}`],
     [4, 'Clear'],
   ];
   const stars = h(
@@ -41,9 +42,9 @@ export function resultsModal(r: RunResult, rw: RunRewards, sectorName: string, o
   // the single most useful "what next" line
   let next = '';
   if (r.won) next = rw.unlockedSector ? 'Next sector unlocked. Keep the streak going!' : 'Cleared again. Push your score higher!';
-  else if (r.time < 300) next = `${fmtTime(300 - r.time)} short of your first star. Upgrade in the Armory, then go again!`;
-  else if (r.time < 480) next = `${fmtTime(480 - r.time)} short of the 8:00 star!`;
-  else next = `So close: ${fmtTime(600 - r.time)} from clearing the sector!`;
+  else if (r.time < STAR1_TIME) next = `${fmtTime(STAR1_TIME - r.time)} short of your first star. Upgrade in the Armory, then go again!`;
+  else if (r.time < STAR2_TIME) next = `${fmtTime(STAR2_TIME - r.time)} short of the ${fmtTime(STAR2_TIME).replace(/^0/, '')} star!`;
+  else next = `So close: ${fmtTime(RUN_LENGTH - r.time)} from clearing the sector!`;
   if (rw.levelsGained) next += ` Account level up!`;
   return h(
     'div.modal.results',
@@ -76,7 +77,7 @@ export function introModal(onGo: () => void) {
       'div.intro',
       h('p', 'A broadcast went out on every frequency at once. Everyone who heard it ', h('span.hl', 'changed'), '.'),
       h('p', "You're a courier. Your rig was tuned to a dead channel — so you're still you."),
-      h('p', 'Move with one thumb. Your weapons fire on their own. Grab the green shards to level up, and survive ten minutes per sector.'),
+      h('p', 'Move with one thumb. Your weapons fire on their own. Grab the green shards to level up, and survive five minutes per sector.'),
       h('p', 'Max a weapon and pick up its partner gear to ', h('span.hl', 'evolve'), ' it from a chest.'),
     ),
     h('div.actions', h('button.btn.primary.big', { onclick: onGo }, "Let's go")),

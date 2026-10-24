@@ -1,4 +1,5 @@
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
+import { STAR1_TIME, STAR2_TIME, TIME_SCALE } from '../sim/data';
 import { Rng } from '../sim/math';
 import type { RunResult } from '../sim/game';
 import type { BaseStats } from '../sim/types';
@@ -38,7 +39,7 @@ export interface SaveData {
   accountLevel: number;
   accountXp: number;
   unlocked: number; // highest sector index unlocked
-  stars: Record<number, number>; // bitmask: 1 = survived 5:00, 2 = survived 8:00, 4 = cleared
+  stars: Record<number, number>; // bitmask: 1 = survived half the run, 2 = 80%, 4 = cleared
   best: Record<number, number>; // best survival time per sector
   gear: GearItem[];
   equipped: Partial<Record<Slot, string>>;
@@ -349,16 +350,16 @@ export class Profile {
     const ch = getChapter(sector);
     const rng = new Rng(seed);
     const goldMul = 1 + this.milestone('gold');
-    const gold = Math.round((r.gold + (r.time / 6) * ch.goldMul + (r.won ? 120 * ch.goldMul : 0)) * goldMul);
-    const xp = Math.round(r.time * 0.5 + r.kills * 0.02 + r.bossKills * 60 + (r.won ? 100 : 0));
+    const gold = Math.round((r.gold + ((r.time * TIME_SCALE) / 6) * ch.goldMul + (r.won ? 120 * ch.goldMul : 0)) * goldMul);
+    const xp = Math.round(r.time * TIME_SCALE * 0.5 + r.kills * 0.02 + r.bossKills * 60 + (r.won ? 100 : 0));
     const prevStars = d.stars[sector] ?? 0;
     const score = r.score ?? 0;
     const prevBest = d.bestScore[sector] ?? 0;
     const newBest = score > prevBest;
     if (newBest) d.bestScore[sector] = score;
     let stars = prevStars;
-    if (r.time >= 300) stars |= 1;
-    if (r.time >= 480) stars |= 2;
+    if (r.time >= STAR1_TIME) stars |= 1;
+    if (r.time >= STAR2_TIME) stars |= 2;
     if (r.won) stars |= 4;
     const firstClear = r.won && !(prevStars & 4);
     const newStars = popcount(stars) - popcount(prevStars);
@@ -372,7 +373,7 @@ export class Profile {
     const items: GearItem[] = [];
     const drops = r.bossKills + (r.eliteKills > 0 ? 1 : 0) + (r.won ? 1 : 0);
     for (let i = 0; i < drops; i++) items.push(this.rollItem(rng, sector, false));
-    const scrap = Math.round(2 + r.time / 60 + r.eliteKills * 2 + r.bossKills * 4);
+    const scrap = Math.round(2 + (r.time * TIME_SCALE) / 60 + r.eliteKills * 2 + r.bossKills * 4);
 
     let unlockedSector = false;
     if (r.won && sector === d.unlocked && d.unlocked < CHAPTER_COUNT - 1) {
@@ -457,6 +458,8 @@ export class Profile {
     if (!this.data.missions || this.data.missions.date !== key) {
       this.data.missions = rollDaily(key, this.data.unlocked);
     }
+    // saves from the 10-minute era may hold a survive target longer than a run
+    for (const m of this.data.missions.list) if (m.kind === 'survive' && m.target > STAR2_TIME) m.target = STAR2_TIME;
     return this.data.missions;
   }
 

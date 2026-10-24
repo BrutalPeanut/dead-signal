@@ -1,4 +1,4 @@
-import { BOSSES, MAX_PASSIVE_SLOTS, MAX_SKILL_LEVEL, MAX_WEAPON_SLOTS, PASSIVES, WEAPONS } from '../sim/data';
+import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, MAX_PASSIVE_SLOTS, MAX_SKILL_LEVEL, MAX_WEAPON_SLOTS, PASSIVES, WEAPONS } from '../sim/data';
 import type { Game } from '../sim/game';
 import { offerDesc, offerTitle } from '../sim/offers';
 import type { Offer, PassiveState, WeaponState } from '../sim/types';
@@ -70,15 +70,15 @@ export class Hud {
           this.score,
           h('div.score-sub', h('span', '☠ ', this.kills), h('span', coin('gold'), this.gold)),
         ),
-        h('div.timer', this.timer, h('small', ' / 10:00')),
+        h('div.timer', this.timer, h('small', ` / ${fmtTime(RUN_LENGTH)}`)),
         h('button.pause', { onclick: onPause, 'aria-label': 'Pause' }, 'II'),
       ),
       h(
         'div.runbar',
         h('div.rb-track', this.runFill),
         this.runBest,
-        mark(50, 'star.boss', '5:00'),
-        mark(80, 'star', '8:00'),
+        mark(50, 'star.boss', fmtTime(STAR1_TIME).replace(/^0/, '')),
+        mark(80, 'star', fmtTime(STAR2_TIME).replace(/^0/, '')),
         mark(100, 'win', 'WIN'),
       ),
       this.toasts,
@@ -103,8 +103,8 @@ export class Hud {
   /** Called at run start with this sector's best survival time (for the BEST marker). */
   startRun(best: number) {
     this.toasts.replaceChildren();
-    this.runBest.style.display = best > 5 && best < 600 ? '' : 'none';
-    this.runBest.style.left = `${(best / 600) * 100}%`;
+    this.runBest.style.display = best > 5 && best < RUN_LENGTH ? '' : 'none';
+    this.runBest.style.left = `${(best / RUN_LENGTH) * 100}%`;
     for (const m of this.runMarks) m.classList.remove('hit');
   }
 
@@ -118,15 +118,15 @@ export class Hud {
   }
 
   update(g: Game, banners: Banner[]) {
-    const frac = Math.min(1, g.time / 600);
+    const frac = Math.min(1, g.time / RUN_LENGTH);
     this.runFill.style.width = `${(frac * 100).toFixed(2)}%`;
-    this.runMarks[0].classList.toggle('hit', g.time >= 300);
-    this.runMarks[1].classList.toggle('hit', g.time >= 480);
+    this.runMarks[0].classList.toggle('hit', g.time >= STAR1_TIME);
+    this.runMarks[1].classList.toggle('hit', g.time >= STAR2_TIME);
     this.runMarks[2].classList.toggle('hit', g.state === 'won');
     this.set('sc', this.score, g.score().toLocaleString());
     this.xpFill.style.width = `${Math.min(100, (g.xp / g.xpNeed) * 100).toFixed(1)}%`;
     this.set('lvl', this.lvl, `LV ${g.level}`);
-    this.set('t', this.timer, fmtTime(Math.min(g.time, 600)));
+    this.set('t', this.timer, fmtTime(Math.min(g.time, RUN_LENGTH)));
     this.set('k', this.kills, fmtNum(g.kills));
     this.set('g', this.gold, fmtNum(g.gold));
 
