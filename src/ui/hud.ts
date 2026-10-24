@@ -1,4 +1,4 @@
-import { BOSSES, MAX_SKILL_LEVEL, PASSIVES, WEAPONS } from '../sim/data';
+import { BOSSES, MAX_PASSIVE_SLOTS, MAX_SKILL_LEVEL, MAX_WEAPON_SLOTS, PASSIVES, WEAPONS } from '../sim/data';
 import type { Game } from '../sim/game';
 import { offerDesc, offerTitle } from '../sim/offers';
 import type { Offer, PassiveState, WeaponState } from '../sim/types';
@@ -156,16 +156,38 @@ export class Hud {
   }
 
   private renderSkills(ws: WeaponState[], ps: PassiveState[]) {
-    const line1 = h(
-      'div.line',
-      ws.map((w) => h('div.sk', h('img', { src: skillIcon(w.id, w.evolved), alt: WEAPONS[w.id].name }), h('b', w.evolved ? '★' : w.level))),
-    );
-    const line2 = h(
-      'div.line',
-      ps.map((p) => h('div.sk', h('img', { src: skillIcon(p.id), alt: PASSIVES[p.id].name }), h('b', p.level))),
-    );
-    this.skills.replaceChildren(line1, line2);
+    this.skills.replaceChildren(...loadoutRows(ws, ps, 'hud'));
   }
+}
+
+// ------------------------------------------------------------------ loadout rows
+
+/**
+ * Two labelled rows of 6 slots: Attack (weapons) and Support (passives). Empty slots are drawn so
+ * players always know how many abilities they can still add.
+ */
+export function loadoutRows(ws: WeaponState[], ps: PassiveState[], variant: 'hud' | 'big') {
+  const row = (kind: 'atk' | 'sup', label: string, filled: HTMLElement[]) => {
+    const slots: HTMLElement[] = [...filled];
+    for (let i = filled.length; i < MAX_WEAPON_SLOTS; i++) slots.push(h('div.sk.empty'));
+    return h(
+      `div.line.${kind}`,
+      h('span.ltag', variant === 'hud' ? h('b', label[0]) : h('b', label), h('small', `${filled.length}/${MAX_WEAPON_SLOTS}`)),
+      slots,
+    );
+  };
+  return [
+    row(
+      'atk',
+      'Attack',
+      ws.map((w) => h('div.sk', h('img', { src: skillIcon(w.id, w.evolved), alt: WEAPONS[w.id].name }), h('b', w.evolved ? '★' : w.level))),
+    ),
+    row(
+      'sup',
+      'Support',
+      ps.map((p) => h('div.sk', h('img', { src: skillIcon(p.id), alt: PASSIVES[p.id].name }), h('b', p.level))),
+    ),
+  ];
 }
 
 // ------------------------------------------------------------------ modals
@@ -201,8 +223,21 @@ export function offerCard(g: Game, o: Offer, onPick: (() => void) | null) {
     { onclick: onPick ?? undefined, style: { borderColor: col + '88' } },
     badge,
     h('img', { src: offerIcon(o), alt: '' }),
-    h('div', h('div.name', offerTitle(o)), h('div.desc', offerDesc(o)), lvl),
+    h('div', h('div.ctag-row', ctag(g, o)), h('div.name', offerTitle(o)), h('div.desc', offerDesc(o)), lvl),
   );
+}
+
+/** Category chip: which slot row this upgrade fills, and whether it takes a new slot. */
+function ctag(g: Game, o: Offer) {
+  if (o.type === 'weapon') {
+    const txt = o.isNew ? `ATTACK · new slot ${g.weapons.length + 1}/${MAX_WEAPON_SLOTS}` : `ATTACK · Lv ${o.level}`;
+    return h('span.ctag.atk', txt);
+  }
+  if (o.type === 'passive') {
+    const txt = o.isNew ? `SUPPORT · new slot ${g.passives.length + 1}/${MAX_PASSIVE_SLOTS}` : `SUPPORT · Lv ${o.level}`;
+    return h('span.ctag.sup', txt);
+  }
+  return h('span.ctag.misc', 'BONUS');
 }
 
 export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void) {
@@ -211,6 +246,7 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
     'div.modal',
     h('h2', { style: { color: '#5ef2ff', textShadow: '0 0 20px rgba(94,242,255,.6)' } }, 'LEVEL UP'),
     h('div.sub', 'Choose one upgrade'),
+    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big')),
     cards,
     h(
       'div.actions',
@@ -252,7 +288,6 @@ export function pauseModal(
   onToggle: (k: 'sfx' | 'music') => void,
   onQuit: () => void,
 ) {
-  const sk = [...g.weapons.map((w) => skillIcon(w.id, w.evolved)), ...g.passives.map((p) => skillIcon(p.id))];
   const toggle = (label: string, key: 'sfx' | 'music') => {
     const sw = h('span.sw' + (settings[key] ? '.on' : ''));
     return h(
@@ -271,7 +306,7 @@ export function pauseModal(
     'div.modal',
     h('h2', 'PAUSED'),
     h('div.sub', `${g.chapter.name} · ${fmtTime(g.time)} · ${fmtNum(g.kills)} kills`),
-    h('div.pause-skills', sk.map((s) => h('img', { src: s, alt: '' }))),
+    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big')),
     h('div', { style: { width: 'min(100%, 380px)' } }, toggle('Sound effects', 'sfx'), toggle('Music', 'music')),
     h(
       'div.actions',

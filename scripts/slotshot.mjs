@@ -1,0 +1,38 @@
+// Bot screenshots: HUD slot rows, level-up with loadout + category chips, pause loadout.
+import { chromium } from 'playwright';
+const [w = '390', hgt = '844'] = process.argv.slice(2);
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome', args: ['--no-sandbox'] });
+const page = await browser.newPage({ viewport: { width: +w, height: +hgt }, deviceScaleFactor: 2 });
+const errs = [];
+page.on('pageerror', (e) => errs.push(String(e.stack || e)));
+await page.goto('http://localhost:5173/');
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+await page.waitForTimeout(400);
+await page.click('.modal .btn');
+await page.click('.battle-row .go');
+await page.waitForTimeout(300);
+await page.evaluate(() => {
+  const g = window.__ds.app.game;
+  g.base.hp = g.maxHp = g.hp = 1e6;
+  g.addWeapon('arc'); g.addWeapon('blades');
+  g.weapons[0].level = 3;
+  g.passives.push({ id: 'chip', level: 2 }, { id: 'boots', level: 1 });
+  g.recalc();
+  window.__ds.advance(20);
+});
+await page.waitForTimeout(800);
+await page.screenshot({ path: `screens/slots-hud-${w}.png` });
+await page.evaluate(() => window.__ds.app.game.gainXp(400));
+await page.waitForSelector('.modal .cards', { timeout: 5000 });
+await page.waitForTimeout(700);
+await page.screenshot({ path: `screens/slots-levelup-${w}.png` });
+await page.evaluate(() => document.querySelector('.modal .card')?.click());
+await page.waitForTimeout(400);
+await page.evaluate(() => { const g = window.__ds.app.game; while (g.state === 'levelup') g.choose(0); });
+await page.waitForTimeout(400);
+await page.click('.hud .pause');
+await page.waitForTimeout(400);
+await page.screenshot({ path: `screens/slots-pause-${w}.png` });
+console.log(errs.length ? 'ERRORS:\n' + errs.join('\n') : 'clean');
+await browser.close();
