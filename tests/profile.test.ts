@@ -164,3 +164,16 @@ describe('characters', () => {
     expect(p.baseStats().regen).toBeGreaterThan(0.003);
   });
 });
+
+describe('crates', () => {
+  it('open all spends every key and returns one item per key', () => {
+    const p = mk();
+    p.data.keys = 7;
+    const n0 = p.data.gear.length;
+    const items = p.openAllCrates();
+    expect(items).toHaveLength(7);
+    expect(p.data.keys).toBe(0);
+    expect(p.data.gear.length).toBe(n0 + 7);
+    expect(p.openAllCrates()).toHaveLength(0);
+  });
+});

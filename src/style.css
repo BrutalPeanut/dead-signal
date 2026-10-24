@@ -3219,25 +3219,25 @@ button {
 }
 
 /* topbar: the name block yields space to the wallet instead of sliding under it */
-.hub.lobby .topbar .acct {
+.hub .topbar .acct {
   min-width: 0;
   flex: 0 1 auto;
 }
 
-.hub.lobby .topbar .acct .who {
+.hub .topbar .acct .who {
   min-width: 0;
 }
 
-.hub.lobby .topbar .acct .who .pw {
+.hub .topbar .acct .who .pw {
   white-space: nowrap;
 }
 
 @media (max-width: 420px) {
   /* narrow phones: keep power, drop the name and the decorative "+" so nothing collides */
-  .hub.lobby .topbar .acct .who .nm {
+  .hub .topbar .acct .who .nm {
     display: none;
   }
-  .hub.lobby .topbar .wallet .plus {
+  .hub .topbar .wallet .plus {
     display: none;
   }
 }
@@ -4000,4 +4000,79 @@ button {
   top: 4px;
   right: 6px;
   color: #c9a6ff;
+}
+
+/* ------------------------------------------------------------ open-all haul */
+
+.sheet.haul h2 {
+  text-align: center;
+  font-size: 22px;
+}
+
+.haul-sum {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  margin: 2px 0 10px;
+}
+
+.haul-best {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 2px solid;
+  text-align: left;
+  margin-bottom: 10px;
+}
+
+.haul-best img {
+  width: 54px;
+  height: 54px;
+}
+
+.haul-best small {
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.haul-best b {
+  display: block;
+  font-size: 17px;
+}
+
+.haul-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.haul-grid .item {
+  animation: haulPop 0.35s ease-out both;
+}
+
+@keyframes haulPop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .haul-grid .item {
+    animation: none;
+  }
 }

@@ -495,6 +495,17 @@ export class Profile {
     return it;
   }
 
+  /** Open every crate key at once (each item auto-equips into empty slots like single opens). */
+  openAllCrates(rng = new Rng(Date.now())): GearItem[] {
+    const out: GearItem[] = [];
+    while (this.data.keys > 0) {
+      const it = this.openCrate(rng);
+      if (!it) break;
+      out.push(it);
+    }
+    return out;
+  }
+
   /** New gear goes straight into an empty slot: an empty slot is pure lost power. */
   autoEquip(it: GearItem) {
     const slot = GEAR[it.def].slot;
@@ -564,7 +575,7 @@ export class Profile {
       return { kind: 'merge', label: `Merge 3 ${GEAR[mergeable.def].name}s`, detail: `→ ${RARITIES[mergeable.rarity + 1]}`, apply: () => this.mergeAll() > 0 };
     }
     // 3. crates
-    if (d.keys > 0) return { kind: 'crate', label: 'Open a supply crate', detail: `${d.keys} key${d.keys > 1 ? 's' : ''}`, apply: () => !!this.openCrate() };
+    if (d.keys > 0) return { kind: 'crate', label: d.keys > 1 ? `Open ${d.keys} supply crates` : 'Open a supply crate', detail: `${d.keys} key${d.keys > 1 ? 's' : ''}`, apply: () => this.openAllCrates().length > 0 };
     // 4. cheapest affordable stat upgrade (talent ATK/HP or levelling equipped gear)
     const opts: { cost: number; a: CoachAction }[] = [];
     for (const id of ['atk', 'hp'] as const) {
