@@ -136,6 +136,12 @@ export class Game {
     this.revives = base.revives;
     this.addWeapon(base.startWeapon);
     this.recalc();
+    // Opening wave so the first second already has targets (empty screens kill first impressions).
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * TAU + this.rng.range(-0.2, 0.2);
+      const d = 240 + this.rng.range(0, 80);
+      this.spawnEnemyAt('shambler', Math.cos(a) * d, Math.sin(a) * d, false);
+    }
     if (base.startLevels > 0) {
       this.pendingLevels += base.startLevels;
       this.openLevelUp();
