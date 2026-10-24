@@ -20,6 +20,7 @@ import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
 import { drawHero } from '../render/art';
 import { setHeroSkin } from '../render/hero';
 import { CHARACTERS, charById } from '../meta/characters';
+import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
 import { gearIcon } from '../render/icons';
 import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, WEAPONS } from '../sim/data';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
@@ -410,6 +411,7 @@ export class Hub {
       return [
         h(
           'div.sector-card.mode-card',
+          this.lbButton('daily'),
           h('div.sc-num', `DAILY CHALLENGE · ${dateTxt.toUpperCase()}`),
           h('div.sc-name', ch.mods.map((m) => m.name).join(' + ')),
           h('div.mc-mods', ch.mods.map((m) => h('div', m.desc))),
@@ -441,6 +443,7 @@ export class Hub {
     return [
       h(
         'div.sector-card.mode-card',
+        this.lbButton('endless'),
         h('div.sc-num', 'ENDLESS · NO TIME LIMIT'),
         h('div.sc-name', 'Last Signal'),
         h('div.mc-mods', h('div', `Survive as long as you can. A boss every ${fmtTime(ENDLESS_BOSS_EVERY).replace(/^0/, '')}, each dropping a chest.`), h('div', 'Uses your gear · it only gets harder')),
@@ -455,6 +458,108 @@ export class Hub {
         h('button.btn.primary.big.go', { onclick: () => (haptic(20), this.onDeploy(2, 'endless')) }, h('span', 'ENDLESS', h('small', 'How long can you last?'))),
       ),
     ];
+  }
+
+  private lbButton(mode: 'daily' | 'endless') {
+    return h('button.lb-btn', { onclick: () => this.leaderboard(mode), 'aria-label': 'Leaderboard' }, '🏆', h('span', 'Ranks'));
+  }
+
+  /** Leaderboard sheet: call-sign setup on first open, then Crew / Everyone boards. */
+  leaderboard(mode: 'daily' | 'endless', scope: 'crew' | 'all' | null = null) {
+    this.closeModal();
+    const p = this.p;
+    const o = p.data.online;
+    const sheet = h('div.sheet.lb', { onclick: (e: Event) => e.stopPropagation() });
+    this.modal = h('div.modal', { onclick: () => this.closeModal() }, sheet);
+    document.getElementById('ui')!.append(this.modal);
+    if (!o.name) return this.lbSetup(sheet, mode);
+    const sc = scope ?? (o.crew ? 'crew' : 'all');
+    const board = mode === 'daily' ? dailyBoard(p.dailyState().key) : ENDLESS_BOARD;
+    const list = h('div.lb-list', h('div.lb-msg', 'Loading…'));
+    const seg = (label: string, on: boolean, fn: () => void, dis = false) => h('button.mt' + (on ? '.on' : '') + (dis ? '.lock' : ''), { onclick: fn }, label);
+    sheet.append(
+      h('h2', '🏆 Leaderboard'),
+      h(
+        'div.mode-tabs.lb-tabs',
+        seg('Daily', mode === 'daily', () => this.leaderboard('daily', sc)),
+        seg('Endless', mode === 'endless', () => this.leaderboard('endless', sc)),
+      ),
+      h(
+        'div.mode-tabs.lb-tabs',
+        seg(o.crew ? `Crew ${o.crew}` : 'Crew', sc === 'crew', () => (o.crew ? this.leaderboard(mode, 'crew') : this.lbSetup(sheet, mode, true)), !o.crew),
+        seg('Everyone', sc === 'all', () => this.leaderboard(mode, 'all')),
+      ),
+      list,
+      o.crew
+        ? h(
+            'button.lb-share',
+            {
+              onclick: () => {
+                const text = `Join my Dead Signal crew! Code: ${o.crew}  ${location.origin}${location.pathname}`;
+                const nav = navigator as Navigator & { share?: (d: { text: string }) => Promise<void> };
+                if (nav.share) nav.share({ text }).catch(() => {});
+                else navigator.clipboard?.writeText(text).then(() => toast('Crew invite copied', '#43ffa4'));
+              },
+            },
+            `Invite family · crew code ${o.crew}`,
+          )
+        : h('span'),
+      h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.lbSetup(sheet, mode, true) }, `${o.name} · edit name / crew`),
+    );
+    getBoard(board, sc === 'crew' ? o.crew : '', p.playerId(), 50).then((rows) => {
+      if (!list.isConnected) return;
+      if (rows === null) {
+        list.replaceChildren(h('div.lb-msg', "Couldn't reach the leaderboard. Your scores upload automatically next time you're online."));
+        return;
+      }
+      if (!rows.length) {
+        list.replaceChildren(h('div.lb-msg', mode === 'daily' ? 'No scores yet today. Be the first!' : 'No Endless runs yet. Set the record!'));
+        return;
+      }
+      list.replaceChildren(...rows.map((r) => this.lbRow(r, mode)));
+      list.querySelector('.me')?.scrollIntoView({ block: 'center' });
+    });
+  }
+
+  private lbRow(r: BoardRow, mode: 'daily' | 'endless') {
+    const medal = r.rnk === 1 ? '🥇' : r.rnk === 2 ? '🥈' : r.rnk === 3 ? '🥉' : String(r.rnk);
+    return h(
+      'div.lb-row' + (r.me ? '.me' : ''),
+      h('b.lb-rk', medal),
+      h('img', { src: portrait(CHARACTERS.some((c) => c.id === r.hero) ? r.hero : 'courier'), alt: '' }),
+      h('div.lb-nm', h('span', r.name), h('small', mode === 'endless' ? `${fmtTime(r.run_time)} survived` : charById(r.hero).name)),
+      h('b.lb-sc', r.score.toLocaleString()),
+    );
+  }
+
+  private lbSetup(sheet: HTMLElement, mode: 'daily' | 'endless', editing = false) {
+    const o = this.p.data.online;
+    const name = h('input.lb-in', { value: o.name, placeholder: 'Call sign (2–16 letters)', maxlength: '16' }) as HTMLInputElement;
+    const crew = h('input.lb-in', { value: o.crew, placeholder: 'Crew code', maxlength: '8', style: { textTransform: 'uppercase' } }) as HTMLInputElement;
+    sheet.replaceChildren(
+      h('h2', editing ? 'Your call sign' : 'Join the leaderboard'),
+      h('div.help', { style: { marginTop: 0 } }, 'Pick a name for the boards. Share a crew code with family to get your own private ranking.'),
+      name,
+      h('div.lb-crewrow', crew, h('button.btn.small.cyan', { onclick: () => (crew.value = newCrewCode()) }, 'New crew')),
+      h(
+        'button.btn.primary.big',
+        {
+          style: { width: '100%', marginTop: '10px' },
+          onclick: () => {
+            const c = crew.value.trim().toUpperCase();
+            if (!validName(name.value)) return toast('Call sign needs 2–16 characters', '#ff5c7a');
+            if (!validCrew(c)) return toast('Crew codes are 4–8 letters/numbers', '#ff5c7a');
+            this.p.setOnline(name.value, c);
+            audio.levelUp();
+            this.p.flushScores();
+            this.leaderboard(mode);
+          },
+        },
+        'Save',
+      ),
+      h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Not now'),
+    );
+    setTimeout(() => name.focus(), 50);
   }
 
   /** One-tap "Power Up" coach: the single best next upgrade, applied in place. */

@@ -3713,3 +3713,142 @@ button {
   color: #ffb24d;
   font-size: 13px;
 }
+
+/* ------------------------------------------------------------ leaderboard */
+
+.lb-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffd34d;
+  background: rgba(255, 211, 77, 0.1);
+  border: 1px solid rgba(255, 211, 77, 0.4);
+}
+
+.mode-card {
+  position: relative;
+}
+
+.sheet.lb h2 {
+  text-align: center;
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+
+.lb-tabs {
+  position: static;
+  transform: none;
+  margin: 0 auto 8px;
+  width: 100%;
+}
+
+.lb-tabs .mt {
+  flex: 1;
+  justify-content: center;
+}
+
+.lb-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+
+.lb-msg {
+  text-align: center;
+  color: var(--dim);
+  font-size: 13px;
+  padding: 24px 8px;
+}
+
+.lb-row {
+  display: grid;
+  grid-template-columns: 30px 34px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.lb-row.me {
+  background: rgba(255, 178, 77, 0.12);
+  border-color: rgba(255, 178, 77, 0.5);
+}
+
+.lb-rk {
+  text-align: center;
+  font-size: 15px;
+}
+
+.lb-row img {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.lb-nm {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lb-nm span {
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-nm small {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.lb-sc {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-share {
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 13px;
+  color: #43ffa4;
+  background: rgba(67, 255, 164, 0.08);
+  border: 1px solid rgba(67, 255, 164, 0.4);
+}
+
+.lb-in {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 16px;
+  color: var(--text);
+  background: #0e121b;
+  border: 1px solid #34405c;
+}
+
+.lb-crewrow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.lb-crewrow .btn {
+  flex: none;
+  height: 46px;
+}

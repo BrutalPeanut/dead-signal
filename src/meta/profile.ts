@@ -1,4 +1,5 @@
 import { CHARACTERS, charById } from './characters';
+import { dailyBoard, ENDLESS_BOARD, submitScore, uuid, type Submission } from '../net/leaderboard';
 import { DAILY_TIERS, dailySeed, type RunMode } from '../sim/modes';
 import { LOGIN_DAYS, freshLogin, loginReward, type LoginReward, type LoginState } from './login';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
@@ -69,6 +70,7 @@ export interface SaveData {
   daily: { key: string; best: number; tiers: number; plays: number; bestEver: number };
   endless: { best: number; bestScore: number; runs: number };
   character: string;
+  online: { id: string; name: string; crew: string; pending: Submission[] };
 }
 
 export interface RunRewards {
@@ -123,6 +125,7 @@ function fresh(): SaveData {
     daily: { key: '', best: 0, tiers: 0, plays: 0, bestEver: 0 },
     endless: { best: 0, bestScore: 0, runs: 0 },
     character: 'courier',
+    online: { id: '', name: '', crew: '', pending: [] },
   };
 }
 
@@ -143,7 +146,7 @@ export class Profile {
       const raw = this.storage?.getItem(KEY);
       if (raw) {
         const d = JSON.parse(raw) as SaveData;
-        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless, character: d.character ?? 'courier' };
+        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless, character: d.character ?? 'courier', online: d.online ?? fresh().online };
       }
     } catch {
       /* corrupted save → start fresh */
@@ -233,6 +236,55 @@ export class Profile {
       atk: 45, hp: 420, def: 0.05, crit: 0.08, critMul: 1.6, moveSpeed: 92, pickup: 52,
       healMul: 1, goldMul: 1, rerolls: 2, revives: 0, startWeapon: 'pistol', startLevels: 0, regen: 0,
     };
+  }
+
+  // ------------------------------------------------------------------ online
+
+  /** Stable anonymous player id (created on first use). */
+  playerId() {
+    if (!this.data.online.id) {
+      this.data.online.id = uuid();
+      this.save();
+    }
+    return this.data.online.id;
+  }
+
+  setOnline(name: string, crew: string) {
+    this.playerId();
+    this.data.online.name = name.trim().slice(0, 16);
+    this.data.online.crew = crew.trim().toUpperCase();
+    this.save();
+  }
+
+  /**
+   * Queue a score for the board and try to send everything pending. Resolves with the rank of
+   * this submission (null when offline or no call sign yet; it stays queued for next time).
+   */
+  async postScore(mode: 'daily' | 'endless', score: number, time: number, now = new Date()): Promise<number | null> {
+    const o = this.data.online;
+    const board = mode === 'daily' ? dailyBoard(this.dailyState(now).key) : ENDLESS_BOARD;
+    const sub: Submission = { board, score, time, hero: this.data.character };
+    const same = o.pending.find((x) => x.board === board);
+    if (same) {
+      if (score > same.score) Object.assign(same, sub);
+    } else o.pending.push(sub);
+    o.pending = o.pending.slice(-6);
+    this.save();
+    return this.flushScores(board);
+  }
+
+  async flushScores(want?: string): Promise<number | null> {
+    const o = this.data.online;
+    if (!o.name) return null;
+    let rank: number | null = null;
+    for (const s of o.pending.slice()) {
+      const r = await submitScore(this.playerId(), o.name, o.crew, s);
+      if (r === null) return rank; // offline: keep the rest queued
+      o.pending = o.pending.filter((x) => x !== s);
+      if (s.board === want) rank = r;
+    }
+    this.save();
+    return rank;
   }
 
   charUnlocked(id: string) {
