@@ -649,7 +649,7 @@ export class Renderer {
     const w = g.weapons.find((x) => x.id === 'blades');
     if (!w || !bladesActive(w)) return;
     const pos = bladePositions(g, w, []);
-    const r = 11 * (w.evolved ? 1.3 : 1) * Math.sqrt(g.areaMul);
+    const r = 14 * (w.evolved ? 1.3 : 1) * Math.sqrt(g.areaMul);
     const col = w.evolved ? '#ffe9a8' : '#ffb84d';
     for (let k = 0; k < pos.length; k += 2) {
       const x = pos[k];
