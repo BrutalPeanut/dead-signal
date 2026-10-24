@@ -66,6 +66,7 @@ function manage() {
 }
 
 const clears: string[] = [];
+const deaths: Record<string, { n: number; last: Record<string, number>; dmg: Record<string, number>; t: number[] }> = {};
 const t0 = performance.now();
 for (let run = 1; run <= maxRuns && p.data.unlocked < CHAPTER_COUNT; run++) {
   const sector = p.data.unlocked;
@@ -84,6 +85,14 @@ for (let run = 1; run <= maxRuns && p.data.unlocked < CHAPTER_COUNT; run++) {
   const won = g.state === 'won';
   const was = p.data.unlocked;
   p.applyRun(sector, g.result(), rng.int(1, 1e9));
+  if (!won) {
+    const k = `S${sector + 1}`;
+    const a = (deaths[k] ??= { n: 0, last: {}, dmg: {}, t: [] });
+    a.n++;
+    a.t.push(Math.round(g.time));
+    a.last[g.lastHurt] = (a.last[g.lastHurt] ?? 0) + 1;
+    for (const [src, v] of Object.entries(g.hurtBy)) a.dmg[src] = (a.dmg[src] ?? 0) + v;
+  }
   console.log(`run ${String(run).padStart(3)} S${sector + 1} ${won ? 'WIN ' : 'lose'} t=${String(Math.round(g.time)).padStart(3)} pow=${p.power()} atk=${base.atk} hp=${base.hp} acct=${p.data.accountLevel} gold=${p.data.gold} gear=${p.equippedItems().map((i) => i.rarity).join('')}`);
   if (p.data.unlocked > was || (won && sector === CHAPTER_COUNT - 1)) {
     clears.push(`S${sector + 1} cleared on run ${run} (power ${p.power()}, acct ${p.data.accountLevel})`);
@@ -92,4 +101,11 @@ for (let run = 1; run <= maxRuns && p.data.unlocked < CHAPTER_COUNT; run++) {
   manage();
 }
 console.log('\n' + clears.join('\n'));
+console.log('\nlosses: sector n | killing blow | damage share | death times');
+for (const [k, a] of Object.entries(deaths)) {
+  const tot = Object.values(a.dmg).reduce((x, y) => x + y, 0);
+  const share = Object.entries(a.dmg).sort((x, y) => y[1] - x[1]).slice(0, 5).map(([s2, v]) => `${s2} ${Math.round((v / tot) * 100)}%`).join(', ');
+  const last = Object.entries(a.last).sort((x, y) => y[1] - x[1]).map(([s2, v]) => `${s2}×${v}`).join(' ');
+  console.log(`${k} ${a.n} | ${last} | ${share} | ${a.t.sort((x, y) => x - y).join(',')}`);
+}
 console.log(`(${((performance.now() - t0) / 1000).toFixed(0)}s)`);

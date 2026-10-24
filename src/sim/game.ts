@@ -58,6 +58,9 @@ export interface RunResult {
   eliteKills: number;
   evolutions?: number;
   score?: number;
+  /** What landed the final hit on a loss (enemy kind or boss attack), for the death tip. */
+  killedBy?: string;
+  killedByBoss?: string;
 }
 
 export class Game {
@@ -551,7 +554,7 @@ export class Game {
         e.contactCd = 0.6;
         this.contactWindow = 0.12;
         const damp = fieldR > 0 && d2p < fieldR * fieldR ? fieldDamp : 0;
-        this.hurtPlayer(e.dmg * (1 - damp));
+        this.hurtPlayer(e.dmg * (1 - damp), e.kind === 'boss' ? 'boss-touch' : e.kind);
       }
 
       if (this.cage && e.kind !== 'boss') {
@@ -568,10 +571,18 @@ export class Game {
     }
   }
 
-  hurtPlayer(raw: number) {
+  /** Damage taken by source (balance analytics only). */
+  hurtBy: Record<string, number> = {};
+  lastHurt = '';
+  lastHurtBoss = '';
+
+  hurtPlayer(raw: number, src = '?') {
     if (this.state !== 'play' || this.winT > 0) return;
     const amt = raw * this.takenMul;
     this.hp -= amt;
+    this.hurtBy[src] = (this.hurtBy[src] ?? 0) + amt;
+    this.lastHurt = src;
+    this.lastHurtBoss = this.boss?.boss ?? '';
     this.hurtT = 0.25;
     this.fx.push({ t: 'playerHit', amt });
   }
@@ -637,7 +648,7 @@ export class Game {
 
     if (e.kind === 'bloater') {
       this.fx.push({ t: 'explode', x: e.x, y: e.y, r: 58, color: '#9dff4a' });
-      if (dist2(e.x, e.y, this.px, this.py) < 58 * 58) this.hurtPlayer(e.dmg * 1.4);
+      if (dist2(e.x, e.y, this.px, this.py) < 58 * 58) this.hurtPlayer(e.dmg * 1.4, 'bloater-pop');
     }
 
     if (e.elite) {
@@ -807,7 +818,7 @@ export class Game {
       const rr = s.r + 9;
       if (dist2(s.x, s.y, this.px, this.py) < rr * rr) {
         s.alive = false;
-        this.hurtPlayer(s.dmg);
+        this.hurtPlayer(s.dmg, this.boss ? 'boss-shot' : 'shot');
       }
     }
   }
@@ -820,11 +831,11 @@ export class Game {
           if (tg.kind === 'circle') {
             this.fx.push({ t: 'explode', x: tg.x, y: tg.y, r: tg.r, color: '#ff3b5c' });
             this.fx.push({ t: 'shake', amt: 4 });
-            if (dist2(tg.x, tg.y, this.px, this.py) < (tg.r + 8) ** 2) this.hurtPlayer(tg.dmg);
+            if (dist2(tg.x, tg.y, this.px, this.py) < (tg.r + 8) ** 2) this.hurtPlayer(tg.dmg, 'boss-aoe');
             tg.active = -1;
           } else if (tg.active <= 0 && tg.sweep === 0) {
             // instant line strike (dmg 0 = purely a warning, e.g. Warden's charge lane)
-            if (tg.dmg > 0 && this.inLine(tg)) this.hurtPlayer(tg.dmg);
+            if (tg.dmg > 0 && this.inLine(tg)) this.hurtPlayer(tg.dmg, 'boss-line');
             this.fx.push({ t: 'shake', amt: 5 });
             tg.active = -1;
           }
@@ -839,7 +850,7 @@ export class Game {
         (tg as any).tickT = ((tg as any).tickT ?? 0) - dt;
         if ((tg as any).tickT <= 0 && this.inLine(tg)) {
           (tg as any).tickT = 0.25;
-          this.hurtPlayer(tg.dmg);
+          this.hurtPlayer(tg.dmg, 'boss-laser');
         }
         if (tg.active <= 0) tg.active = -1;
       }
@@ -1086,6 +1097,8 @@ export class Game {
       eliteKills: this.eliteKills,
       evolutions: this.weapons.filter((w) => w.evolved).length,
       score: this.score(),
+      killedBy: this.state === 'won' ? undefined : this.lastHurt,
+      killedByBoss: this.state === 'won' ? undefined : this.lastHurtBoss,
     };
   }
 

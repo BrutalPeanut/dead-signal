@@ -2,7 +2,29 @@ import { GEAR, RARITIES, RARITY_COLORS } from '../meta/gear';
 import type { RunRewards } from '../meta/profile';
 import type { RunResult } from '../sim/game';
 import { gearIcon } from '../render/icons';
-import { RUN_LENGTH, STAR1_TIME, STAR2_TIME } from '../sim/data';
+import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, type BossKind } from '../sim/data';
+
+/** "What got me, and what do I do about it" — one line, shown on a loss. */
+export function deathTip(src?: string, boss?: string): [string, string] | null {
+  if (!src) return null;
+  const bn = boss ? BOSSES[boss as BossKind]?.name ?? 'The boss' : 'The boss';
+  const T: Record<string, [string, string]> = {
+    'boss-shot': [`${bn}'s spores`, 'Strafe sideways through the gaps in the fan instead of running straight back.'],
+    'boss-aoe': [`${bn}'s strike zone`, 'Red circles land a moment later: step out as soon as they appear.'],
+    'boss-line': [`${bn}'s charge`, 'The red lane shows where it will charge. Sidestep, then punish it.'],
+    'boss-laser': [`${bn}'s laser`, 'Circle around the boss in the same direction the beam sweeps.'],
+    'boss-touch': [bn, 'Bosses hit hard up close. Keep a little distance and let your weapons work.'],
+    brute: ['a Brute', 'Brutes hit hardest. Kite them in wide circles rather than standing your ground.'],
+    spitter: ['a Spitter', 'Keep moving and the acid lands where you were.'],
+    shot: ['Spitter acid', 'Keep moving and the acid lands where you were.'],
+    bloater: ['a Bloater', 'Bloaters burst when they die. Pop them at range.'],
+    'bloater-pop': ['a Bloater burst', 'Bloaters burst when they die. Pop them at range.'],
+    runner: ['Runners', 'Runners are fast but fragile. Area weapons like Arc or Napalm clear them.'],
+    crawler: ['Crawlers', 'Crawlers swarm low. Blades and Plasma Field shred them.'],
+    shambler: ['the horde', 'Move in big loops so the horde trails behind you in one clump.'],
+  };
+  return T[src] ?? ['the horde', 'Move in big loops so the horde trails behind you in one clump.'];
+}
 import { coin, fmtNum, fmtTime, h } from './dom';
 
 export function resultsModal(
@@ -49,7 +71,7 @@ export function resultsModal(
   // the single most useful "what next" line
   let next = '';
   if (r.won) next = rw.unlockedSector ? 'Next sector unlocked. Keep the streak going!' : 'Cleared again. Push your score higher!';
-  else if (r.time < STAR1_TIME) next = `${fmtTime(STAR1_TIME - r.time)} short of your first star. Upgrade in the Armory, then go again!`;
+  else if (r.time < STAR1_TIME) next = `${fmtTime(STAR1_TIME - r.time)} short of your first star. ${powerUp ? 'Go again!' : 'Upgrade in the Armory, then go again!'}`;
   else if (r.time < STAR2_TIME) next = `${fmtTime(STAR2_TIME - r.time)} short of the ${fmtTime(STAR2_TIME).replace(/^0/, '')} star!`;
   else next = `So close: ${fmtTime(RUN_LENGTH - r.time)} from clearing the sector!`;
   if (rw.levelsGained) next += ` Account level up!`;
@@ -72,6 +94,10 @@ export function resultsModal(
     ),
     h('div.rewards', rewards),
     h('div.next-goal', next),
+    (() => {
+      const tip = r.won ? null : deathTip(r.killedBy, r.killedByBoss);
+      return tip ? h('div.death-tip', h('small', `Downed by ${tip[0]}`), h('span', tip[1])) : null;
+    })(),
     powerUp
       ? h(
           'div.res-powerup',

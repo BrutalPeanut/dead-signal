@@ -47,8 +47,8 @@ export function getChapter(index: number): ChapterDef {
   const early = Math.min(index, 3);
   const mid = Math.max(0, Math.min(index, 6) - 3);
   const late = Math.max(0, index - 6);
-  const hpMul = Math.pow(1.8, early) * Math.pow(1.55, mid) * Math.pow(1.34, late);
-  const dmgMul = Math.pow(1.38, early) * Math.pow(1.28, mid) * Math.pow(1.18, late);
+  const hpMul = Math.pow(1.8, early) * Math.pow(1.55, mid) * Math.pow(1.24, late);
+  const dmgMul = Math.pow(1.38, early) * Math.pow(1.28, mid) * Math.pow(1.12, late);
   return {
     index,
     name,
@@ -59,6 +59,7 @@ export function getChapter(index: number): ChapterDef {
     midBoss,
     finalBoss,
     goldMul: 1 + index * 0.45,
-    power: Math.round(300 * Math.pow(1.6, early) * Math.pow(1.42, mid) * Math.pow(1.3, late)),
+    // Calibrated to the power a player following Power Up actually clears each sector at (+~10%).
+    power: Math.round((450 * Math.pow(1.28, index)) / 10) * 10,
   };
 }
