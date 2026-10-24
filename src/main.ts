@@ -93,7 +93,11 @@ class App {
     this.sector = sector;
     this.mode = 'run';
     this.endT = -1;
-    this.game = new Game(getChapter(sector), this.profile.baseStats(), Math.floor(Math.random() * 1e9));
+    const base = this.profile.baseStats();
+    // Sector 1 is the training ground: one free revive so first-timers can bank a win.
+    if (sector === 0) base.revives += 1;
+    this.game = new Game(getChapter(sector), base, Math.floor(Math.random() * 1e9));
+    this.hud.startRun(this.profile.data.best[sector] ?? 0);
     this.renderer.setGame(this.game);
     this.renderer.fx.parts.length = 0;
     this.renderer.fx.decals.length = 0;
@@ -311,6 +315,13 @@ class App {
         case 'bossDown':
           audio.explode();
           haptic(80);
+          break;
+        case 'toast':
+          this.hud.toast(e.text, e.color, e.big);
+          if (e.big) {
+            audio.pickup('chest');
+            haptic(30);
+          } else audio.pickup('gold');
           break;
       }
     }

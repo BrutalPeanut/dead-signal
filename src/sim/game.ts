@@ -53,6 +53,7 @@ export interface RunResult {
   bossKills: number;
   eliteKills: number;
   evolutions?: number;
+  score?: number;
 }
 
 export class Game {
@@ -205,6 +206,7 @@ export class Game {
     this.updateTelegraphs(dt);
     this.updatePickups(dt);
     this.compact();
+    this.milestones();
 
     if (this.hp <= 0) this.onDeath();
     if (this.winT > 0) {
@@ -1067,7 +1069,41 @@ export class Game {
       bossKills: this.bossKills,
       eliteKills: this.eliteKills,
       evolutions: this.weapons.filter((w) => w.evolved).length,
+      score: this.score(),
     };
+  }
+
+  // ------------------------------------------------------------------ score + milestones
+
+  /** Run score: everything the player did, so every run produces a number to beat. */
+  score(): number {
+    const t = Math.min(this.time, RUN_LENGTH);
+    return Math.round(this.kills * 10 + t * 5 + this.eliteKills * 300 + this.bossKills * 1500 + (this.state === 'won' ? 5000 : 0));
+  }
+
+  private nextTimeMs = 0;
+  private nextKillMs = 0;
+  private static TIME_MS: [number, string, string, boolean][] = [
+    [60, '1:00 survived', '#5ef2ff', false],
+    [180, '3:00 survived', '#5ef2ff', false],
+    [300, '★ STAR EARNED · 5:00', '#ffd34d', true],
+    [480, '★ STAR EARNED · 8:00', '#ffd34d', true],
+    [540, 'ONE MINUTE LEFT', '#43ffa4', true],
+  ];
+  private static KILL_MS = [100, 500, 1000, 2500, 5000, 10000, 20000];
+
+  /** Encouragement pops: time milestones (incl. star thresholds) and kill counts. */
+  private milestones() {
+    const tm = Game.TIME_MS[this.nextTimeMs];
+    if (tm && this.time >= tm[0]) {
+      this.nextTimeMs++;
+      this.fx.push({ t: 'toast', text: tm[1], color: tm[2], big: tm[3] });
+    }
+    const km = Game.KILL_MS[this.nextKillMs];
+    if (km && this.kills >= km) {
+      this.nextKillMs++;
+      this.fx.push({ t: 'toast', text: `${km.toLocaleString()} kills!`, color: '#ff7ae6' });
+    }
   }
 
   // ------------------------------------------------------------------ housekeeping

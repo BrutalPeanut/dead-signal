@@ -150,6 +150,7 @@ export type FxEvent =
   | { t: 'pickup'; kind: PickupKind; x: number; y: number }
   | { t: 'playerHit'; amt: number }
   | { t: 'banner'; text: string; sub: string; color: string }
+  | { t: 'toast'; text: string; color: string; big?: boolean }
   | { t: 'shoot'; weapon: WeaponId }
   | { t: 'slash'; x: number; y: number; a: number; r: number; arc: number; evo: boolean }
   | { t: 'emp'; x: number; y: number }

@@ -23,6 +23,11 @@ export class Hud {
   private bossFill: HTMLElement;
   private banner: HTMLElement;
   private hint: HTMLElement;
+  private score: HTMLElement;
+  private runFill: HTMLElement;
+  private runBest: HTMLElement;
+  private runMarks: HTMLElement[] = [];
+  private toasts: HTMLElement;
   private cache: Record<string, string> = {};
   private skillKey = '';
   private bannerKey = '';
@@ -30,7 +35,16 @@ export class Hud {
   constructor(onPause: () => void) {
     this.xpFill = h('div.xpfill');
     this.lvl = h('div.lvl', 'LV 1');
-    this.timer = h('div.timer', '00:00');
+    this.timer = h('span', '00:00');
+    this.score = h('b.score-v', '0');
+    this.runFill = h('i.rb-fill');
+    this.runBest = h('span.rb-best', h('em', 'BEST'));
+    this.toasts = h('div.hud-toasts');
+    const mark = (pct: number, cls: string, label: string) => {
+      const m = h('span.rb-mark.' + cls, { style: { left: `${pct}%` } }, h('span.rb-ico'), h('small', label));
+      this.runMarks.push(m);
+      return m;
+    };
     this.kills = h('span', '0');
     this.gold = h('span', '0');
     this.skills = h('div.skills');
@@ -50,11 +64,24 @@ export class Hud {
       this.lvl,
       h(
         'div.row',
-        h('div.stat', h('span', { style: { fontSize: '15px' } }, '☠'), this.kills),
-        h('div.stat', coin('gold'), this.gold),
-        this.timer,
+        h(
+          'div.scorebox',
+          h('div.score-l', 'SCORE'),
+          this.score,
+          h('div.score-sub', h('span', '☠ ', this.kills), h('span', coin('gold'), this.gold)),
+        ),
+        h('div.timer', this.timer, h('small', ' / 10:00')),
         h('button.pause', { onclick: onPause, 'aria-label': 'Pause' }, 'II'),
       ),
+      h(
+        'div.runbar',
+        h('div.rb-track', this.runFill),
+        this.runBest,
+        mark(50, 'star.boss', '5:00'),
+        mark(80, 'star', '8:00'),
+        mark(100, 'win', 'WIN'),
+      ),
+      this.toasts,
       this.skills,
       this.boss,
       this.banner,
@@ -73,10 +100,33 @@ export class Hud {
     this.hint.classList.toggle('on', on);
   }
 
+  /** Called at run start with this sector's best survival time (for the BEST marker). */
+  startRun(best: number) {
+    this.toasts.replaceChildren();
+    this.runBest.style.display = best > 5 && best < 600 ? '' : 'none';
+    this.runBest.style.left = `${(best / 600) * 100}%`;
+    for (const m of this.runMarks) m.classList.remove('hit');
+  }
+
+  /** Short encouragement pop (milestones, stars, kill counts). */
+  toast(text: string, color: string, big = false) {
+    const t = h('div.hud-toast' + (big ? '.big' : ''), { style: { color, borderColor: color } }, text);
+    this.toasts.append(t);
+    while (this.toasts.children.length > 3) this.toasts.firstElementChild?.remove();
+    setTimeout(() => t.classList.add('out'), big ? 2200 : 1400);
+    setTimeout(() => t.remove(), big ? 2700 : 1900);
+  }
+
   update(g: Game, banners: Banner[]) {
+    const frac = Math.min(1, g.time / 600);
+    this.runFill.style.width = `${(frac * 100).toFixed(2)}%`;
+    this.runMarks[0].classList.toggle('hit', g.time >= 300);
+    this.runMarks[1].classList.toggle('hit', g.time >= 480);
+    this.runMarks[2].classList.toggle('hit', g.state === 'won');
+    this.set('sc', this.score, g.score().toLocaleString());
     this.xpFill.style.width = `${Math.min(100, (g.xp / g.xpNeed) * 100).toFixed(1)}%`;
     this.set('lvl', this.lvl, `LV ${g.level}`);
-    this.set('t', this.timer, fmtTime(g.time));
+    this.set('t', this.timer, fmtTime(Math.min(g.time, 600)));
     this.set('k', this.kills, fmtNum(g.kills));
     this.set('g', this.gold, fmtNum(g.gold));
 

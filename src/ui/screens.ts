@@ -24,15 +24,38 @@ export function resultsModal(r: RunResult, rw: RunRewards, sectorName: string, o
       ),
     );
   }
-  const notes: string[] = [];
-  if (rw.firstClear) notes.push('First clear bonus!');
-  if (rw.unlockedSector) notes.push('Next sector unlocked.');
-  if (rw.levelsGained) notes.push(`Account level up! (+${rw.levelsGained})`);
-  if (!r.won && r.time < 300) notes.push('Tip: upgrade gear in the Armory and buy talents, then try again.');
+  // stars: earned before (dim gold), earned this run (bright + "NEW"), not yet (grey)
+  const starDefs: [number, string][] = [
+    [1, 'Survive 5:00'],
+    [2, 'Survive 8:00'],
+    [4, 'Clear'],
+  ];
+  const stars = h(
+    'div.res-stars',
+    starDefs.map(([bit, label]) => {
+      const had = !!(rw.starsBefore & bit);
+      const has = !!(rw.starsAfter & bit);
+      return h('div.rs' + (has ? '.on' : '') + (has && !had ? '.new' : ''), h('i'), h('small', label), has && !had ? h('b', 'NEW') : null);
+    }),
+  );
+  // the single most useful "what next" line
+  let next = '';
+  if (r.won) next = rw.unlockedSector ? 'Next sector unlocked. Keep the streak going!' : 'Cleared again. Push your score higher!';
+  else if (r.time < 300) next = `${fmtTime(300 - r.time)} short of your first star. Upgrade in the Armory, then go again!`;
+  else if (r.time < 480) next = `${fmtTime(480 - r.time)} short of the 8:00 star!`;
+  else next = `So close: ${fmtTime(600 - r.time)} from clearing the sector!`;
+  if (rw.levelsGained) next += ` Account level up!`;
   return h(
     'div.modal.results',
     h('h2', { style: { color, textShadow: `0 0 24px ${color}` } }, title),
     h('div.sub', sectorName),
+    h(
+      'div.res-score',
+      h('small', 'SCORE'),
+      h('b', rw.score.toLocaleString()),
+      rw.newBest ? h('span.best-badge', rw.prevBest ? 'NEW BEST!' : 'FIRST SCORE!') : h('span.prev', `Best ${rw.prevBest.toLocaleString()}`),
+    ),
+    stars,
     h(
       'div.stats',
       h('div', h('b', fmtTime(r.time)), h('span', 'Survived')),
@@ -40,7 +63,7 @@ export function resultsModal(r: RunResult, rw: RunRewards, sectorName: string, o
       h('div', h('b', r.level), h('span', 'Level')),
     ),
     h('div.rewards', rewards),
-    notes.length ? h('div.help', { style: { color: '#cfd7e6', fontSize: '13px' } }, notes.join(' ')) : null,
+    h('div.next-goal', next),
     h('div.actions', h('button.btn.primary.big', { onclick: onContinue }, 'Continue')),
   );
 }
