@@ -17,6 +17,7 @@ import {
   type PerkStat,
   type Slot,
 } from './gear';
+import { dailyBonus, dateKey, MISSION_DEFS, rollDaily, starReward, type DailyMissions, type MissionKind, type Reward } from './missions';
 import { MILESTONES, TRACKS, accountXpNeed, trackCap, trackCost, type TrackId } from './talents';
 
 const KEY = 'deadsignal.save.v1';
@@ -48,6 +49,9 @@ export interface SaveData {
   stats: { runs: number; kills: number; bossKills: number; wins: number };
   seenIntro: boolean;
   uidSeq: number;
+  missions: DailyMissions | null;
+  /** Claimed sector-chest bits per sector (same bit layout as stars). */
+  starClaims: Record<number, number>;
 }
 
 export interface RunRewards {
@@ -85,6 +89,8 @@ function fresh(): SaveData {
     stats: { runs: 0, kills: 0, bossKills: 0, wins: 0 },
     seenIntro: false,
     uidSeq: 3,
+    missions: null,
+    starClaims: {},
   };
 }
 
@@ -105,7 +111,7 @@ export class Profile {
       const raw = this.storage?.getItem(KEY);
       if (raw) {
         const d = JSON.parse(raw) as SaveData;
-        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings } };
+        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {} };
       }
     } catch {
       /* corrupted save → start fresh */
@@ -225,6 +231,7 @@ export class Profile {
     this.data.gold -= c.gold;
     this.data.scrap -= c.scrap;
     it.level++;
+    this.track('levelgear', 1);
     this.save();
     return true;
   }
@@ -304,6 +311,7 @@ export class Profile {
     this.data.keys--;
     const it = this.rollItem(rng, this.data.unlocked, true);
     this.data.gear.push(it);
+    this.track('crate', 1);
     this.save();
     return it;
   }
@@ -366,6 +374,12 @@ export class Profile {
     d.keys += keys;
     d.gear.push(...items);
     d.stats.runs++;
+    this.track('runs', 1);
+    this.track('kills', r.kills);
+    this.track('survive', r.time);
+    this.track('boss', r.bossKills);
+    this.track('elite', r.eliteKills);
+    this.track('evolve', r.evolutions ?? 0);
     d.stats.kills += r.kills;
     d.stats.bossKills += r.bossKills;
     if (r.won) d.stats.wins++;
@@ -405,6 +419,7 @@ export class Profile {
       this.data.accountLevel++;
     }
     this.data.relayAt = now;
+    this.track('relay', 1);
     this.save();
     return p;
   }
@@ -421,6 +436,83 @@ export class Profile {
     this.data.keys += 1;
     this.save();
     return { gold, keys: 1 };
+  }
+
+  // ------------------------------------------------------------------ missions + sector chests
+
+  /** Today's missions (rolled on first access each day). */
+  missions(now = new Date()): DailyMissions {
+    const key = dateKey(now);
+    if (!this.data.missions || this.data.missions.date !== key) {
+      this.data.missions = rollDaily(key, this.data.unlocked);
+    }
+    return this.data.missions;
+  }
+
+  track(kind: MissionKind, amount: number, now = new Date()) {
+    if (amount <= 0) return;
+    const m = this.missions(now);
+    for (const ms of m.list) {
+      if (ms.kind !== kind || ms.claimed) continue;
+      ms.progress = MISSION_DEFS[kind].mode === 'max' ? Math.max(ms.progress, amount) : ms.progress + amount;
+      ms.progress = Math.min(ms.progress, ms.target);
+    }
+  }
+
+  grant(r: Reward) {
+    this.data.gold += r.gold ?? 0;
+    this.data.scrap += r.scrap ?? 0;
+    this.data.keys += r.keys ?? 0;
+  }
+
+  claimMission(i: number): Reward | null {
+    const ms = this.missions().list[i];
+    if (!ms || ms.claimed || ms.progress < ms.target) return null;
+    ms.claimed = true;
+    this.grant(ms.reward);
+    this.save();
+    return ms.reward;
+  }
+
+  bonusReady() {
+    const m = this.missions();
+    return !m.bonusClaimed && m.list.every((x) => x.claimed);
+  }
+
+  claimBonus(): Reward | null {
+    if (!this.bonusReady()) return null;
+    const r = dailyBonus(this.data.unlocked);
+    this.missions().bonusClaimed = true;
+    this.grant(r);
+    this.save();
+    return r;
+  }
+
+  missionsClaimable() {
+    return this.missions().list.filter((x) => !x.claimed && x.progress >= x.target).length + (this.bonusReady() ? 1 : 0);
+  }
+
+  canClaimStar(sector: number, bit: 1 | 2 | 4) {
+    return !!((this.data.stars[sector] ?? 0) & bit) && !((this.data.starClaims[sector] ?? 0) & bit);
+  }
+
+  claimStar(sector: number, bit: 1 | 2 | 4): Reward | null {
+    if (!this.canClaimStar(sector, bit)) return null;
+    this.data.starClaims[sector] = (this.data.starClaims[sector] ?? 0) | bit;
+    const r = starReward(sector, bit);
+    this.grant(r);
+    this.save();
+    return r;
+  }
+
+  /** Total unclaimed sector chests across all sectors. */
+  starChestsReady() {
+    let n = 0;
+    for (const k of Object.keys(this.data.stars)) {
+      const s = Number(k);
+      for (const b of [1, 2, 4] as const) if (this.canClaimStar(s, b)) n++;
+    }
+    return n;
   }
 
   trackInfo() {

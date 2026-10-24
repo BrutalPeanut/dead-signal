@@ -13,7 +13,7 @@ for (let i = 0; i < 10; i++) {
   await page.evaluate((i) => { const a = window.__ds.app; a.profile.data.unlocked = 9; a.hub.sector = i; a.hub.refresh(); }, i);
   await page.waitForTimeout(1500);
 }
-await page.click('.deploy .btn');
+await page.click('.battle-row .go');
 for (let i = 0; i < 12; i++) { await page.evaluate(() => window.__ds.advance(50)); await page.waitForTimeout(300); }
 console.log(errs.length ? 'ERRORS:\n' + [...new Set(errs)].join('\n') : 'soak clean');
 await browser.close();

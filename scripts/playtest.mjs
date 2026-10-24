@@ -13,7 +13,7 @@ await page.evaluate(() => { localStorage.clear(); });
 await page.reload();
 await page.waitForTimeout(800);
 await page.click('.modal .btn');
-await page.click('.deploy .btn');
+await page.click('.battle-row .go');
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${out}/run-00.png` });
 const shots = [[20, 'run-20s'], [70, 'run-90s'], [80, 'run-170s'], [125, 'run-boss'], [100, 'run-400s'], [130, 'run-final']];

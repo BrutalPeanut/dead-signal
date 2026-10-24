@@ -7,7 +7,7 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.waitForTimeout(500);
 await page.click('.modal .btn');
-await page.click('.deploy .btn');
+await page.click('.battle-row .go');
 const r = await page.evaluate(async () => {
   const g = window.__ds.app.game;
   g.base.hp = 1e9; g.maxHp = 1e9; g.hp = 1e9;

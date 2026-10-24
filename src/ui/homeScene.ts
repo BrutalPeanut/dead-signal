@@ -53,6 +53,8 @@ export class HomeScene {
   private aim = 0;
   private boss: 'warden' | 'hive' | 'colossus' = 'warden';
   private dpr = Math.min(window.devicePixelRatio || 1, 2);
+  private edgeL = -20;
+  private edgeR = W + 20;
 
   constructor() {
     this.canvas.className = 'home-scene';
@@ -72,7 +74,7 @@ export class HomeScene {
   private spawn(scatter = false) {
     const kinds = Object.keys(ENEMY_DRAW);
     const dir = Math.random() < 0.5 ? 1 : -1;
-    const startX = dir > 0 ? -20 : W + 20;
+    const startX = dir > 0 ? Math.max(-60, this.edgeL) - 20 : Math.min(W + 60, this.edgeR) + 20;
     this.walkers.push({
       kind: kinds[Math.floor(Math.random() * kinds.length)],
       x: scatter ? (dir > 0 ? 10 + Math.random() * 70 : W - 10 - Math.random() * 70) : startX,
@@ -97,15 +99,20 @@ export class HomeScene {
       c.height = Math.round(ch * this.dpr);
     }
     this.t += dt;
-    const k = Math.min((ch * this.dpr) / H, (cw * this.dpr) / W); // fit the whole stage
+    // fill the stage: fit width, but zoom in on tall stages so the courier and boss read big (sides crop)
+    const wide = cw / ch > (W / H) * 1.15;
+    const k = wide ? ((ch * this.dpr) / H) * 0.92 : Math.max((cw * this.dpr) / W, ((ch * this.dpr) / H) * 0.8);
     const ox = (c.width / k - W) / 2; // centre the stage on any aspect
     const x = this.ctx;
-    const oy = c.height / k - H; // extra height goes above (sky)
+    const oy = Math.max(0, c.height / k - H) * 0.55 + Math.min(0, c.height / k - H); // spare height: mostly above, some below
     x.setTransform(k, 0, 0, k, ox * k, oy * k);
     this.ground?.setScale(k);
     const left = -ox;
     const right = W + ox;
-    this.ground?.draw(x, (left + right) / 2, (H - oy) / 2, (right - left) / 2 + 4, (H + oy) / 2 + 4);
+    this.edgeL = left;
+    this.edgeR = right;
+    const vh = c.height / k;
+    this.ground?.draw(x, (left + right) / 2, -oy + vh / 2, (right - left) / 2 + 4, vh / 2 + 4);
 
     // sky fade at the top so the scene melts into the page
     const sky = x.createLinearGradient(0, 0, 0, H);
@@ -115,10 +122,10 @@ export class HomeScene {
     sky.addColorStop(0.7, 'rgba(11,13,18,0.05)');
     sky.addColorStop(1, 'rgba(11,13,18,0.75)');
     x.fillStyle = sky;
-    x.fillRect(left, -oy, right - left, H + oy);
+    x.fillRect(left, -oy, right - left, vh + 1);
 
     // looming boss in the haze
-    const bx = W * 0.79;
+    const bx = W * 0.7;
     const by = 90;
     x.save();
     x.translate(bx, by);
@@ -147,8 +154,8 @@ export class HomeScene {
     x.globalCompositeOperation = 'source-over';
 
     // walkers
-    const hx = W * 0.4;
-    const hy = 116;
+    const hx = W * 0.44;
+    const hy = 112;
     for (const w of this.walkers) {
       if (w.dying > 0) continue;
       w.ph += dt * (w.speed / 7);
@@ -195,7 +202,7 @@ export class HomeScene {
       }
     }
     this.bolts = this.bolts.filter((b) => b.t < 1);
-    this.walkers = this.walkers.filter((w) => w.dying === 0 && w.x > -40 && w.x < W + 40 && !(w.dir > 0 ? w.x > hx - 8 : w.x < hx + 8));
+    this.walkers = this.walkers.filter((w) => w.dying === 0 && w.x > Math.min(-40, left - 40) && w.x < Math.max(W + 40, right + 40) && !(w.dir > 0 ? w.x > hx - 8 : w.x < hx + 8));
     while (this.walkers.length < 6) this.spawn();
 
     // draw actors sorted by depth, hero included
@@ -225,20 +232,20 @@ export class HomeScene {
       y: hy,
       draw: () => {
         // glow ring under the courier
-        const g = x.createRadialGradient(hx, hy + 12, 2, hx, hy + 12, 26);
+        const g = x.createRadialGradient(hx, hy + 18, 2, hx, hy + 18, 30);
         g.addColorStop(0, 'rgba(94,242,255,0.45)');
         g.addColorStop(1, 'rgba(94,242,255,0)');
         x.fillStyle = g;
         x.beginPath();
-        x.ellipse(hx, hy + 12, 26, 9, 0, 0, Math.PI * 2);
+        x.ellipse(hx, hy + 18, 30, 10, 0, 0, Math.PI * 2);
         x.fill();
         x.fillStyle = 'rgba(0,0,0,0.4)';
         x.beginPath();
-        x.ellipse(hx, hy + 12, 10, 3.5, 0, 0, Math.PI * 2);
+        x.ellipse(hx, hy + 19, 13, 4.5, 0, 0, Math.PI * 2);
         x.fill();
         x.save();
         x.translate(hx, hy);
-        x.scale(1.25, 1.25);
+        x.scale(1.55, 1.55);
         drawHero(x, { t: this.t, moving: false, aim: this.aim });
         x.restore();
       },
@@ -296,10 +303,11 @@ export class HomeScene {
     x.stroke();
 
     // bottom fade into the page
-    const fade = x.createLinearGradient(0, H * 0.82, 0, H);
+    const bottom = vh - oy;
+    const fade = x.createLinearGradient(0, bottom - 34, 0, bottom);
     fade.addColorStop(0, 'rgba(11,13,18,0)');
     fade.addColorStop(1, 'rgba(11,13,18,1)');
     x.fillStyle = fade;
-    x.fillRect(left, H * 0.82, right - left, H * 0.18 + 1);
+    x.fillRect(left, bottom - 34, right - left, 35);
   }
 }
