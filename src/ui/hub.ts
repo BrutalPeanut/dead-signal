@@ -43,8 +43,8 @@ function avatar(): string {
   g.addColorStop(1, '#141a28');
   x.fillStyle = g;
   x.fillRect(0, 0, 96, 96);
-  x.translate(46, 98);
-  x.scale(3.4, 3.4);
+  x.translate(44, 108);
+  x.scale(2.7, 2.7);
   drawHero(x, { t: 0.4, moving: false, aim: 0 });
   avatarUrl = c.toDataURL();
   return avatarUrl;
@@ -107,8 +107,8 @@ export class Hub {
       const hh = (c.height = c.clientHeight * 2);
       x.clearRect(0, 0, w, hh);
       x.save();
-      x.translate(w / 2, hh * 0.62);
-      x.scale(hh / 70, hh / 70);
+      x.translate(w / 2, hh * 0.72);
+      x.scale(hh / 78, hh / 78);
       x.fillStyle = 'rgba(0,0,0,0.35)';
       x.beginPath();
       x.ellipse(0, 13, 12, 4, 0, 0, Math.PI * 2);

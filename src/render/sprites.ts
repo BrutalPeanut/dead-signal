@@ -1,6 +1,6 @@
 import { ENEMY_BOX, ENEMY_DRAW } from './art';
 
-export const FRAMES = 8;
+export const FRAMES = 12;
 
 export interface Sprite {
   img: HTMLCanvasElement;
