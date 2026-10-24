@@ -51,7 +51,7 @@ export class HomeScene {
   private t = 0;
   private shootT = 0;
   private aim = 0;
-  private boss: 'warden' | 'hive' | 'colossus' = 'warden';
+  private boss: keyof typeof BOSS_DRAW = 'warden';
   private dpr = Math.min(window.devicePixelRatio || 1, 2);
   private edgeL = -20;
   private edgeR = W + 20;

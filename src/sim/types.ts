@@ -69,6 +69,8 @@ export interface EnemyShot {
   life: number;
   kind: 'acid' | 'spore';
   alive: boolean;
+  /** Homing strength (rad/s turn rate) for seeker orbs. */
+  home?: number;
 }
 
 export interface Pool {

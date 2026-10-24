@@ -46,3 +46,35 @@ describe('modes', () => {
     expect(g.result().time).toBeGreaterThan(300);
   });
 });
+
+describe('act II', () => {
+  it('has 20 sectors with the Broadcaster closing Act II and a gentler curve', async () => {
+    const { CHAPTER_COUNT } = await import('../src/sim/chapters');
+    expect(CHAPTER_COUNT).toBe(20);
+    expect(getChapter(10).finalBoss).toBe('broadcaster');
+    expect(getChapter(10).biome).toBe('reactor');
+    const step = getChapter(15).hpMul / getChapter(14).hpMul;
+    expect(step).toBeLessThan(1.15);
+  });
+
+  it('Broadcaster cycles beams, seekers and a blink without breaking the run', () => {
+    const g = new Game(getChapter(10), kit, 9, defaultMods());
+    (g as any).spawnBoss('broadcaster', false);
+    let lines = 0, homing = 0, moved = 0;
+    let last = [g.boss!.x, g.boss!.y];
+    for (let i = 0; i < 60 * 25 && g.boss; i++) {
+      if (g.state === 'levelup') g.choose(0);
+      g.step(0.3, 0.2);
+      lines = Math.max(lines, g.telegraphs.filter((t) => t.kind === 'line').length);
+      homing = Math.max(homing, g.shots.filter((s) => s.home).length);
+      const d = Math.hypot(g.boss!.x - last[0], g.boss!.y - last[1]);
+      if (d > 20) moved++;
+      last = [g.boss!.x, g.boss!.y];
+      g.boss!.hp = g.boss!.maxHp; // keep it alive to see the whole loop
+      g.fx.length = 0;
+    }
+    expect(lines).toBeGreaterThanOrEqual(4);
+    expect(homing).toBeGreaterThanOrEqual(3);
+    expect(moved).toBeGreaterThanOrEqual(1); // the blink teleport
+  });
+});

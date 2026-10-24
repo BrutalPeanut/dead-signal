@@ -32,4 +32,5 @@ export const BOSS_DRAW = {
   warden: (ctx: CanvasRenderingContext2D, p: BossPose) => drawBoss(ctx, 'warden', p),
   hive: (ctx: CanvasRenderingContext2D, p: BossPose) => drawBoss(ctx, 'hive', p),
   colossus: (ctx: CanvasRenderingContext2D, p: BossPose) => drawBoss(ctx, 'colossus', p),
+  broadcaster: (ctx: CanvasRenderingContext2D, p: BossPose) => drawBoss(ctx, 'broadcaster', p),
 };

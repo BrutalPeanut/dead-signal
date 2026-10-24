@@ -254,7 +254,7 @@ export const MAX_PASSIVE_SLOTS = 6;
 // ---------------------------------------------------------------- enemies
 
 export type EnemyKind = 'shambler' | 'runner' | 'crawler' | 'brute' | 'spitter' | 'bloater';
-export type BossKind = 'warden' | 'hive' | 'colossus';
+export type BossKind = 'warden' | 'hive' | 'colossus' | 'broadcaster';
 
 export interface EnemyDef {
   kind: EnemyKind;
@@ -288,6 +288,7 @@ export interface BossDef {
 export const BOSSES: Record<BossKind, BossDef> = {
   warden: { kind: 'warden', name: 'The Warden', title: 'Riot Unit 07, still on duty', r: 34, speed: 46, hp: 2600, dmg: 18 },
   hive: { kind: 'hive', name: 'Hive Mother', title: 'She hears the signal loudest', r: 38, speed: 30, hp: 3200, dmg: 16 },
+  broadcaster: { kind: 'broadcaster', name: 'The Broadcaster', title: 'Still on the air', r: 40, speed: 34, hp: 4600, dmg: 21 },
   colossus: { kind: 'colossus', name: 'Signal Colossus', title: 'The tower walks', r: 44, speed: 26, hp: 4200, dmg: 22 },
 };
 

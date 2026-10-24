@@ -11,6 +11,7 @@ export const BOSS_SPEC = {
   warden: { h: 108, foot: 34 },
   hive: { h: 100, foot: 38 },
   colossus: { h: 102, foot: 44 },
+  broadcaster: { h: 112, foot: 40 },
 };
 
 // ------------------------------------------------------------------ The Warden
@@ -375,10 +376,196 @@ function colossus(ctx: C, p: BossPose) {
   ao(ctx, 0, -2, 34, 5, 0.3);
 }
 
-const DRAW = { warden, hive, colossus };
+
+// ------------------------------------------------------------------ The Broadcaster
+
+const SKIN = mat('#9aa48e', '#3e4636', '#c8d2ba');
+const SKIN_D = mat('#6e7864', '#262c20', '#9aa48e');
+const JACKET = mat('#2f4a52', '#0f1c20', '#4f7480');
+const SHIRT = mat('#c9c2b0', '#6a6454', '#efe8d8');
+const BRASS = mat('#c89a46', '#5e4216', '#f2d08a');
+const MIC = mat('#3a3d44', '#101114', '#70747e');
+
+/**
+ * The Broadcaster: a gaunt late-night radio host grown three metres tall. A speaker cone has
+ * burst through his chest, a crown of antennae blinks on his skull and he still clutches the mic.
+ * Hovers slightly (cables hang from his back); the speaker pulses with each attack.
+ */
+function broadcaster(ctx: C, p: BossPose) {
+  const t = p.t;
+  const bob = Math.sin(t * 1.8) * 2;
+  const pulse = (Math.sin(t * (p.phase2 ? 9 : 5)) + 1) / 2;
+  // hanging cables behind (sway)
+  for (let i = 0; i < 4; i++) {
+    const x0 = -12 + i * 5;
+    const sw = Math.sin(t * 2 + i) * 5;
+    line(ctx, [x0, -78 + bob, x0 - 10 + sw, -50, x0 - 16 + sw * 1.4, -20, x0 - 12 + sw, -4], 2.2, '#16181e');
+    if (i % 2 === 0) glow(ctx, x0 - 12 + sw, -4, 1.6, SIGNAL);
+  }
+  // long digitigrade legs (far leg darker)
+  const leg = (side: number, m: typeof SKIN) => {
+    const sw = Math.sin(t * 1.8 + (side > 0 ? 0 : Math.PI)) * 3;
+    limb(ctx, side * 8, -44 + bob, side * 13 + 6 + sw, -24, side * 8 + sw, -4, [7.5, 5.6, 4.2], m);
+    paint(ctx, (c) => c.roundRect(side * 7 + sw - 6, -6, 15, 6, 3), mat('#1e2026', '#08090b', '#3a3d46', null), side * 7 + sw - 6, -6, 15, 6);
+  };
+  // long coat tails flaring behind the legs
+  const flap = Math.sin(t * 2.4) * 3;
+  paint(ctx, (c) => (c.moveTo(-20, -60 + bob), c.lineTo(-30 - flap, -18), c.lineTo(-14, -24), c.lineTo(-6, -50 + bob), c.closePath()), mat('#24393f', '#0a1417', '#3d5c66'), -30, -60, 26, 42);
+  paint(ctx, (c) => (c.moveTo(16, -60 + bob), c.lineTo(26 + flap * 0.6, -22), c.lineTo(12, -28), c.lineTo(6, -50 + bob), c.closePath()), mat('#24393f', '#0a1417', '#3d5c66'), 6, -60, 22, 38);
+  leg(-1, SKIN_D);
+  // trousers / hips
+  paint(ctx, (c) => c.roundRect(-13, -54 + bob, 26, 14, 5), mat('#232832', '#0b0d11', '#3b4352'), -13, -54 + bob, 26, 14);
+  leg(1, SKIN);
+  // tall torso in a torn suit jacket
+  const torso = (c: C) => {
+    c.moveTo(-16, -50 + bob);
+    c.quadraticCurveTo(-26, -76 + bob, -28, -96 + bob);
+    c.quadraticCurveTo(0, -108 + bob, 30, -96 + bob);
+    c.quadraticCurveTo(28, -74 + bob, 18, -50 + bob);
+    c.quadraticCurveTo(0, -45 + bob, -16, -50 + bob);
+    c.closePath();
+  };
+  paint(ctx, torso, JACKET, -28, -108 + bob, 58, 62);
+  // shoulder pads
+  ball(ctx, -22, -95 + bob, 9, 6, JACKET, -0.3);
+  ball(ctx, 25, -95 + bob, 9, 6, JACKET, 0.3);
+  // shirt + loosened tie down the middle
+  paint(ctx, (c) => (c.moveTo(-5, -96 + bob), c.lineTo(8, -96 + bob), c.lineTo(5, -52 + bob), c.lineTo(-3, -52 + bob), c.closePath()), SHIRT, -5, -96 + bob, 13, 44);
+  paint(ctx, (c) => (c.moveTo(0, -94 + bob), c.lineTo(4, -94 + bob), c.lineTo(5, -70 + bob), c.lineTo(2, -66 + bob), c.lineTo(-1, -70 + bob), c.closePath()), mat('#a3243a', '#4a0c18', '#e05a70'), -1, -94 + bob, 6, 28);
+  // lapels
+  line(ctx, [-6, -96 + bob, -12, -76 + bob, -4, -64 + bob], 2, '#0b1418');
+  line(ctx, [9, -96 + bob, 15, -76 + bob, 7, -64 + bob], 2, '#0b1418');
+  // the speaker that burst through his chest
+  const sx = 3;
+  const sy = -76 + bob;
+  ctx.save();
+  ctx.shadowColor = SIGNAL;
+  ctx.shadowBlur = 10 + pulse * (p.phase2 ? 22 : 12);
+  ball(ctx, sx, sy, 15, 15, mat('#2a2c33', '#0a0b0e', '#4a4e58'));
+  ctx.restore();
+  ball(ctx, sx, sy, 11.5 - pulse * 1.4, 11.5 - pulse * 1.4, mat('#3e2a44', '#120a16', '#6e4a7a', null, 1.4));
+  ctx.strokeStyle = hexA('#ff9ae8', 0.35 + pulse * 0.4);
+  ctx.lineWidth = 1.2;
+  for (const r of [3.5, 6.5]) {
+    ctx.beginPath();
+    ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  glow(ctx, sx, sy, 2.4 + pulse * 1.4);
+  // torn flesh around the cone
+  line(ctx, [sx - 14, sy - 4, sx - 11, sy - 8, sx - 13, sy - 12], 1.6, '#4a1a2a');
+  line(ctx, [sx + 13, sy + 2, sx + 16, sy + 6, sx + 13, sy + 9], 1.6, '#4a1a2a');
+  veins(ctx, sx - 10, sy + 8, 14, 2.2, 5);
+  veins(ctx, sx + 10, sy - 8, 12, -0.6, 8);
+  // far arm: long fingers spread (cable-like)
+  const reach = Math.sin(t * 1.3) * 0.15;
+  limb(ctx, -22, -94 + bob, -34, -72 + bob, -38, -52 + bob + reach * 20, [6.4, 5, 4], JACKET);
+  for (let f = 0; f < 4; f++) {
+    const a = 1.7 + f * 0.28 + reach;
+    paint(ctx, taper(-38, -52 + bob, 2.2, -38 + Math.cos(a) * 16, -52 + bob + Math.sin(a) * 16, 0.7), SKIN_D, -56, -70, 34, 34);
+  }
+  // head: long skull, microphone-grille jaw, antenna crown
+  const hx = 4;
+  const hy = -114 + bob;
+  limb(ctx, 2, -98 + bob, 3, -104 + bob, hx, hy + 6, [4, 4, 4], SKIN);
+  ball(ctx, hx, hy, 12, 14, SKIN, 0.08);
+  // grille jaw
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(hx + 3, hy + 6, 7, 5, 0.1, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1c22';
+  ctx.fill();
+  ctx.clip();
+  ctx.strokeStyle = '#6c7280';
+  ctx.lineWidth = 0.9;
+  for (let k = -8; k <= 8; k += 2.4) {
+    ctx.beginPath();
+    ctx.moveTo(hx + k, hy);
+    ctx.lineTo(hx + k + 4, hy + 12);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // hollow eyes
+  glow(ctx, hx + 6, hy - 3, 2.6);
+  glow(ctx, hx - 1, hy - 4, 2);
+  // antenna crown with blinking tips
+  const ant: [number, number, number][] = [[-8, -0.55, 16], [-2, -0.15, 28], [5, 0.12, 20], [10, 0.5, 14]];
+  ant.forEach(([ox, a, len], i) => {
+    const x0 = hx + ox;
+    const y0 = hy - 10;
+    const x1 = x0 + Math.sin(a) * len;
+    const y1 = y0 - Math.cos(a) * len;
+    ctx.save();
+    ctx.strokeStyle = '#9aa0ac';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x0 - 1.6, y0);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x0 + 1.6, y0);
+    for (let q = 0.2; q < 0.9; q += 0.2) {
+      const mx = x0 + (x1 - x0) * q;
+      const my = y0 + (y1 - y0) * q;
+      const w = 1.6 * (1 - q);
+      ctx.moveTo(mx - w, my);
+      ctx.lineTo(mx + w, my + 1.4);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+    ctx.restore();
+    const on = Math.sin(t * 4 + i * 1.7) > 0.2;
+    glow(ctx, x1, y1, on ? 2.2 : 1.2, on ? SIGNAL : '#7a2a6a');
+  });
+  // signal rings from the tallest antenna
+  const ring = (t * 0.9) % 1;
+  ctx.strokeStyle = `rgba(255,59,212,${0.55 * (1 - ring)})`;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(hx - 2 + Math.sin(-0.15) * 28, hy - 10 - Math.cos(-0.15) * 28, 4 + ring * 30, 0, Math.PI * 2);
+  ctx.stroke();
+  // near arm holding a vintage microphone on its cord
+  const sway = Math.sin(t * 2.2) * 0.12;
+  ctx.save();
+  ctx.translate(18, -92 + bob);
+  ctx.rotate(0.5 + sway);
+  limb(ctx, 0, 0, 13, 15, 26, 21, [6.4, 5.2, 4.4], JACKET);
+  ball(ctx, 28, 21, 5, 4.8, SKIN);
+  // mic
+  ctx.save();
+  ctx.translate(30, 16);
+  ctx.rotate(-1.1 - sway);
+  paint(ctx, (c) => c.roundRect(-3, 0, 6, 14, 2), MIC, -3, 0, 6, 14);
+  ball(ctx, 0, -4, 7, 7.6, BRASS);
+  ctx.strokeStyle = hexA('#5e4216', 0.8);
+  ctx.lineWidth = 0.8;
+  for (let k = -4; k <= 4; k += 2) {
+    ctx.beginPath();
+    ctx.moveTo(-5, -3 + k);
+    ctx.lineTo(5, -3 + k);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
+  // mic cord trailing to the ground
+  line(ctx, [36, -70 + bob, 42, -50, 34, -30, 40, -10, 30, -2], 1.4, '#16181e');
+  if (p.phase2) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = hexA(SIGNAL, 0.45);
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 18 + pulse * 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ao(ctx, 0, -2, 30, 5, 0.32);
+}
+
+const DRAW = { warden, hive, colossus, broadcaster };
 
 /** Draw a boss in world units with its origin at the sim position, facing +x. */
-export function drawBoss(ctx: C, kind: 'warden' | 'hive' | 'colossus', pose: BossPose) {
+export function drawBoss(ctx: C, kind: keyof typeof DRAW, pose: BossPose) {
   const spec = BOSS_SPEC[kind];
   const k = spec.h / 100;
   ctx.save();
