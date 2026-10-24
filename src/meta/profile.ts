@@ -1,3 +1,4 @@
+import { CHARACTERS, charById } from './characters';
 import { DAILY_TIERS, dailySeed, type RunMode } from '../sim/modes';
 import { LOGIN_DAYS, freshLogin, loginReward, type LoginReward, type LoginState } from './login';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
@@ -67,6 +68,7 @@ export interface SaveData {
   login: LoginState;
   daily: { key: string; best: number; tiers: number; plays: number; bestEver: number };
   endless: { best: number; bestScore: number; runs: number };
+  character: string;
 }
 
 export interface RunRewards {
@@ -87,6 +89,8 @@ export interface RunRewards {
   /** Daily Challenge tiers reached for the first time today. */
   tiersNew?: string[];
   mode?: RunMode;
+  /** Character unlocked by this clear, if any. */
+  newCharacter?: string;
 }
 
 function fresh(): SaveData {
@@ -118,6 +122,7 @@ function fresh(): SaveData {
     login: freshLogin(),
     daily: { key: '', best: 0, tiers: 0, plays: 0, bestEver: 0 },
     endless: { best: 0, bestScore: 0, runs: 0 },
+    character: 'courier',
   };
 }
 
@@ -138,7 +143,7 @@ export class Profile {
       const raw = this.storage?.getItem(KEY);
       if (raw) {
         const d = JSON.parse(raw) as SaveData;
-        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless };
+        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless, character: d.character ?? 'courier' };
       }
     } catch {
       /* corrupted save → start fresh */
@@ -196,24 +201,26 @@ export class Profile {
       else hp += gearStat(it);
     }
     const p = this.perkSum();
-    atk *= 1 + p.atkPct;
-    hp *= 1 + p.hpPct;
+    const ch = charById(d.character);
+    atk *= 1 + p.atkPct + (ch.atkPct ?? 0);
+    hp *= 1 + p.hpPct + (ch.hpPct ?? 0);
     const weapon = this.data.equipped.weapon ? this.item(this.data.equipped.weapon) : undefined;
     return {
       atk: Math.round(atk),
       hp: Math.round(hp),
       def: Math.min(0.6, d.tracks.def * 0.005 + p.def),
-      crit: 0.05 + p.crit + this.milestone('crit'),
+      crit: 0.05 + p.crit + this.milestone('crit') + (ch.crit ?? 0),
       critMul: 1.5 + p.critMul,
-      moveSpeed: 92 * (1 + p.move),
-      pickup: 46 * (1 + p.pickup + this.milestone('pickup')),
-      healMul: 1 + d.tracks.heal * 0.04 + p.heal,
+      moveSpeed: 92 * (1 + p.move + (ch.move ?? 0)),
+      pickup: 46 * (1 + p.pickup + this.milestone('pickup') + (ch.pickup ?? 0)),
+      healMul: 1 + d.tracks.heal * 0.04 + p.heal + (ch.healMul ?? 0),
       goldMul: 1 + this.milestone('gold'),
       rerolls: 1 + this.milestone('reroll'),
       revives: this.milestone('revive') + p.revive,
       startWeapon: weapon ? GEAR[weapon.def].startWeapon ?? 'pistol' : 'pistol',
       startLevels: this.milestone('startLevel') + p.startLevel,
-      regen: p.regen,
+      regen: p.regen + (ch.regen ?? 0),
+      bonusWeapon: ch.bonusWeapon,
     };
   }
 
@@ -226,6 +233,17 @@ export class Profile {
       atk: 45, hp: 420, def: 0.05, crit: 0.08, critMul: 1.6, moveSpeed: 92, pickup: 52,
       healMul: 1, goldMul: 1, rerolls: 2, revives: 0, startWeapon: 'pistol', startLevels: 0, regen: 0,
     };
+  }
+
+  charUnlocked(id: string) {
+    return this.data.unlocked >= charById(id).unlock;
+  }
+
+  selectCharacter(id: string) {
+    if (!this.charUnlocked(id)) return false;
+    this.data.character = id;
+    this.save();
+    return true;
   }
 
   power(): number {
@@ -609,7 +627,8 @@ export class Profile {
       levelsGained++;
     }
     this.save();
-    return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector, score, newBest, prevBest, starsBefore: prevStars, starsAfter: stars };
+    const newCharacter = unlockedSector ? CHARACTERS.find((c) => c.unlock === d.unlocked)?.name : undefined;
+    return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector, score, newBest, prevBest, starsBefore: prevStars, starsAfter: stars, newCharacter };
   }
 
   // ------------------------------------------------------------------ idle relay + daily

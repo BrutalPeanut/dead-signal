@@ -18,6 +18,8 @@ import { LOGIN_DAYS, loginReward } from '../meta/login';
 import { DAILY_TIERS, ENDLESS_BOSS_EVERY, dailyChallenge, type RunMode } from '../sim/modes';
 import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
 import { drawHero } from '../render/art';
+import { setHeroSkin } from '../render/hero';
+import { CHARACTERS, charById } from '../meta/characters';
 import { gearIcon } from '../render/icons';
 import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, WEAPONS } from '../sim/data';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
@@ -34,9 +36,26 @@ const UNLOCK: Partial<Record<Tab, { runs: number; text: string }>> = {
   missions: { runs: 1, text: 'Unlocks after your first deployment' },
 };
 
-let avatarUrl = '';
+const avatarUrls = new Map<string, string>();
+let currentSkin = 'courier';
+/** Portrait of a character (cached per skin). Leaves the active skin as it found it. */
+function portrait(id: string): string {
+  const hit = avatarUrls.get(id);
+  if (hit) return hit;
+  setHeroSkin(id);
+  const url = renderAvatar();
+  setHeroSkin(currentSkin);
+  avatarUrls.set(id, url);
+  return url;
+}
+export function useSkin(id: string) {
+  currentSkin = id;
+  setHeroSkin(id);
+}
 function avatar(): string {
-  if (avatarUrl) return avatarUrl;
+  return portrait(currentSkin);
+}
+function renderAvatar(): string {
   const c = document.createElement('canvas');
   c.width = c.height = 96;
   const x = c.getContext('2d')!;
@@ -48,8 +67,7 @@ function avatar(): string {
   x.translate(44, 108);
   x.scale(2.7, 2.7);
   drawHero(x, { t: 0.4, moving: false, aim: 0 });
-  avatarUrl = c.toDataURL();
-  return avatarUrl;
+  return c.toDataURL();
 }
 
 export class Hub {
@@ -145,7 +163,7 @@ export class Hub {
           h('span.lvb', d.accountLevel),
           h('span.ring', { html: `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16.5" pathLength="100" stroke-dasharray="${Math.round((d.accountXp / need) * 100)} 100"/></svg>` }),
         ),
-        h('div.who', h('div.nm', 'Courier'), h('div.pw', coin('power'), fmtNum(this.p.power()))),
+        h('div.who', h('div.nm', charById(d.character).name), h('div.pw', coin('power'), fmtNum(this.p.power()))),
       ),
       h('div.wallet', pill('gold', fmtNum(d.gold), true), pill('scrap', fmtNum(d.scrap), false), pill('key', String(d.keys), true)),
       h('button.icon-btn', { onclick: this.onSettings, 'aria-label': 'Settings', html: icon('settings', 20) }),
@@ -596,8 +614,40 @@ export class Hub {
     const items = p.data.gear
       .slice()
       .sort((a, b2) => b2.rarity - a.rarity || SLOTS.indexOf(GEAR[a.def].slot) - SLOTS.indexOf(GEAR[b2.def].slot) || b2.level - a.level);
+    const sel = charById(p.data.character);
+    const roster = h(
+      'div.roster',
+      CHARACTERS.map((c) => {
+        const open = p.charUnlocked(c.id);
+        const on = c.id === sel.id;
+        return h(
+          'button.ch-card' + (on ? '.on' : '') + (open ? '' : '.lock'),
+          {
+            onclick: () => {
+              if (!open) {
+                audio.click();
+                toast(`Clear Sector ${c.unlock} to unlock ${c.name}`, '#8d97ab');
+                return;
+              }
+              useSkin(c.id);
+              if (p.selectCharacter(c.id)) {
+                audio.levelUp();
+                haptic(15);
+              }
+            },
+          },
+          h('img', { src: portrait(c.id), alt: c.name }),
+          h('b', c.name),
+          h('small', open ? c.role : `Sector ${c.unlock}`),
+          open ? null : h('i.lk', { html: icon('lock', 14) }),
+        );
+      }),
+    );
     return h(
       'div',
+      h('div.section-h', 'Couriers', h('span.reset', `${CHARACTERS.filter((c) => p.charUnlocked(c.id)).length}/${CHARACTERS.length} unlocked`)),
+      roster,
+      h('div.ch-perk', h('b', `${sel.name} · ${sel.role}`), h('span', sel.perk)),
       h(
         'div.loadout',
         h('div.col', left.map(slotBtn)),

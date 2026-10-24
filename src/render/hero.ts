@@ -10,16 +10,79 @@ export interface HeroPose {
 export const HERO_H = 52;
 export const HERO_FOOT = 13;
 
-const PANTS = mat('#2f3850', '#161b28', '#4a5674');
-const PANTS_BACK = mat('#262d41', '#11151f', '#3a4560');
 const BOOT = mat('#24262c', '#0c0d10', '#4a4e58', null);
-const JACKET = mat('#ff8a2a', '#b2400a', '#ffc27a');
-const JACKET_BACK = mat('#d9661a', '#8a2f06', '#f29a4a');
-const PACK = mat('#4b5568', '#20252f', '#7a869c');
-const HELMET = mat('#eef2f7', '#7d8a9c', '#ffffff');
 const GLOVE = mat('#30343d', '#14161b', '#5a606c', null);
 const GUN = mat('#5a6478', '#1f2430', '#8e9ab0', null);
 const GUN_DARK = mat('#2c323f', '#12151c', '#4a5263', null);
+
+/** A playable character's look: the courier rig recoloured, plus a chest emblem and helmet trim. */
+export interface HeroSkin {
+  jacket: [string, string, string];
+  jacketBack: [string, string, string];
+  collar: [string, string, string];
+  pants: [string, string, string];
+  helmet: [string, string, string];
+  pack: [string, string, string];
+  accent: string; // boot stripe, helmet crest
+  glow: string; // visor + antenna light
+  visorDark: string;
+  zip: string;
+  tape: boolean; // reflective chest tape
+  emblem: 'none' | 'cross' | 'bolt' | 'chevron' | 'shield';
+}
+
+export const SKINS: Record<string, HeroSkin> = {
+  courier: {
+    jacket: ['#ff8a2a', '#b2400a', '#ffc27a'], jacketBack: ['#d9661a', '#8a2f06', '#f29a4a'], collar: ['#e0661a', '#8a2f06', '#ff9a4a'],
+    pants: ['#2f3850', '#161b28', '#4a5674'], helmet: ['#eef2f7', '#7d8a9c', '#ffffff'], pack: ['#4b5568', '#20252f', '#7a869c'],
+    accent: '#ff7a1a', glow: '#5ef2ff', visorDark: '#0a6f8a', zip: '#7a2c06', tape: true, emblem: 'none',
+  },
+  medic: {
+    jacket: ['#eef3f4', '#8ea2a8', '#ffffff'], jacketBack: ['#c9d4d7', '#6e8186', '#eef3f4'], collar: ['#2fbfa8', '#0e5e52', '#7fe8d6'],
+    pants: ['#2a4a52', '#10222a', '#3f6a74'], helmet: ['#ffffff', '#93a4ae', '#ffffff'], pack: ['#3f6a74', '#162a30', '#6a96a0'],
+    accent: '#ff3b5c', glow: '#7dffcf', visorDark: '#0a7a5a', zip: '#5a6e74', tape: false, emblem: 'cross',
+  },
+  rigger: {
+    jacket: ['#ffcf2a', '#a07a00', '#fff09a'], jacketBack: ['#d9a81a', '#7a5a00', '#f2d24a'], collar: ['#2a2d35', '#0c0d10', '#4a4e58'],
+    pants: ['#2b2d33', '#111215', '#45484f'], helmet: ['#3a3d44', '#15161a', '#6a6e78'], pack: ['#5a5e68', '#22252c', '#8a8e98'],
+    accent: '#1d1d1d', glow: '#9dd8ff', visorDark: '#1a4a8a', zip: '#3a2c00', tape: false, emblem: 'bolt',
+  },
+  ranger: {
+    jacket: ['#2b3a5a', '#101828', '#4a5e88'], jacketBack: ['#22304c', '#0c121e', '#3a4a6c'], collar: ['#1a2236', '#080b12', '#34405c'],
+    pants: ['#1c2232', '#0a0d14', '#323c54'], helmet: ['#3c465c', '#141924', '#6e7a94'], pack: ['#2a3246', '#0e121a', '#4a5670'],
+    accent: '#ff3b5c', glow: '#ff4f6e', visorDark: '#7a0a1e', zip: '#0a0d14', tape: false, emblem: 'chevron',
+  },
+  vanguard: {
+    jacket: ['#5a7a3a', '#22320e', '#8eae6a'], jacketBack: ['#4a6a2e', '#1a280a', '#7a9a5a'], collar: ['#3a4a2a', '#141c0a', '#5e7246'],
+    pants: ['#3a4030', '#161a10', '#5a624a'], helmet: ['#7a8a6a', '#2e3626', '#aebc9c'], pack: ['#4a5440', '#1a2014', '#74806a'],
+    accent: '#ffcf2a', glow: '#ffd34d', visorDark: '#8a5a00', zip: '#1a280a', tape: true, emblem: 'shield',
+  },
+};
+
+let SKIN = SKINS.courier;
+let PANTS = mat(...SKIN.pants);
+let PANTS_BACK = mat(...SKIN.pants);
+let JACKET = mat(...SKIN.jacket);
+let JACKET_BACK = mat(...SKIN.jacketBack);
+let PACK = mat(...SKIN.pack);
+let HELMET = mat(...SKIN.helmet);
+
+/** Switch the look used by every drawHero() call (game, lobby, avatar). */
+export function setHeroSkin(id: string) {
+  SKIN = SKINS[id] ?? SKINS.courier;
+  PANTS = mat(...SKIN.pants);
+  PANTS_BACK = mat(SKIN.pants[1] === SKIN.pants[0] ? SKIN.pants[0] : shade(SKIN.pants[0]), SKIN.pants[1], SKIN.pants[0]);
+  JACKET = mat(...SKIN.jacket);
+  JACKET_BACK = mat(...SKIN.jacketBack);
+  PACK = mat(...SKIN.pack);
+  HELMET = mat(...SKIN.helmet);
+}
+function shade(hex: string) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v: number) => Math.round(v * 0.82);
+  return '#' + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map((v) => v.toString(16).padStart(2, '0')).join('');
+}
+setHeroSkin('courier');
 
 /**
  * The courier. Design space: 100 units tall, feet at y=0, facing +x. The blaster arm is drawn in
@@ -61,7 +124,7 @@ export function drawHero(ctx: C, pose: HeroPose) {
       15,
       8,
     );
-    ctx.fillStyle = '#ff7a1a';
+    ctx.fillStyle = SKIN.accent;
     ctx.fillRect(footX - 5, footY + 0.2, 13, 1.6);
   };
   legs(-1, PANTS_BACK);
@@ -76,15 +139,15 @@ export function drawHero(ctx: C, pose: HeroPose) {
   ctx.fillRect(-24, -60, 11, 3);
   ctx.fillRect(-24, -52, 11, 3);
   ctx.save();
-  ctx.shadowColor = '#5ef2ff';
+  ctx.shadowColor = SKIN.glow;
   ctx.shadowBlur = 6;
-  ctx.fillStyle = '#5ef2ff';
+  ctx.fillStyle = SKIN.glow;
   ctx.fillRect(-24, -44, 3, 7);
   ctx.restore();
   line(ctx, [-21, -68, -25, -86, -27, -110], 2.4, '#8e9ab0');
   line(ctx, [-21, -68, -25, -86, -27, -110], 0.9, '#cfd6e2');
   const blink = 0.6 + 0.4 * Math.sin(pose.t * 6);
-  glow(ctx, -27, -111, 2.4 + blink, '#5ef2ff');
+  glow(ctx, -27, -111, 2.4 + blink, SKIN.glow);
   // cable from pack to helmet
   line(ctx, [-12, -62, -6, -66, -4, -70], 2.2, '#1b2029');
 
@@ -108,6 +171,7 @@ export function drawHero(ctx: C, pose: HeroPose) {
   ctx.beginPath();
   torso(ctx);
   ctx.clip();
+  if (SKIN.tape) {
   const tape = ctx.createLinearGradient(-16, -46, 16, -41);
   tape.addColorStop(0, '#f4f8fb');
   tape.addColorStop(0.5, '#c8dce4');
@@ -117,14 +181,18 @@ export function drawHero(ctx: C, pose: HeroPose) {
   ctx.fillRect(-18, -46, 36, 5);
   ctx.fillStyle = 'rgba(94,242,255,0.35)';
   ctx.fillRect(-18, -46, 36, 1.4);
+  }
   // shading under the chest
   ctx.fillStyle = 'rgba(80,20,0,0.18)';
   ctx.fillRect(-18, -38, 36, 8);
   ctx.restore();
-  line(ctx, [-18, -46, 18, -46], 1.2, INK, 0.6);
-  line(ctx, [-18, -41, 18, -41], 1.2, INK, 0.6);
+  if (SKIN.tape) {
+    line(ctx, [-18, -46, 18, -46], 1.2, INK, 0.6);
+    line(ctx, [-18, -41, 18, -41], 1.2, INK, 0.6);
+  }
   // zipper
-  line(ctx, [3, -59, 4, -33], 1.4, '#7a2c06');
+  line(ctx, [3, -59, 4, -33], 1.4, SKIN.zip);
+  emblem(ctx, SKIN);
   // belt + pouches
   paint(ctx, (c) => c.roundRect(-16, -35, 32, 5, 2), mat('#4a3626', '#22170e', '#6e5440', null, 2), -16, -35, 32, 5);
   paint(ctx, (c) => c.roundRect(-14, -36, 8, 8, 2), mat('#5a4632', '#2a1e12', '#806650', null, 2), -14, -36, 8, 8);
@@ -141,7 +209,7 @@ export function drawHero(ctx: C, pose: HeroPose) {
       c.quadraticCurveTo(0, -61, -10, -65);
       c.closePath();
     },
-    mat('#e0661a', '#8a2f06', '#ff9a4a', null, 2),
+    mat(SKIN.collar[0], SKIN.collar[1], SKIN.collar[2], null, 2),
     -11,
     -65,
     22,
@@ -156,14 +224,14 @@ export function drawHero(ctx: C, pose: HeroPose) {
   ball(ctx, hx, hy, 21, 20, HELMET);
   // comms port on the back of the helmet: a flat plate, not a round 'eye'
   paint(ctx, (c) => c.roundRect(hx - 19, hy - 2, 7, 11, 2.5), mat('#9aa6b8', '#4a5466', '#d8dee8', null, 2), hx - 19, hy - 2, 7, 11);
-  ctx.fillStyle = '#5ef2ff';
+  ctx.fillStyle = SKIN.glow;
   ctx.fillRect(hx - 17, hy + 1, 3, 4);
   // orange crest stripe
   ctx.save();
   ctx.beginPath();
   ctx.ellipse(hx, hy, 21, 20, 0, 0, Math.PI * 2);
   ctx.clip();
-  ctx.strokeStyle = '#ff7a1a';
+  ctx.strokeStyle = SKIN.accent;
   ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.arc(hx + 2, hy + 6, 22, Math.PI * 1.08, Math.PI * 1.62);
@@ -178,14 +246,14 @@ export function drawHero(ctx: C, pose: HeroPose) {
     c.closePath();
   };
   ctx.save();
-  ctx.shadowColor = '#5ef2ff';
+  ctx.shadowColor = SKIN.glow;
   ctx.shadowBlur = 8;
   ctx.beginPath();
   visor(ctx);
   const vg = ctx.createLinearGradient(hx, hy - 12, hx + 20, hy + 10);
-  vg.addColorStop(0, '#d8fdff');
-  vg.addColorStop(0.35, '#5ef2ff');
-  vg.addColorStop(1, '#0a6f8a');
+  vg.addColorStop(0, '#ffffff');
+  vg.addColorStop(0.35, SKIN.glow);
+  vg.addColorStop(1, SKIN.visorDark);
   ctx.fillStyle = vg;
   ctx.fill();
   ctx.restore();
@@ -227,7 +295,7 @@ export function drawHero(ctx: C, pose: HeroPose) {
   const local = facing > 0 ? pose.aim : Math.PI - pose.aim;
   ctx.rotate(local);
   paint(ctx, taper(0, 0, 5.8, 13, 1, 4.8), JACKET, -6, -6, 22, 12);
-  ball(ctx, 13, 1, 4.4, 4.2, mat('#e0661a', '#8a2f06', '#ff9a4a', null, 2));
+  ball(ctx, 13, 1, 4.4, 4.2, mat(SKIN.collar[0], SKIN.collar[1], SKIN.collar[2], null, 2));
   paint(ctx, taper(13, 1, 4.4, 22, 1.5, 4.2), GLOVE, 9, -4, 16, 10);
   // blaster
   paint(ctx, (c) => c.roundRect(17, -5.5, 24, 9, [3, 4, 4, 3]), GUN, 17, -5.5, 24, 9);
@@ -240,5 +308,50 @@ export function drawHero(ctx: C, pose: HeroPose) {
   ctx.fillRect(24, -2.6, 12, 2.6);
   ctx.restore();
   glow(ctx, 48.5, -1, 1.6, '#5ef2ff');
+  ctx.restore();
+}
+
+/** Chest emblem: the quickest read of which character you are at phone size. */
+function emblem(ctx: C, sk: HeroSkin) {
+  if (sk.emblem === 'none') return;
+  const x = -6;
+  const y = -51;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  if (sk.emblem === 'cross') {
+    ctx.rect(x - 1.8, y - 5.5, 3.6, 11);
+    ctx.rect(x - 5.5, y - 1.8, 11, 3.6);
+  } else if (sk.emblem === 'bolt') {
+    ctx.moveTo(x + 1, y - 7);
+    ctx.lineTo(x - 4, y + 1);
+    ctx.lineTo(x, y + 1);
+    ctx.lineTo(x - 2, y + 7);
+    ctx.lineTo(x + 4, y - 1.5);
+    ctx.lineTo(x, y - 1.5);
+    ctx.closePath();
+  } else if (sk.emblem === 'chevron') {
+    for (const dy of [-4, 1]) {
+      ctx.moveTo(x - 5, y + dy);
+      ctx.lineTo(x, y + dy + 4);
+      ctx.lineTo(x + 5, y + dy);
+      ctx.lineTo(x + 5, y + dy + 2.4);
+      ctx.lineTo(x, y + dy + 6.4);
+      ctx.lineTo(x - 5, y + dy + 2.4);
+      ctx.closePath();
+    }
+  } else if (sk.emblem === 'shield') {
+    ctx.moveTo(x - 5, y - 6);
+    ctx.lineTo(x + 5, y - 6);
+    ctx.lineTo(x + 5, y);
+    ctx.quadraticCurveTo(x + 4, y + 5, x, y + 7);
+    ctx.quadraticCurveTo(x - 4, y + 5, x - 5, y);
+    ctx.closePath();
+  }
+  ctx.fillStyle = sk.accent;
+  ctx.fill();
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = INK;
+  ctx.stroke();
   ctx.restore();
 }

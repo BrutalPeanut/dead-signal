@@ -91,6 +91,7 @@ export function resultsModal(
   else if (r.time < STAR2_TIME) next = `${fmtTime(STAR2_TIME - r.time)} short of the ${fmtTime(STAR2_TIME).replace(/^0/, '')} star!`;
   else next = `So close: ${fmtTime(RUN_LENGTH - r.time)} from clearing the sector!`;
   if (rw.levelsGained) next += ` Account level up!`;
+  if (rw.newCharacter) next += ` New courier unlocked: ${rw.newCharacter}! (Armory)`;
   return h(
     'div.modal.results',
     h('h2', { style: { color, textShadow: `0 0 24px ${color}` } }, title),

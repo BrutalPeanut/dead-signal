@@ -145,3 +145,22 @@ describe('missions and sector chests', () => {
     expect(p.starChestsReady()).toBe(2);
   });
 });
+
+describe('characters', () => {
+  it('unlock with sectors and apply their perk', async () => {
+    const { Game } = await import('../src/sim/game');
+    const { getChapter } = await import('../src/sim/chapters');
+    const p = mk();
+    expect(p.selectCharacter('rigger')).toBe(false);
+    p.data.unlocked = 6;
+    const hp0 = p.baseStats().hp;
+    expect(p.selectCharacter('rigger')).toBe(true);
+    const g = new Game(getChapter(0), p.baseStats(), 1);
+    expect(g.weapons.map((w) => w.id)).toContain('arc');
+    p.data.unlocked = 15;
+    p.selectCharacter('vanguard');
+    expect(p.baseStats().hp).toBeGreaterThan(hp0 * 1.25);
+    p.selectCharacter('medic');
+    expect(p.baseStats().regen).toBeGreaterThan(0.003);
+  });
+});

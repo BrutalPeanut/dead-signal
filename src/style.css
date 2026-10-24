@@ -3640,3 +3640,76 @@ button {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------ character roster */
+
+.roster {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 74px;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: none;
+}
+
+.ch-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px 7px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #1e2638, #121723);
+  border: 1.5px solid #34405c;
+}
+
+.ch-card img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+}
+
+.ch-card b {
+  font-size: 12px;
+}
+
+.ch-card small {
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.ch-card.on {
+  border-color: #ffb24d;
+  box-shadow: 0 0 0 1px #ffb24d, 0 0 14px rgba(255, 160, 60, 0.35);
+}
+
+.ch-card.lock img {
+  filter: grayscale(1) brightness(0.35);
+}
+
+.ch-card .lk {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #c9d2e3;
+}
+
+.ch-perk {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  background: rgba(255, 178, 77, 0.07);
+  border: 1px solid rgba(255, 178, 77, 0.3);
+  font-size: 12.5px;
+}
+
+.ch-perk b {
+  color: #ffb24d;
+  font-size: 13px;
+}

@@ -167,6 +167,7 @@ export class Game {
     this.revives = base.revives;
     this.addWeapon(base.startWeapon);
     for (const w of mods.extraWeapons) if (!this.weapons.some((x) => x.id === w)) this.addWeapon(w);
+    if (base.bonusWeapon && !this.weapons.some((x) => x.id === base.bonusWeapon)) this.addWeapon(base.bonusWeapon);
     this.recalc();
     // Opening wave so the first second already has targets (empty screens kill first impressions).
     for (let i = 0; i < 6; i++) {
