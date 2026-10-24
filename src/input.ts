@@ -10,6 +10,8 @@ export class Input {
   private keys = new Set<string>();
   private readonly R = 52;
   enabled = true;
+  /** Set the first time the player moves in a run; drives the controls hint. */
+  moved = false;
 
   constructor(el: HTMLElement) {
     el.addEventListener('pointerdown', this.down, { passive: false });
@@ -71,6 +73,7 @@ export class Input {
     if (k.has('w') || k.has('arrowup')) y -= 1;
     if (k.has('s') || k.has('arrowdown')) y += 1;
     if (x || y) {
+      this.moved = true;
       const m = Math.hypot(x, y);
       return [x / m, y / m];
     }
@@ -79,6 +82,7 @@ export class Input {
       const dy = this.stick.y - this.stick.oy;
       const d = Math.hypot(dx, dy);
       if (d < 6) return [0, 0];
+      this.moved = true;
       // full speed from ~60% deflection: thumbs are imprecise
       const m = Math.min(1, d / (this.R * 0.6));
       return [(dx / d) * m, (dy / d) * m];

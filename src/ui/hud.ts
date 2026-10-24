@@ -22,6 +22,7 @@ export class Hud {
   private bossName: HTMLElement;
   private bossFill: HTMLElement;
   private banner: HTMLElement;
+  private hint: HTMLElement;
   private cache: Record<string, string> = {};
   private skillKey = '';
   private bannerKey = '';
@@ -37,6 +38,12 @@ export class Hud {
     this.bossFill = h('div.fill');
     this.boss = h('div.bossbar', this.bossName, h('div.bar', this.bossFill));
     this.banner = h('div.banner');
+    const touch = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+    this.hint = h(
+      'div.hint',
+      touch ? h('div.hand') : null,
+      touch ? 'Drag anywhere to move' : 'Move with WASD or arrow keys · or drag with the mouse',
+    );
     this.el = h(
       'div.hud',
       h('div.xpbar', this.xpFill),
@@ -51,6 +58,7 @@ export class Hud {
       this.skills,
       this.boss,
       this.banner,
+      this.hint,
     );
   }
 
@@ -59,6 +67,10 @@ export class Hud {
       this.cache[key] = v;
       el.textContent = v;
     }
+  }
+
+  showHint(on: boolean) {
+    this.hint.classList.toggle('on', on);
   }
 
   update(g: Game, banners: Banner[]) {

@@ -745,14 +745,14 @@ export class Game {
           e.burn = 0.5;
           this.damage(e, pl.dmg, 0, 0, 0, '#ff9a1f');
         });
-        if (pl.evo && pl.life > 0.5 && this.rng.chance(0.06)) {
+        if (pl.evo && pl.life > 0.5 && this.pools.length < 24 && this.rng.chance(0.04)) {
           // inferno grid: pools spread
           const a = this.rng.range(0, TAU);
           this.pools.push({ x: pl.x + Math.cos(a) * pl.r * 1.4, y: pl.y + Math.sin(a) * pl.r * 1.4, r: pl.r * 0.7, life: 1.8, maxLife: 1.8, tick: 0.15, dmg: pl.dmg, evo: false });
         }
       }
     }
-    if (this.pools.length > 40) this.pools.splice(0, this.pools.length - 40);
+    if (this.pools.length > 30) this.pools.splice(0, this.pools.length - 30);
   }
 
   private updateShots(dt: number) {
