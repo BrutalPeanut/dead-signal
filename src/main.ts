@@ -9,7 +9,7 @@ import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes'
 import { DT, Game } from './sim/game';
 import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics } from './ui/dom';
-import { Hub } from './ui/hub';
+import { Hub, useSkin } from './ui/hub';
 import { Hud, chestModal, levelUpModal, pauseModal, reviveModal } from './ui/hud';
 import { introModal, resultsModal, settingsModal } from './ui/screens';
 
@@ -34,6 +34,7 @@ class App {
   private endT = -1;
 
   constructor() {
+    useSkin(this.profile.data.character);
     const s = this.profile.data.settings;
     audio.setSfx(s.sfx);
     audio.setMusic(s.music);

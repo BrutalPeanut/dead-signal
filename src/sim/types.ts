@@ -176,6 +176,8 @@ export interface BaseStats {
   startWeapon: WeaponId;
   startLevels: number; // free level-ups at run start (Head Start talent)
   regen: number; // fraction of max hp per second
+  /** Character perk: a second weapon at run start. */
+  bonusWeapon?: WeaponId;
 }
 
 export type RunState = 'play' | 'levelup' | 'chest' | 'revive' | 'dead' | 'won';
