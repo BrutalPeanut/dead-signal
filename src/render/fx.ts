@@ -67,6 +67,7 @@ const GOO: Record<string, string> = {
   warden: '#b0208e',
   hive: '#6a2a7a',
   colossus: '#b0208e',
+  broadcaster: '#b0208e',
 };
 
 export class Fx {

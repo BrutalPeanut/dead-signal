@@ -624,7 +624,7 @@ export class Renderer {
     const draw = BOSS_DRAW[b.boss!];
     const flash = b.flash > 0;
     // telegraph pre-glow when winding up
-    this.drawTinted(ctx, b.x, b.y, 190, 210, b.face, flash ? 'rgba(255,255,255,0.75)' : null, (c) =>
+    this.drawTinted(ctx, b.x, b.y, 190, 210, b.face, flash ? 'rgba(255,255,255,0.3)' : null, (c) =>
       draw(c, { t: b.anim, state: b.state, phase2: b.phase2 }),
     );
   }

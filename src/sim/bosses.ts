@@ -32,6 +32,9 @@ export function updateBoss(g: Game, b: Enemy, dt: number) {
     case 'colossus':
       colossus(g, b, dt, chase);
       break;
+    case 'broadcaster':
+      broadcaster(g, b, chase);
+      break;
   }
 
   if (g.cage) {
@@ -147,5 +150,59 @@ function colossus(g: Game, b: Enemy, _dt: number, chase: (m?: number) => void) {
       g.telegraphs.push({ kind: 'circle', x: g.px + Math.cos(a) * r, y: g.py + Math.sin(a) * r, r: 42, a: 0, len: 0, t: 1.15 + k * 0.08, total: 1.15 + k * 0.08, dmg: b.dmg, sweep: 0, active: 0 });
     }
     b.stateT = b.phase2 ? 2.2 : 3.0;
+  }
+}
+
+/**
+ * The Broadcaster (Sectors 11+): three readable moves on a loop.
+ *  - Cross-beam: 4 (phase 2: 6) beams fan out from it and sweep a quarter turn. Stand between them.
+ *  - Seekers: slow homing orbs that expire after a few seconds. Keep moving; they turn wide.
+ *  - Blink: a red circle marks where it will land; it appears there with a slam.
+ */
+function broadcaster(g: Game, b: Enemy, chase: (m?: number) => void) {
+  const beaming = g.telegraphs.some((t) => t.kind === 'line' && (t.t > 0 || t.active > 0));
+  if (b.state === 9) {
+    // waiting to land a blink
+    if (b.stateT <= 0) {
+      b.x = (b as any).landX;
+      b.y = (b as any).landY;
+      g.fx.push({ t: 'shake', amt: 8 });
+      g.fx.push({ t: 'explode', x: b.x, y: b.y, r: 70, color: '#ff3bd4' });
+      b.state = 1;
+      b.stateT = b.phase2 ? 1.0 : 1.4;
+    }
+    return;
+  }
+  if (!beaming) chase(0.75);
+  if (b.stateT > 0) return;
+  const move = b.state % 3;
+  b.state = (b.state + 1) % 9;
+  if (move === 0) {
+    const n = b.phase2 ? 6 : 4;
+    const base = Math.atan2(g.py - b.y, g.px - b.x) + Math.PI / n;
+    const dir = g.rng.chance(0.5) ? 1 : -1;
+    const dur = 2.4;
+    for (let k = 0; k < n; k++) {
+      g.telegraphs.push({
+        kind: 'line', x: b.x, y: b.y, r: 13, a: base + (k / n) * Math.PI * 2, len: 520, t: 1.1, total: 1.1,
+        dmg: b.dmg * 0.6, sweep: (dir * (Math.PI / 2)) / dur, active: dur,
+      });
+    }
+    g.fx.push({ t: 'banner', text: '', sub: 'Cross-beam charging', color: '#ff3b5c' });
+    b.stateT = 1.1 + dur + 0.9;
+  } else if (move === 1) {
+    const n = b.phase2 ? 5 : 3;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + g.rng.range(0, 1);
+      g.shots.push({ x: b.x + Math.cos(a) * 30, y: b.y + Math.sin(a) * 30, vx: Math.cos(a) * 95, vy: Math.sin(a) * 95, r: 9, dmg: b.dmg * 0.7, life: 4.5, kind: 'spore', alive: true, home: 1.2 });
+    }
+    b.stateT = b.phase2 ? 2.0 : 2.8;
+  } else {
+    const r = 64;
+    (b as any).landX = g.px;
+    (b as any).landY = g.py;
+    g.telegraphs.push({ kind: 'circle', x: g.px, y: g.py, r, a: 0, len: 0, t: 1.15, total: 1.15, dmg: b.dmg * 1.4, sweep: 0, active: 0 });
+    b.state = 9;
+    b.stateT = 1.15;
   }
 }

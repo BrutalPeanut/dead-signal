@@ -333,7 +333,7 @@ export class Game {
     if (this.endless) {
       // a boss every 2:30, cycling the roster; each one drops a big chest instead of ending the run
       if (this.midBossSpawned && !bossActive && this.time >= this.endlessBossT) {
-        const kinds = [this.chapter.finalBoss, this.chapter.midBoss, 'colossus', 'warden', 'hive'] as const;
+        const kinds = [this.chapter.finalBoss, this.chapter.midBoss, 'broadcaster', 'colossus', 'warden', 'hive'] as const;
         this.spawnBoss(kinds[this.endlessBossIdx++ % kinds.length], true);
         this.endlessBossT += ENDLESS_BOSS_EVERY;
       }
@@ -853,6 +853,16 @@ export class Game {
   private updateShots(dt: number) {
     for (const s of this.shots) {
       if (!s.alive) continue;
+      if (s.home) {
+        // seeker orb: turn toward the courier at a capped rate, speed unchanged
+        const sp = Math.hypot(s.vx, s.vy);
+        const cur = Math.atan2(s.vy, s.vx);
+        const want = Math.atan2(this.py - s.y, this.px - s.x);
+        const da = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+        const na = cur + Math.max(-s.home * dt, Math.min(s.home * dt, da));
+        s.vx = Math.cos(na) * sp;
+        s.vy = Math.sin(na) * sp;
+      }
       s.x += s.vx * dt;
       s.y += s.vy * dt;
       s.life -= dt;

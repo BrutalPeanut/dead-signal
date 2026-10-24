@@ -51,7 +51,7 @@ export class Ground {
   }
 }
 
-const BIOME_SEED: Record<Biome, number> = { downtown: 11, biolab: 23, spaceport: 37 };
+const BIOME_SEED: Record<Biome, number> = { downtown: 11, biolab: 23, spaceport: 37, reactor: 53 };
 
 type C = CanvasRenderingContext2D;
 
@@ -115,6 +115,69 @@ function goo(ctx: C, rng: Rng, color: string, glow: string) {
 }
 
 const PAINT: Record<Biome, (ctx: C, rng: Rng, cx: number, cy: number) => void> = {
+  /** Reactor deck (Sectors 11+): dark steel grating over glowing coolant channels, hazard rings. */
+  reactor(ctx, rng, cx, cy) {
+    ctx.fillStyle = '#161b1a';
+    ctx.fillRect(0, 0, CHUNK, CHUNK);
+    const T = 64;
+    // coolant channel along every other chunk row/column, glowing through the grating
+    const chan = (horiz: boolean, at: number) => {
+      const g = horiz ? ctx.createLinearGradient(0, at - 14, 0, at + 14) : ctx.createLinearGradient(at - 14, 0, at + 14, 0);
+      g.addColorStop(0, 'rgba(60,255,170,0)');
+      g.addColorStop(0.5, 'rgba(60,255,170,0.55)');
+      g.addColorStop(1, 'rgba(60,255,170,0)');
+      ctx.fillStyle = g;
+      if (horiz) ctx.fillRect(0, at - 14, CHUNK, 28);
+      else ctx.fillRect(at - 14, 0, 28, CHUNK);
+    };
+    if (((cy % 2) + 2) % 2 === 0) chan(true, CHUNK / 2);
+    if (((cx % 3) + 3) % 3 === 0) chan(false, CHUNK / 2);
+    // grating plates
+    for (let x = 0; x < CHUNK; x += T)
+      for (let y = 0; y < CHUNK; y += T) {
+        const v = rng.range(-5, 5);
+        ctx.fillStyle = `rgba(${44 + v},${52 + v},${50 + v},0.86)`;
+        ctx.fillRect(x + 2, y + 2, T - 4, T - 4);
+        ctx.fillStyle = 'rgba(8,12,11,0.55)';
+        for (let k = 6; k < T - 4; k += 7) ctx.fillRect(x + 6, y + k, T - 12, 2.2);
+        ctx.fillStyle = '#6a7774';
+        for (const [rx, ry] of [[5, 5], [T - 5, 5], [5, T - 5], [T - 5, T - 5]]) {
+          ctx.beginPath();
+          ctx.arc(x + rx, y + ry, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    // hazard ring painted on the deck
+    if (rng.chance(0.3)) {
+      const x = rng.range(60, CHUNK - 60);
+      const y = rng.range(60, CHUNK - 60);
+      ctx.save();
+      ctx.lineWidth = 7;
+      ctx.setLineDash([10, 8]);
+      ctx.strokeStyle = 'rgba(242,192,24,0.7)';
+      ctx.beginPath();
+      ctx.arc(x, y, 38, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      // trefoil
+      ctx.fillStyle = 'rgba(242,192,24,0.65)';
+      for (let k = 0; k < 3; k++) {
+        const a = (k / 3) * Math.PI * 2 - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.arc(x, y, 18, a - 0.5, a + 0.5);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#161b1a';
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let i = 0; i < 3; i++) crack(ctx, rng, 'rgba(0,0,0,0.5)', 1);
+    if (rng.chance(0.5)) goo(ctx, rng, 'rgba(40,120,70,0.4)', 'rgba(120,255,170,0.6)');
+    if (rng.chance(0.4)) goo(ctx, rng, 'rgba(120,20,100,0.35)', 'rgba(255,59,212,0.6)');
+  },
+
   downtown(ctx, rng, cx, cy) {
     ctx.fillStyle = '#2b2e35';
     ctx.fillRect(0, 0, CHUNK, CHUNK);
