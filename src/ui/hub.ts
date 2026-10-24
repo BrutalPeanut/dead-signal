@@ -312,7 +312,7 @@ export class Hub {
             { onclick: () => this.sectorMap() },
             h('div.sc-num', `SECTOR ${this.sector + 1} · ${ch.biome.toUpperCase()}`),
             h('div.sc-name', ch.name),
-            h('div.sc-sub', locked ? `Clear Sector ${this.sector} to unlock` : best ? `Best ${fmtTime(best)}` : 'Not attempted', h('span.sc-map', { html: icon('map', 14) }), 'Map'),
+            h('div.sc-sub', locked ? `Clear Sector ${this.sector} to unlock` : best ? `Best ${fmtTime(best)} · ${(d.bestScore[this.sector] ?? 0).toLocaleString()} pts` : this.sector === 0 ? 'Training sector · free revive' : 'Not attempted', h('span.sc-map', { html: icon('map', 14) }), 'Map'),
           ),
           h('button.sc-arrow', { onclick: () => go(1), disabled: this.sector === CHAPTER_COUNT - 1, 'aria-label': 'Next sector', html: icon('chevR', 20) }),
         ),

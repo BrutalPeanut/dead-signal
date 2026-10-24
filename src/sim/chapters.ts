@@ -54,7 +54,8 @@ export function getChapter(index: number): ChapterDef {
     name,
     biome,
     hpMul,
-    dmgMul,
+    // Sector 1 is the training ground: softer hits so a first run can end in a win.
+    dmgMul: index === 0 ? dmgMul * 0.8 : dmgMul,
     midBoss,
     finalBoss,
     goldMul: 1 + index * 0.45,

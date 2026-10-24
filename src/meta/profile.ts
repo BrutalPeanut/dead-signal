@@ -52,6 +52,7 @@ export interface SaveData {
   missions: DailyMissions | null;
   /** Claimed sector-chest bits per sector (same bit layout as stars). */
   starClaims: Record<number, number>;
+  bestScore: Record<number, number>;
 }
 
 export interface RunRewards {
@@ -64,6 +65,11 @@ export interface RunRewards {
   newStars: number;
   levelsGained: number;
   unlockedSector: boolean;
+  score: number;
+  newBest: boolean;
+  prevBest: number;
+  starsBefore: number;
+  starsAfter: number;
 }
 
 function fresh(): SaveData {
@@ -91,6 +97,7 @@ function fresh(): SaveData {
     uidSeq: 3,
     missions: null,
     starClaims: {},
+    bestScore: {},
   };
 }
 
@@ -111,7 +118,7 @@ export class Profile {
       const raw = this.storage?.getItem(KEY);
       if (raw) {
         const d = JSON.parse(raw) as SaveData;
-        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {} };
+        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {} };
       }
     } catch {
       /* corrupted save → start fresh */
@@ -345,6 +352,10 @@ export class Profile {
     const gold = Math.round((r.gold + (r.time / 6) * ch.goldMul + (r.won ? 120 * ch.goldMul : 0)) * goldMul);
     const xp = Math.round(r.time * 0.5 + r.kills * 0.02 + r.bossKills * 60 + (r.won ? 100 : 0));
     const prevStars = d.stars[sector] ?? 0;
+    const score = r.score ?? 0;
+    const prevBest = d.bestScore[sector] ?? 0;
+    const newBest = score > prevBest;
+    if (newBest) d.bestScore[sector] = score;
     let stars = prevStars;
     if (r.time >= 300) stars |= 1;
     if (r.time >= 480) stars |= 2;
@@ -392,7 +403,7 @@ export class Profile {
       levelsGained++;
     }
     this.save();
-    return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector };
+    return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector, score, newBest, prevBest, starsBefore: prevStars, starsAfter: stars };
   }
 
   // ------------------------------------------------------------------ idle relay + daily
