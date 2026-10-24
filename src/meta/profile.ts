@@ -8,6 +8,7 @@ import {
   GEAR_IDS,
   MAX_LEVEL,
   MERGE_COUNT,
+  RARITIES,
   SLOTS,
   activePerks,
   dropWeights,
@@ -20,6 +21,13 @@ import {
 } from './gear';
 import { dailyBonus, dateKey, MISSION_DEFS, rollDaily, starReward, type DailyMissions, type MissionKind, type Reward } from './missions';
 import { MILESTONES, TRACKS, accountXpNeed, trackCap, trackCost, type TrackId } from './talents';
+
+export interface CoachAction {
+  kind: 'equip' | 'merge' | 'crate' | 'talent' | 'level';
+  label: string;
+  detail: string;
+  apply: () => boolean;
+}
 
 const KEY = 'deadsignal.save.v1';
 export const RELAY_CAP_H = 8;
@@ -319,9 +327,65 @@ export class Profile {
     this.data.keys--;
     const it = this.rollItem(rng, this.data.unlocked, true);
     this.data.gear.push(it);
+    this.autoEquip(it);
     this.track('crate', 1);
     this.save();
     return it;
+  }
+
+  /** New gear goes straight into an empty slot: an empty slot is pure lost power. */
+  autoEquip(it: GearItem) {
+    const slot = GEAR[it.def].slot;
+    if (!this.data.equipped[slot]) this.data.equipped[slot] = it.uid;
+  }
+
+  /** Strongest item for a slot by stat, preferring higher rarity on ties. */
+  bestFor(slot: Slot): GearItem | undefined {
+    return this.data.gear
+      .filter((g) => GEAR[g.def].slot === slot)
+      .sort((a, b) => gearStat(b) - gearStat(a) || b.rarity - a.rarity)[0];
+  }
+
+  /**
+   * The single most valuable next upgrade, as a one-tap action. Drives the lobby's Power Up coach
+   * so players who never open the menus still progress.
+   */
+  coach(): CoachAction | null {
+    const d = this.data;
+    // 1. better gear sitting unequipped (weapons keep their own play style, so only upgrade within the same item)
+    for (const s of SLOTS) {
+      const cur = d.equipped[s] ? this.item(d.equipped[s]!) : undefined;
+      const best = this.bestFor(s);
+      if (!best || best.uid === cur?.uid) continue;
+      if (s === 'weapon' && cur && best.def !== cur.def) continue;
+      if (!cur || gearStat(best) > gearStat(cur) * 1.05) {
+        const gain = Math.round(gearStat(best) - (cur ? gearStat(cur) : 0));
+        return { kind: 'equip', label: `Equip ${RARITIES[best.rarity]} ${GEAR[best.def].name}`, detail: `+${gain} ${GEAR[best.def].stat === 'atk' ? 'ATK' : 'HP'}`, apply: () => (this.equip(best.uid), true) };
+      }
+    }
+    // 2. merges
+    const mergeable = d.gear.find((g) => this.mergeMates(g.uid).length >= MERGE_COUNT - 1);
+    if (mergeable) {
+      return { kind: 'merge', label: `Merge 3 ${GEAR[mergeable.def].name}s`, detail: `→ ${RARITIES[mergeable.rarity + 1]}`, apply: () => this.mergeAll() > 0 };
+    }
+    // 3. crates
+    if (d.keys > 0) return { kind: 'crate', label: 'Open a supply crate', detail: `${d.keys} key${d.keys > 1 ? 's' : ''}`, apply: () => !!this.openCrate() };
+    // 4. cheapest affordable stat upgrade (talent ATK/HP or levelling equipped gear)
+    const opts: { cost: number; a: CoachAction }[] = [];
+    for (const id of ['atk', 'hp'] as const) {
+      if (this.canBuyTrack(id)) {
+        const t = TRACKS.find((x) => x.id === id)!;
+        opts.push({ cost: trackCost(d.tracks[id]), a: { kind: 'talent', label: `${t.name}: +${t.per} ${t.unit}`, detail: `${trackCost(d.tracks[id])} gold`, apply: () => this.buyTrack(id) } });
+      }
+    }
+    for (const it of this.equippedItems()) {
+      if (this.canLevel(it)) {
+        const c = levelCost(it.level, it.rarity);
+        opts.push({ cost: c.gold, a: { kind: 'level', label: `Level up ${GEAR[it.def].name}`, detail: `${c.gold} gold`, apply: () => this.levelUp(it.uid) } });
+      }
+    }
+    opts.sort((a, b) => a.cost - b.cost);
+    return opts[0]?.a ?? null;
   }
 
   // ------------------------------------------------------------------ talents
@@ -385,6 +449,7 @@ export class Profile {
     d.scrap += scrap;
     d.keys += keys;
     d.gear.push(...items);
+    for (const it of items) this.autoEquip(it);
     d.stats.runs++;
     this.track('runs', 1);
     this.track('kills', r.kills);

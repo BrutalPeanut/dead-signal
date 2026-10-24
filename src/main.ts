@@ -112,12 +112,12 @@ class App {
     audio.intensity = 0;
   }
 
-  private backToHub() {
+  private backToHub(goNext = false) {
     this.closeModal();
     this.hud.el.remove();
     this.mode = 'hub';
     this.paused = false;
-    this.hub.sector = Math.min(this.profile.data.unlocked, Math.max(this.sector, this.hub.sector));
+    this.hub.sector = goNext ? this.profile.data.unlocked : Math.min(this.profile.data.unlocked, Math.max(this.sector, this.hub.sector));
     this.hub.tab = 'deploy';
     this.hub.refresh();
     this.ui.append(this.hub.el);
@@ -200,7 +200,13 @@ class App {
     const r = g.result();
     const rw = this.profile.applyRun(this.sector, r);
     this.input.release();
-    this.showModal(resultsModal(r, rw, `Sector ${this.sector + 1} · ${g.chapter.name}`, () => this.backToHub()), 'results');
+    // After a first clear, land on the newly unlocked sector, ready to go.
+    const goNext = rw.unlockedSector;
+    const coach = !r.won ? this.profile.coach() : null;
+    this.showModal(
+      resultsModal(r, rw, `Sector ${this.sector + 1} · ${g.chapter.name}`, () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false)),
+      'results',
+    );
     if (r.won) audio.evolve();
   }
 
@@ -388,6 +394,7 @@ const app = new App();
 // Test hook (used by the screenshot/playtest scripts): fast-forward the current run with the autopilot.
 (window as any).__ds = {
   app,
+  botIntent: (g: Game) => botMove(g),
   advance(seconds: number) {
     const g = app.game;
     const steps = Math.round(seconds / DT);

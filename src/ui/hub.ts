@@ -320,6 +320,7 @@ export class Hub {
       ),
       h(
         'div.battle-row',
+        this.coachButton(),
         h(
           'button.btn.primary.big.go',
           {
@@ -350,6 +351,29 @@ export class Hub {
           h('b', fmtNum(ch.power)),
         ),
       ),
+    );
+  }
+
+  /** One-tap "Power Up" coach: the single best next upgrade, applied in place. */
+  private coachButton() {
+    if (this.p.data.stats.runs < 1) return null;
+    const c = this.p.coach();
+    if (!c) return null;
+    return h(
+      'button.coach',
+      {
+        onclick: () => {
+          const label = c.label;
+          if (c.apply()) {
+            audio.levelUp();
+            haptic(25);
+            toast(`⚡ ${label}`, '#43ffa4');
+          }
+        },
+      },
+      h('span.ch-bolt', '⚡'),
+      h('span.ch-t', h('small', 'POWER UP'), h('b', c.label)),
+      h('span.ch-d', c.detail),
     );
   }
 

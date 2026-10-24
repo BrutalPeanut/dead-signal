@@ -605,7 +605,7 @@ export class Renderer {
     ctx.drawImage(sp.img, sp.ox, sp.oy, sp.w, sp.h);
     if (e.flash > 0) {
       // translucent white overlay: readable hit feedback without turning tanky targets into blobs
-      ctx.globalAlpha = e.elite ? 0.25 : 0.7;
+      ctx.globalAlpha = e.elite ? 0.22 : 0.45;
       ctx.drawImage(sp.white, sp.ox, sp.oy, sp.w, sp.h);
       ctx.globalAlpha = 1;
     }

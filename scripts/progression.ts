@@ -18,8 +18,22 @@ const seed0 = Number(process.argv[3] ?? 1);
 const p = new Profile(new Mem() as unknown as Storage);
 const rng = new Rng(seed0);
 
+const NAIVE = process.env.NAIVE === '1';
+
 function manage() {
   const d = p.data;
+  if (NAIVE) {
+    // a player who only presses Battle: no merging, equipping, levelling, talents or crates
+    return;
+  }
+  if (process.env.COACH === '1') {
+    // a player who only taps the lobby's Power Up button a few times between runs
+    for (let i = 0; i < 6; i++) {
+      const c = p.coach();
+      if (!c || !c.apply()) break;
+    }
+    return;
+  }
   // passive income: assume ~40 min between runs on average → relay + a daily every 6 runs
   d.relayAt -= 40 * 60 * 1000;
   p.claimRelay();
