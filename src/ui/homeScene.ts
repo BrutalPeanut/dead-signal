@@ -130,7 +130,7 @@ export class HomeScene {
     x.save();
     x.translate(bx, by);
     const breathe = 1 + Math.sin(this.t * 1.3) * 0.015;
-    x.scale(-0.92 * breathe, 0.92 * breathe);
+    x.scale(-0.68 * breathe, 0.68 * breathe);
     x.globalAlpha = 0.92;
     BOSS_DRAW[this.boss](x, { t: this.t, state: 0, phase2: false });
     x.restore();
@@ -215,7 +215,7 @@ export class HomeScene {
         x.fill();
         x.save();
         x.translate(w.x, w.y);
-        x.scale(w.dir, 1);
+        x.scale(w.dir * 0.78, 0.78);
         ENEMY_DRAW[w.kind](x, w.ph);
         x.restore();
         if (w.flash > 0) {
@@ -245,7 +245,7 @@ export class HomeScene {
         x.fill();
         x.save();
         x.translate(hx, hy);
-        x.scale(1.55, 1.55);
+        x.scale(1.05, 1.05);
         drawHero(x, { t: this.t, moving: false, aim: this.aim });
         x.restore();
       },

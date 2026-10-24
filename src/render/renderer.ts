@@ -7,7 +7,7 @@ import { Ground } from './ground';
 import { SpriteCache, hexA, makeCanvas } from './sprites';
 
 /** Target visible width (world units) on a portrait phone. Smaller = more zoomed in. */
-const TARGET_VIEW = 390;
+const TARGET_VIEW = 360;
 
 export class Renderer {
   readonly ctx: CanvasRenderingContext2D;
@@ -561,7 +561,7 @@ export class Renderer {
       return;
     }
     const sp = this.sprites.get(e.kind, e.anim);
-    const sc = e.elite ? 1.5 : 1;
+    const sc = e.elite ? 1.3 : 1;
     if (e.elite) {
       const pulse = (Math.sin(this.time * 5 + e.id) + 1) / 2;
       ctx.globalCompositeOperation = 'lighter';
@@ -596,7 +596,7 @@ export class Renderer {
     const draw = BOSS_DRAW[b.boss!];
     const flash = b.flash > 0;
     // telegraph pre-glow when winding up
-    this.drawTinted(ctx, b.x, b.y, 140, 150, b.face, flash ? 'rgba(255,255,255,0.75)' : null, (c) =>
+    this.drawTinted(ctx, b.x, b.y, 190, 210, b.face, flash ? 'rgba(255,255,255,0.75)' : null, (c) =>
       draw(c, { t: b.anim, state: b.state, phase2: b.phase2 }),
     );
   }
@@ -611,9 +611,25 @@ export class Renderer {
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
+    // ground ring so the courier never gets lost in a swarm
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const rg = ctx.createRadialGradient(g.px, g.py + 13, 4, g.px, g.py + 13, 22);
+    rg.addColorStop(0, 'rgba(94,242,255,0.28)');
+    rg.addColorStop(1, 'rgba(94,242,255,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.ellipse(g.px, g.py + 13, 22, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(94,242,255,0.55)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(g.px, g.py + 13, 15, 5.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
     const pose = { t: this.time, moving: g.moving, aim: g.aim };
     if (hurt) {
-      this.drawTinted(ctx, g.px, g.py, 70, 80, 1, 'rgba(255,50,70,0.5)', (c) => drawHero(c, pose));
+      this.drawTinted(ctx, g.px, g.py, 100, 96, 1, 'rgba(255,50,70,0.5)', (c) => drawHero(c, pose));
     } else {
       ctx.save();
       ctx.translate(g.px, g.py);
