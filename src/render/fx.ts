@@ -1,4 +1,4 @@
-import { SPLAT_SCALE, SPLAT_SIZE, splat } from './blood';
+import { SPLAT_SCALE, SPLAT_SIZE, SPLAT_VARIANTS, splat } from './blood';
 import type { Game } from '../sim/game';
 import { WEAPONS } from '../sim/data';
 import type { FxEvent } from '../sim/types';
@@ -49,6 +49,8 @@ interface Decal {
   rot: number;
   /** Splatter sprite variant; undefined = plain scorch (explosions). */
   v?: number;
+  /** Per-decal squash and mirror so repeated sprites never line up. */
+  sy?: number;
 }
 
 export interface Banner {
@@ -116,8 +118,16 @@ export class Fx {
           const big = e.elite || e.r > 25;
           // spray is thrown away from the courier (the direction the shot was travelling)
           const away = Math.atan2(e.y - g.py, e.x - g.px) + (Math.random() - 0.5) * 0.6;
-          this.decals.push({ x: e.x, y: e.y + e.r * 0.4, r: e.r * (big ? 1.5 : 1.05) * (0.8 + Math.random() * 0.4), color: c, life: 12, rot: away, v: Math.floor(Math.random() * 6) });
-          if (this.decals.length > 140) this.decals.shift();
+          const R = e.r * (big ? 1.5 : 1.05) * (0.7 + Math.random() * 0.7);
+          const sy = (0.65 + Math.random() * 0.3) * (Math.random() < 0.5 ? -1 : 1);
+          this.decals.push({ x: e.x, y: e.y + e.r * 0.4, r: R, color: c, life: 10 + Math.random() * 5, rot: away, v: Math.floor(Math.random() * SPLAT_VARIANTS), sy });
+          // sometimes a second, smaller splat lands further along the shot
+          if (Math.random() < 0.35 || big) {
+            const d = e.r * (1.2 + Math.random() * 1.6);
+            const a2 = away + (Math.random() - 0.5) * 0.9;
+            this.decals.push({ x: e.x + Math.cos(a2) * d, y: e.y + e.r * 0.4 + Math.sin(a2) * d, r: R * (0.3 + Math.random() * 0.3), color: c, life: 9 + Math.random() * 4, rot: a2 + (Math.random() - 0.5), v: Math.floor(Math.random() * SPLAT_VARIANTS), sy: sy * -1 });
+          }
+          while (this.decals.length > 160) this.decals.shift();
           this.burst(e.x, e.y, big ? 22 : 7, c, big ? 220 : 130, PK.Goo, 0.45, big ? 4 : 2.6);
           this.burst(e.x, e.y - 6, big ? 8 : 3, '#3a2a35', 160, PK.Chunk, 0.5, 2.4);
           if (e.elite) {
@@ -232,13 +242,13 @@ export class Fx {
         continue;
       }
       // fresh blood is glossy; it dries darker and soaks in as it fades
-      ctx.globalAlpha = fade * 0.9;
+      ctx.globalAlpha = fade * 0.82;
       const img = splat(d.color, d.v);
       const s = d.r * SPLAT_SCALE;
       ctx.save();
       ctx.translate(d.x, d.y);
       ctx.rotate(d.rot);
-      ctx.scale(s, s * 0.8);
+      ctx.scale(s, s * (d.sy ?? 0.8));
       ctx.drawImage(img, -SPLAT_SIZE * 0.42, -SPLAT_SIZE / 2);
       ctx.restore();
     }

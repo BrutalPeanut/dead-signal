@@ -12,7 +12,7 @@ await p.waitForTimeout(300);
 await p.screenshot({ path: out + '-top.png', clip: { x: 0, y: 0, width: 390, height: 90 } });
 await p.evaluate(() => { const a = window.__ds.app; a.profile.data.unlocked = 3; a.profile.data.stars = { 0: 7 }; a.hub.sector = 2; a.hub.refresh(); });
 await p.tap('.battle-row .go'); await p.waitForTimeout(500);
-await p.evaluate(() => { const g = window.__ds.app.game; g.hp = g.maxHp = 1e7; window.__ds.advance(25); });
+await p.evaluate(() => { const g = window.__ds.app.game; g.hp = g.maxHp = 1e7; window.__ds.advance(55); });
 await p.waitForTimeout(400);
 for (let i = 0; i < 3 && (await p.locator('.modal .card').count()); i++) { await p.locator('.modal .card').first().click(); await p.waitForTimeout(250); }
 await p.waitForTimeout(1500);
