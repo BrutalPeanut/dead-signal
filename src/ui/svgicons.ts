@@ -15,9 +15,7 @@ const P: Record<string, string> = {
   crate:
     '<rect x="3" y="9" width="18" height="11" rx="2" fill="currentColor" fill-opacity=".2"/><path d="M2 6h20v3H2zM12 9v11M3 14h18"/>',
   settings:
-    '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
-  pass:
-    '<path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2 2 0 000-4z" fill="currentColor" fill-opacity=".2"/><path d="M12 7.5l1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4z"/>',
+    '<path d="M19.15 9.43 L21.98 9.90 L21.98 14.10 L19.15 14.57 L18.88 15.24 L20.54 17.57 L17.57 20.54 L15.24 18.88 L14.57 19.15 L14.10 21.98 L9.90 21.98 L9.43 19.15 L8.76 18.88 L6.43 20.54 L3.46 17.57 L5.12 15.24 L4.85 14.57 L2.02 14.10 L2.02 9.90 L4.85 9.43 L5.12 8.76 L3.46 6.43 L6.43 3.46 L8.76 5.12 L9.43 4.85 L9.90 2.02 L14.10 2.02 L14.57 4.85 L15.24 5.12 L17.57 3.46 L20.54 6.43 L18.88 8.76Z" fill="currentColor" fill-opacity=".18"/><circle cx="12" cy="12" r="3.2"/>',
   plus: '<path d="M12 6v12M6 12h12"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor" fill-opacity=".25"/><path d="M8 11V8a4 4 0 018 0v3"/>',
   map: '<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z" fill="currentColor" fill-opacity=".15"/><path d="M9 4v14M15 6v14"/>',
