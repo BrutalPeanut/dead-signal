@@ -52,6 +52,8 @@ class App {
     this.ui.append(this.hub.el);
 
     window.addEventListener('resize', () => this.renderer.resize());
+    window.addEventListener('orientationchange', () => setTimeout(() => this.renderer.resize(), 250));
+    window.visualViewport?.addEventListener('resize', () => this.renderer.resize());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.mode === 'run') this.pause();
     });

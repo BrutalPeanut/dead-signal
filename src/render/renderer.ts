@@ -94,6 +94,11 @@ export class Renderer {
   }
 
   render(dt: number) {
+    // In-app browsers (Messenger, Instagram, iOS webviews) resize the page as their toolbars
+    // slide without firing 'resize'; a stale backing store then gets stretched. Check every frame.
+    const cw = this.canvas.clientWidth;
+    const ch = this.canvas.clientHeight;
+    if (cw && ch && (Math.abs(cw - this.cssW) > 0.5 || Math.abs(ch - this.cssH) > 0.5)) this.resize();
     const g = this.game;
     const ctx = this.ctx;
     this.time += dt;
