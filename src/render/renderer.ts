@@ -25,6 +25,9 @@ export class Renderer {
   private sctx = this.scratch.getContext('2d')!;
   private vignette: HTMLCanvasElement | null = null;
   joystick: { ox: number; oy: number; x: number; y: number } | null = null;
+  /** Fixed thumb pad position when it isn't being touched (pad control modes). */
+  padIdle: { x: number; y: number } | null = null;
+  joystickFixed = false;
   /** Tutorial marker: a bouncing pointer on what the current tip is about. */
   guide: { x: number; y: number } | null = null;
   /** Upper bound on pixel density; lowered automatically when frames run long. */
@@ -1036,6 +1039,45 @@ export class Renderer {
   }
 
   private drawJoystick(ctx: CanvasRenderingContext2D) {
+    const fixed = this.padIdle ?? (this.joystick && this.joystickFixed ? { x: this.joystick.ox, y: this.joystick.oy } : null);
+    if (fixed) {
+      // fixed thumb pad: always visible so the thumb knows where to go
+      const k = this.joystick ?? { ox: fixed.x, oy: fixed.y, x: fixed.x, y: fixed.y };
+      const active = !!this.joystick;
+      ctx.save();
+      ctx.globalAlpha = active ? 0.8 : 0.5;
+      ctx.fillStyle = 'rgba(10,14,20,0.45)';
+      ctx.strokeStyle = 'rgba(200,215,235,0.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(fixed.x, fixed.y, 58, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // direction chevrons
+      ctx.fillStyle = 'rgba(220,230,245,0.75)';
+      for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2;
+        ctx.save();
+        ctx.translate(fixed.x + Math.cos(a) * 44, fixed.y + Math.sin(a) * 44);
+        ctx.rotate(a);
+        ctx.beginPath();
+        ctx.moveTo(6, 0);
+        ctx.lineTo(-3, -6);
+        ctx.lineTo(-3, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = active ? 0.95 : 0.6;
+      ctx.fillStyle = active ? 'rgba(255,138,31,0.85)' : 'rgba(94,242,255,0.45)';
+      ctx.strokeStyle = active ? '#ffc070' : 'rgba(200,250,255,0.8)';
+      ctx.beginPath();
+      ctx.arc(k.x, k.y, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     const j = this.joystick;
     if (!j) return;
     ctx.globalAlpha = 0.5;

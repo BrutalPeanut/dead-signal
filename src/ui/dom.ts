@@ -70,6 +70,24 @@ export function haptic(ms = 12) {
 }
 
 /** Simple SVG-free currency glyphs drawn with CSS. */
+/** Movement scheme picker (Settings + Pause): drag anywhere, or a fixed pad on either side. */
+export function controlsPicker(current: string, onPick: (m: 'drag' | 'left' | 'right') => void): HTMLElement {
+  const opts: ['drag' | 'left' | 'right', string][] = [
+    ['drag', 'Drag anywhere'],
+    ['left', 'Pad left'],
+    ['right', 'Pad right'],
+  ];
+  const row = h('div.mode-tabs.ctl-tabs');
+  const render = (cur: string) =>
+    row.replaceChildren(
+      ...opts.map(([m, label]) =>
+        h('button.mt' + (cur === m ? '.on' : ''), { onclick: (e: Event) => (e.stopPropagation(), onPick(m), render(m)) }, label),
+      ),
+    );
+  render(current);
+  return h('div.ctl', h('div.ctl-l', 'Movement'), row, h('div.ctl-h', 'A fixed pad keeps your thumb in the corner so it never covers the action.'));
+}
+
 export function coin(kind: 'gold' | 'scrap' | 'key' | 'xp' | 'power'): HTMLElement {
   return h(`i.cur.cur-${kind}`);
 }

@@ -26,7 +26,7 @@ export function deathTip(src?: string, boss?: string): [string, string] | null {
   };
   return T[src] ?? ['the horde', 'Move in big loops so the horde trails behind you in one clump.'];
 }
-import { coin, fmtNum, fmtTime, h } from './dom';
+import { coin, controlsPicker, fmtNum, fmtTime, h } from './dom';
 
 export function resultsModal(
   r: RunResult,
@@ -145,10 +145,11 @@ export function introModal(onGo: () => void) {
 }
 
 export function settingsModal(
-  s: { sfx: boolean; music: boolean; haptics: boolean },
+  s: { sfx: boolean; music: boolean; haptics: boolean; controls?: string },
   onToggle: (k: 'sfx' | 'music' | 'haptics') => void,
   onReset: () => void,
   onClose: () => void,
+  onControls: (m: 'drag' | 'left' | 'right') => void = () => {},
 ) {
   const toggle = (label: string, key: 'sfx' | 'music' | 'haptics') => {
     const sw = h('span.sw' + (s[key] ? '.on' : ''));
@@ -174,6 +175,7 @@ export function settingsModal(
       toggle('Sound effects', 'sfx'),
       toggle('Music', 'music'),
       toggle('Vibration', 'haptics'),
+      controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),
       h('div.help', 'Dead Signal · v0.1 · progress is saved on this device'),
       h('button.btn', { style: { width: '100%', marginTop: '12px' }, onclick: onClose }, 'Done'),
