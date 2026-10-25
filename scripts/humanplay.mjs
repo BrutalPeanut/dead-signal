@@ -39,6 +39,9 @@ while (Date.now() - t0 < 6.5 * 60 * 1000) {
     const modal = !!document.querySelector('.modal');
     return { state: g.state, time: g.time, modal, mv: window.__botMove ? window.__botMove() : null, hp: g.hp / g.maxHp };
   });
+  if (st.state === 'dead' || st.state === 'won') {
+    if (!globalThis.__ended) { globalThis.__ended = true; console.log('RUN END', JSON.stringify(await page.evaluate(() => { const g = window.__ds.app.game; return { state: g.state, time: Math.round(g.time), level: g.level, kills: g.kills, killedBy: g.lastHurt }; }))); }
+  }
   if (st.modal) {
     if (down) { await touch('touchEnd', 0, 0); down = false; }
     const ms = Date.now();
