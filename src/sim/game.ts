@@ -139,6 +139,20 @@ export class Game {
   regen = 0;
 
   readonly mods: GameMods;
+  /**
+   * Pacing curve for later sectors: a softer opening (a level-1 build vs Act II stats used to end
+   * runs at 1:30) paid back with a tougher final minute, so losses come late and feel close.
+   * No effect on Sectors 1-3; full strength from Sector 11.
+   */
+  pace() {
+    const k = Math.max(0, Math.min(1, (this.chapter.index - 2) / 8));
+    if (k === 0) return 1;
+    const t = this.time;
+    const early = 1 - 0.32 * k * (1 - Math.min(1, t / 150));
+    const late = 1 + 0.14 * k * Math.max(0, Math.min(1, (t - 180) / 60));
+    return early * late;
+  }
+
   /** Past 5:00 in Endless, toughness climbs on a curve so even maxed builds eventually fall (~10-15 min). */
   endlessRamp() {
     if (!this.endless || this.time <= RUN_LENGTH) return 1;
@@ -389,7 +403,7 @@ export class Game {
 
   spawnEnemyAt(kind: EnemyKind, x: number, y: number, elite: boolean): Enemy {
     const d = ENEMIES[kind];
-    const hpm = hpScale(this.T) * this.chapter.hpMul * this.mods.enemyHp * this.endlessRamp() * (elite ? 14 : 1);
+    const hpm = hpScale(this.T) * this.chapter.hpMul * this.mods.enemyHp * this.endlessRamp() * this.pace() * (elite ? 14 : 1);
     const e: Enemy = {
       id: this.newId(),
       kind,
@@ -401,7 +415,7 @@ export class Game {
       hp: d.hp * hpm,
       maxHp: d.hp * hpm,
       speed: d.speed * this.mods.enemySpeed * (elite ? 0.85 : 1) * this.rng.range(0.92, 1.08),
-      dmg: d.dmg * this.chapter.dmgMul * this.mods.enemyDmg * (elite ? 1.5 : 1) * (1 + this.T / 750),
+      dmg: d.dmg * this.chapter.dmgMul * this.mods.enemyDmg * this.pace() * (elite ? 1.5 : 1) * (1 + this.T / 750),
       xp: d.xp * (elite ? 20 : 1),
       mass: d.mass * (elite ? 4 : 1),
       elite,
