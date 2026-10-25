@@ -94,6 +94,7 @@ export function resultsModal(
   else next = `So close: ${fmtTime(LEN - r.time)} from clearing the sector!`;
   if (rw.levelsGained) next += ` Account level up!`;
   if (rw.newCharacter) next += ` New courier unlocked: ${rw.newCharacter}! (Armory)`;
+  if (rw.newLoadout) next += ` ${rw.newLoadout}`;
   return h(
     'div.modal.results',
     h('h2', { style: { color, textShadow: `0 0 24px ${color}` } }, title),

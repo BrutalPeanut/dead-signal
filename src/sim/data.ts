@@ -251,6 +251,23 @@ export const MAX_SKILL_LEVEL = 5;
 export const MAX_WEAPON_SLOTS = 6;
 export const MAX_PASSIVE_SLOTS = 6;
 
+/**
+ * New players get a smaller, simpler kit so level-ups aren't a wall of unfamiliar choices:
+ * Sectors 1-2 offer 5 weapons and their partner supports with 3+3 slots; Sector 3 opens 4+4 slots
+ * and the full arsenal; Sector 4+ (and Daily/Endless) is the full 6+6 game.
+ */
+export interface LoadoutRules {
+  maxW: number;
+  maxP: number;
+  weapons: WeaponId[] | null; // null = everything
+}
+export const STARTER_WEAPONS: WeaponId[] = ['pistol', 'blades', 'arc', 'frag', 'cleaver'];
+export function loadoutFor(sector: number, campaign: boolean): LoadoutRules {
+  if (!campaign || sector >= 3) return { maxW: MAX_WEAPON_SLOTS, maxP: MAX_PASSIVE_SLOTS, weapons: null };
+  if (sector === 2) return { maxW: 4, maxP: 4, weapons: null };
+  return { maxW: 3, maxP: 3, weapons: STARTER_WEAPONS };
+}
+
 // ---------------------------------------------------------------- enemies
 
 export type EnemyKind = 'shambler' | 'runner' | 'crawler' | 'brute' | 'spitter' | 'bloater';

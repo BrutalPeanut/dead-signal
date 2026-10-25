@@ -29,14 +29,15 @@ function novice(g: Game, rng: Rng, st: { dir: [number, number]; t: number; idle:
   return st.idle ? [0, 0] : st.dir;
 }
 
-for (const tutorial of [false, true]) {
+const SECTOR = Number(process.env.SECTOR ?? 0);
+for (const tutorial of SECTOR === 0 ? [false, true] : [false]) {
   const out: string[] = [];
   let wins = 0, star = 0;
   for (let seed = 1; seed <= 12; seed++) {
     const p = new Profile(new Mem() as unknown as Storage);
     const base = p.baseStats();
-    base.revives += 1;
-    const g = new Game(getChapter(0), base, seed, { ...defaultMods(), tutorial });
+    if (SECTOR === 0) base.revives += 1;
+    const g = new Game(getChapter(SECTOR), base, seed, { ...defaultMods(), tutorial });
     const rng = new Rng(seed * 99);
     const st = { dir: [0, 0] as [number, number], t: 0, idle: false };
     let steps = 0;
@@ -53,5 +54,5 @@ for (const tutorial of [false, true]) {
     if (g.time >= 150) star++;
     out.push(`${g.state === 'won' ? 'W' : Math.round(g.time) + 's:' + g.lastHurt + ':L' + g.level}`);
   }
-  console.log(`${tutorial ? 'tutorial' : 'old S1  '}: wins ${wins}/12, reached 2:30 ${star}/12 | ${out.join(' ')}`);
+  console.log(`S${SECTOR + 1} ${tutorial ? 'tutorial' : 'normal  '}: wins ${wins}/12, reached 2:30 ${star}/12 | ${out.join(' ')}`);
 }

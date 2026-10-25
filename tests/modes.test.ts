@@ -95,3 +95,20 @@ describe('sector 1 training run', () => {
     expect(p.data.stars[0]).toBe(3); // 1:00 and 1:36 stars
   });
 });
+
+describe('starter kit', () => {
+  it('Sectors 1-2 offer 3+3 slots from a small weapon pool; Sector 4+ is the full 6+6', async () => {
+    const { STARTER_WEAPONS } = await import('../src/sim/data');
+    const g = new Game(getChapter(1), kit, 5);
+    expect(g.loadout.maxW).toBe(3);
+    const seen = new Set<string>();
+    for (let i = 0; i < 300; i++) {
+      (g as any).openLevelUp?.();
+      for (const o of g.offers) if (o.type === 'weapon' && o.isNew) seen.add(o.id);
+      g.state = 'play';
+    }
+    for (const id of seen) expect(STARTER_WEAPONS).toContain(id);
+    expect(new Game(getChapter(3), kit, 5).loadout.maxW).toBe(6);
+    expect(new Game(getChapter(1), kit, 5, defaultMods('daily')).loadout.maxW).toBe(6);
+  });
+});

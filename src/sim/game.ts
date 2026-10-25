@@ -10,6 +10,8 @@ import {
   RUN_LENGTH,
   runLengthFor,
   starTimes,
+  loadoutFor,
+  type LoadoutRules,
   TIME_SCALE,
   XP_MUL,
   WEAPONS,
@@ -141,6 +143,8 @@ export class Game {
   regen = 0;
 
   mods: GameMods;
+  /** Slot counts and offer pool (smaller starter kit in Sectors 1-3). */
+  loadout: LoadoutRules = loadoutFor(99, false);
   /** Real seconds until the final boss (2:00 in Sector 1, 5:00 elsewhere). */
   runLength = RUN_LENGTH;
   /** Distance moved; in the tutorial nothing starts until the player has tried moving. */
@@ -181,6 +185,7 @@ export class Game {
     this.chapter = chapter;
     this.mods = mods;
     this.runLength = mods.mode === 'campaign' ? runLengthFor(chapter.index) : RUN_LENGTH;
+    this.loadout = loadoutFor(chapter.index, mods.mode === 'campaign');
     this.travel = mods.tutorial ? 0 : Infinity;
     // modifiers that change the player's kit are folded into a copy of the base stats
     base = { ...base, hp: Math.round(base.hp * mods.playerHp), atk: base.atk * mods.playerDmg, pickup: base.pickup * mods.pickup };
@@ -384,7 +389,10 @@ export class Game {
     }
 
     if (!bossActive && (this.time < this.runLength || this.endless)) {
-      const tut = this.mods.tutorial ? (this.time < 120 ? 0.55 : 0.75) : 1;
+      // tutorial run and the first two full sectors spawn thinner crowds (most first-timer deaths
+      // were being swarmed in the opening minutes)
+      const ramp = this.mods.mode === 'campaign' ? ([1, 0.7, 0.85][this.chapter.index] ?? 1) : 1;
+      const tut = this.mods.tutorial ? (this.time < 120 ? 0.55 : 0.75) : ramp;
       this.spawnAcc += spawnRate(t) * this.mods.spawn * tut * dt;
       while (this.spawnAcc >= 1) {
         this.spawnAcc -= 1;
@@ -1079,7 +1087,7 @@ export class Game {
 
   private openLevelUp() {
     this.pendingLevels--;
-    this.offers = buildOffers(this.rng, this.weapons, this.passives);
+    this.offers = buildOffers(this.rng, this.weapons, this.passives, 3, this.loadout);
     this.state = 'levelup';
     this.fx.push({ t: 'levelup' });
   }
@@ -1087,7 +1095,7 @@ export class Game {
   reroll(): boolean {
     if (this.state !== 'levelup' || this.rerolls <= 0) return false;
     this.rerolls--;
-    this.offers = buildOffers(this.rng, this.weapons, this.passives);
+    this.offers = buildOffers(this.rng, this.weapons, this.passives, 3, this.loadout);
     return true;
   }
 
@@ -1148,7 +1156,7 @@ export class Game {
     }
     const ups = (big ? 3 : 1) - res.evolutions.length;
     for (let i = 0; i < ups; i++) {
-      const offs = buildOffers(this.rng, this.weapons, this.passives, 1);
+      const offs = buildOffers(this.rng, this.weapons, this.passives, 1, this.loadout);
       const o = offs[0];
       this.applyOffer(o);
       res.upgrades.push(o);
