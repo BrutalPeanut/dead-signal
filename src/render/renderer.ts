@@ -25,6 +25,8 @@ export class Renderer {
   private sctx = this.scratch.getContext('2d')!;
   private vignette: HTMLCanvasElement | null = null;
   joystick: { ox: number; oy: number; x: number; y: number } | null = null;
+  /** Tutorial marker: a bouncing pointer on what the current tip is about. */
+  guide: { x: number; y: number } | null = null;
   /** Upper bound on pixel density; lowered automatically when frames run long. */
   dprCap = 2;
   private slowT = 0;
@@ -135,6 +137,7 @@ export class Renderer {
     this.fx.drawParticles(ctx, this.sprites);
     this.drawPlayerBar(ctx);
     this.fx.drawFloaters(ctx);
+    this.drawGuide(ctx, halfW, halfH);
 
     // screen space
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -983,6 +986,53 @@ export class Renderer {
       ctx.fillRect(0, 0, w, h);
       ctx.globalAlpha = 1;
     }
+  }
+
+  private drawGuide(ctx: CanvasRenderingContext2D, halfW: number, halfH: number) {
+    const t = this.guide;
+    if (!t) return;
+    const g = this.game;
+    // clamp to the visible area so off-screen targets still get a pointer at the edge
+    const m = 26;
+    const x = Math.max(this.camX - halfW + m, Math.min(this.camX + halfW - m, t.x));
+    const y = Math.max(this.camY - halfH + m + 60, Math.min(this.camY + halfH - m, t.y));
+    const off = x !== t.x || y !== t.y;
+    const pulse = (Math.sin(this.time * 6) + 1) / 2;
+    ctx.save();
+    ctx.strokeStyle = '#ffd34d';
+    ctx.fillStyle = '#ffd34d';
+    ctx.shadowColor = '#ffd34d';
+    ctx.shadowBlur = 10;
+    if (!off) {
+      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 16 + pulse * 6, 0, Math.PI * 2);
+      ctx.stroke();
+      // chevron bouncing above
+      const by = t.y - 34 - pulse * 6;
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.moveTo(t.x - 9, by - 8);
+      ctx.lineTo(t.x, by + 2);
+      ctx.lineTo(t.x + 9, by - 8);
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    } else {
+      const a = Math.atan2(t.y - g.py, t.x - g.px);
+      ctx.translate(x, y);
+      ctx.rotate(a);
+      ctx.beginPath();
+      ctx.moveTo(10 + pulse * 4, 0);
+      ctx.lineTo(-8, -9);
+      ctx.lineTo(-4, 0);
+      ctx.lineTo(-8, 9);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   private drawJoystick(ctx: CanvasRenderingContext2D) {

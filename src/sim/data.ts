@@ -308,6 +308,10 @@ export const MIDBOSS_TIME = 300;
 /** Real-time star thresholds (half and 80% of the run). */
 export const STAR1_TIME = RUN_LENGTH * 0.5;
 export const STAR2_TIME = RUN_LENGTH * 0.8;
+/** Sector 1 is a short training run (2:00, straight to the boss); everything else is 5:00. */
+export const runLengthFor = (sector: number) => (sector === 0 ? 120 : RUN_LENGTH);
+/** Star thresholds scale with the run: survive half, survive 80%, clear. */
+export const starTimes = (len: number): [number, number] => [len * 0.5, len * 0.8];
 /** XP gem multiplier: half the run time, most of the level-ups. */
 export const XP_MUL = 1.05;
 

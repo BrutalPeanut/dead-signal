@@ -16,6 +16,8 @@ export interface GameMods {
   playerDmg: number;
   extraWeapons: WeaponId[];
   startWeapon?: WeaponId;
+  /** First-time Sector 1: waits for the first move, gentler spawns and hits, light regen. */
+  tutorial?: boolean;
 }
 
 export const defaultMods = (mode: RunMode = 'campaign'): GameMods => ({

@@ -10,6 +10,7 @@ import { DT, Game } from './sim/game';
 import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics, toast } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
+import { LEVELUP_TIP, Tutorial } from './ui/tutorial';
 import { Hud, chestModal, levelUpModal, pauseModal, reviveModal } from './ui/hud';
 import { introModal, resultsModal, settingsModal } from './ui/screens';
 
@@ -94,6 +95,8 @@ class App {
   }
 
   runMode: RunMode = 'campaign';
+  tutorial = new Tutorial();
+  tutorialOn = false;
 
   startRun(sector: number, mode: RunMode = 'campaign') {
     audio.unlock();
@@ -101,6 +104,8 @@ class App {
     this.runMode = mode;
     this.mode = 'run';
     this.endT = -1;
+    this.tutorialOn = false;
+    this.tutorial.reset();
     let title = getChapter(sector).name.toUpperCase();
     let sub = `Sector ${sector + 1} · survive 5:00`;
     if (mode === 'daily') {
@@ -119,8 +124,12 @@ class App {
       const base = this.profile.baseStats();
       // Sector 1 is the training ground: one free revive so first-timers can bank a win.
       if (sector === 0) base.revives += 1;
-      this.game = new Game(getChapter(sector), base, Math.floor(Math.random() * 1e9));
-      this.hud.startRun(this.profile.data.best[sector] ?? 0);
+      // ...and until it's cleared once, a guided tutorial run
+      this.tutorialOn = sector === 0 && !((this.profile.data.stars[0] ?? 0) & 4);
+      this.game = new Game(getChapter(sector), base, Math.floor(Math.random() * 1e9), { ...defaultMods(), tutorial: this.tutorialOn });
+      sub = `Sector ${sector + 1} · survive ${this.game.runLength >= 120 ? Math.round(this.game.runLength / 60) + ':00' : this.game.runLength + 's'}`;
+      if (this.tutorialOn) sub = 'Training run · 2 minutes · follow the tips';
+      this.hud.startRun(this.profile.data.best[sector] ?? 0, 'campaign', 0, this.game.runLength);
     }
     this.renderer.setGame(this.game);
     this.renderer.fx.parts.length = 0;
@@ -264,6 +273,7 @@ class App {
               () => {
                 if (g.reroll()) audio.click();
               },
+              this.tutorialOn && g.level <= 3 ? LEVELUP_TIP : undefined,
             ),
             key,
           );
@@ -416,7 +426,16 @@ class App {
     this.renderer.render(this.mode === 'run' && (this.paused || this.game.state !== 'play') ? 0 : dt);
     if (this.mode === 'run') {
       this.hud.update(this.game, this.renderer.fx.banners);
-      this.hud.showHint(!this.input.moved && this.game.time < 12 && this.profile.data.stats.runs < 3);
+      if (this.tutorialOn) {
+        if (!this.tutorial.el.isConnected) this.hud.el.append(this.tutorial.el);
+        if (!this.paused) this.tutorial.update(this.game, dt);
+        this.renderer.guide = this.tutorial.target;
+        this.hud.showHint(false);
+      } else {
+        this.renderer.guide = null;
+        this.tutorial.el.remove();
+        this.hud.showHint(!this.input.moved && this.game.time < 12 && this.profile.data.stats.runs < 3);
+      }
     }
     requestAnimationFrame(this.frame);
   };

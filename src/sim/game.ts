@@ -8,8 +8,8 @@ import {
   MIDBOSS_TIME,
   PASSIVES,
   RUN_LENGTH,
-  STAR1_TIME,
-  STAR2_TIME,
+  runLengthFor,
+  starTimes,
   TIME_SCALE,
   XP_MUL,
   WEAPONS,
@@ -60,6 +60,8 @@ export interface RunResult {
   evolutions?: number;
   score?: number;
   mode?: 'campaign' | 'daily' | 'endless';
+  /** Length of this run's timer (for star thresholds in the UI). */
+  runLength?: number;
   /** What landed the final hit on a loss (enemy kind or boss attack), for the death tip. */
   killedBy?: string;
   killedByBoss?: string;
@@ -138,7 +140,14 @@ export class Game {
   pickupR = 46;
   regen = 0;
 
-  readonly mods: GameMods;
+  mods: GameMods;
+  /** Real seconds until the final boss (2:00 in Sector 1, 5:00 elsewhere). */
+  runLength = RUN_LENGTH;
+  /** Distance moved; in the tutorial nothing starts until the player has tried moving. */
+  travel = 0;
+  get waitingForMove() {
+    return this.travel < 70;
+  }
   /**
    * Pacing curve for later sectors: a softer opening (a level-1 build vs Act II stats used to end
    * runs at 1:30) paid back with a tougher final minute, so losses come late and feel close.
@@ -171,8 +180,16 @@ export class Game {
     this.rng = new Rng(seed);
     this.chapter = chapter;
     this.mods = mods;
+    this.runLength = mods.mode === 'campaign' ? runLengthFor(chapter.index) : RUN_LENGTH;
+    this.travel = mods.tutorial ? 0 : Infinity;
     // modifiers that change the player's kit are folded into a copy of the base stats
     base = { ...base, hp: Math.round(base.hp * mods.playerHp), atk: base.atk * mods.playerDmg, pickup: base.pickup * mods.pickup };
+    if (mods.tutorial) {
+      // training wheels: softer, slower hits and steady healing so early mistakes are survivable
+      mods = { ...mods, enemyDmg: mods.enemyDmg * 0.55, enemySpeed: mods.enemySpeed * 0.9 };
+      this.mods = mods;
+      base.regen += 0.006;
+    }
     if (mods.startWeapon) base.startWeapon = mods.startWeapon;
     this.base = base;
     this.maxHp = base.hp;
@@ -240,6 +257,15 @@ export class Game {
   /** Advance one fixed step. mx,my is the movement intent (-1..1). */
   step(mx: number, my: number) {
     if (this.state !== 'play') return;
+    if (this.mods.tutorial && this.waitingForMove) {
+      // tutorial: the world holds still until the first steps
+      const bx = this.px;
+      const by = this.py;
+      this.updatePlayer(DT, mx, my);
+      this.travel += Math.hypot(this.px - bx, this.py - by);
+      this.rebuildGrid();
+      return;
+    }
     let dt = DT;
     if (this.slowmo > 0) {
       this.slowmo -= DT;
@@ -341,7 +367,7 @@ export class Game {
       }
     }
 
-    if (!this.midBossSpawned && t >= MIDBOSS_TIME) {
+    if (!this.midBossSpawned && t >= MIDBOSS_TIME && this.time < this.runLength) {
       this.midBossSpawned = true;
       this.spawnBoss(this.chapter.midBoss, true);
     }
@@ -352,17 +378,22 @@ export class Game {
         this.spawnBoss(kinds[this.endlessBossIdx++ % kinds.length], true);
         this.endlessBossT += ENDLESS_BOSS_EVERY;
       }
-    } else if (!this.finalBossSpawned && this.time >= RUN_LENGTH) {
+    } else if (!this.finalBossSpawned && this.time >= this.runLength) {
       this.finalBossSpawned = true;
       this.spawnBoss(this.chapter.finalBoss, false);
     }
 
-    if (!bossActive && (this.time < RUN_LENGTH || this.endless)) {
-      this.spawnAcc += spawnRate(t) * this.mods.spawn * dt;
+    if (!bossActive && (this.time < this.runLength || this.endless)) {
+      const tut = this.mods.tutorial ? (this.time < 120 ? 0.55 : 0.75) : 1;
+      this.spawnAcc += spawnRate(t) * this.mods.spawn * tut * dt;
       while (this.spawnAcc >= 1) {
         this.spawnAcc -= 1;
         if (this.enemies.length >= MAX_ENEMIES) break;
-        const mix = enemyMix(t);
+        let mix = enemyMix(t);
+        if (this.mods.tutorial) {
+          // ranged and heavy infected arrive later (and rarer) in the training run
+          mix = mix.map(([k, w]) => [k, k === 'spitter' ? (t < 400 ? 0 : w * 0.5) : k === 'brute' ? (t < 340 ? 0 : w * 0.5) : w] as [EnemyKind, number]);
+        }
         const i = this.rng.weighted(mix.map((m) => m[1]));
         const kind = mix[i][0];
         if (kind === 'crawler') {
@@ -462,7 +493,7 @@ export class Game {
     this.shots.length = 0;
     const cr = Math.min(this.viewW, this.viewH) * 0.95 + 20;
     this.cage = { x: this.px, y: this.py, r: Math.max(215, cr) };
-    const hp = def.hp * this.chapter.hpMul * this.mods.enemyHp * this.endlessRamp() * hpScale(this.T) * (mid ? 1.3 : 1.5) * 0.45;
+    const hp = def.hp * this.chapter.hpMul * this.mods.enemyHp * this.endlessRamp() * hpScale(this.T) * (mid ? 1.3 : 1.5) * 0.45 * (this.mods.tutorial ? 0.7 : 1);
     const b: Enemy = {
       id: this.newId(),
       kind: 'boss',
@@ -1156,8 +1187,9 @@ export class Game {
   result(): RunResult {
     return {
       won: this.state === 'won',
-      time: this.endless ? this.time : Math.min(this.time, RUN_LENGTH),
+      time: this.endless ? this.time : Math.min(this.time, this.runLength),
       mode: this.mods.mode,
+      runLength: this.runLength,
       kills: this.kills,
       gold: this.gold,
       level: this.level,
@@ -1174,27 +1206,32 @@ export class Game {
 
   /** Run score: everything the player did, so every run produces a number to beat. */
   score(): number {
-    const t = this.endless ? this.time : Math.min(this.time, RUN_LENGTH);
+    const t = this.endless ? this.time : Math.min(this.time, this.runLength);
     return Math.round(this.kills * 10 + t * 10 + this.eliteKills * 300 + this.bossKills * 1500 + (this.state === 'won' ? 5000 : 0));
   }
 
   private nextTimeMs = 0;
   private nextKillMs = 0;
-  private static TIME_MS: [number, string, string, boolean][] = [
-    [60, '1:00 survived', '#5ef2ff', false],
-    [STAR1_TIME, '★ STAR EARNED · 2:30', '#ffd34d', true],
-    [STAR2_TIME, '★ STAR EARNED · 4:00', '#ffd34d', true],
-    [RUN_LENGTH - 30, '30 SECONDS LEFT', '#43ffa4', true],
-  ];
+  private get timeMs(): [number, string, string, boolean][] {
+    const [s1, s2] = starTimes(this.runLength);
+    const f = (t: number) => `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, '0')}`;
+    const list: [number, string, string, boolean][] = [
+      [60, '1:00 survived', '#5ef2ff', false],
+      [s1, `★ STAR EARNED · ${f(s1)}`, '#ffd34d', true],
+      [s2, `★ STAR EARNED · ${f(s2)}`, '#ffd34d', true],
+      [this.runLength - 30, '30 SECONDS LEFT', '#43ffa4', true],
+    ];
+    return list.filter((_, i) => !(i === 0 && s1 <= 60)).sort((a, b) => a[0] - b[0]);
+  }
   private static KILL_MS = [100, 500, 1000, 2500, 5000, 10000, 20000];
 
   /** Encouragement pops: time milestones (incl. star thresholds) and kill counts. */
   private milestones() {
-    const tm = Game.TIME_MS[this.nextTimeMs];
+    const tm = this.timeMs[this.nextTimeMs];
     if (tm && this.time >= tm[0]) {
       this.nextTimeMs++;
       // stars and the countdown only mean something in the campaign
-      if (this.mods.mode === 'campaign' || tm[0] === 60) this.fx.push({ t: 'toast', text: tm[1], color: tm[2], big: tm[3] });
+      if (this.mods.mode === 'campaign' || tm[1].startsWith('1:00')) this.fx.push({ t: 'toast', text: tm[1], color: tm[2], big: tm[3] });
     }
     if (this.endless && this.time >= 120 && Math.floor(this.time / 60) !== Math.floor((this.time - DT) / 60)) {
       this.fx.push({ t: 'toast', text: `${Math.floor(this.time / 60)}:00 survived`, color: '#5ef2ff', big: true });
