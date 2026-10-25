@@ -4,7 +4,7 @@ import { dailyBoard, ENDLESS_BOARD, submitScore, uuid, type Submission } from '.
 import { DAILY_TIERS, dailySeed, type RunMode } from '../sim/modes';
 import { LOGIN_DAYS, freshLogin, loginReward, type LoginReward, type LoginState } from './login';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
-import { STAR1_TIME, STAR2_TIME, TIME_SCALE } from '../sim/data';
+import { STAR2_TIME, TIME_SCALE, runLengthFor, starTimes } from '../sim/data';
 import { Rng } from '../sim/math';
 import type { RunResult } from '../sim/game';
 import type { BaseStats } from '../sim/types';
@@ -719,8 +719,9 @@ export class Profile {
     const newBest = score > prevBest;
     if (newBest) d.bestScore[sector] = score;
     let stars = prevStars;
-    if (r.time >= STAR1_TIME) stars |= 1;
-    if (r.time >= STAR2_TIME) stars |= 2;
+    const [s1, s2] = starTimes(runLengthFor(sector));
+    if (r.time >= s1) stars |= 1;
+    if (r.time >= s2) stars |= 2;
     if (r.won) stars |= 4;
     const firstClear = r.won && !(prevStars & 4);
     const newStars = popcount(stars) - popcount(prevStars);

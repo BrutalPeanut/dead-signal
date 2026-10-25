@@ -78,3 +78,20 @@ describe('act II', () => {
     expect(moved).toBeGreaterThanOrEqual(1); // the blink teleport
   });
 });
+
+describe('sector 1 training run', () => {
+  it('is 2 minutes, waits for the first move in tutorial mode, and awards stars on its own clock', async () => {
+    const { Profile } = await import('../src/meta/profile');
+    class Mem { m = new Map<string, string>(); getItem(k: string) { return this.m.get(k) ?? null; } setItem(k: string, v: string) { this.m.set(k, v); } removeItem() {} clear() {} key() { return null; } length = 0; }
+    const g = new Game(getChapter(0), kit, 1, { ...defaultMods(), tutorial: true });
+    expect(g.runLength).toBe(120);
+    for (let i = 0; i < 120; i++) g.step(0, 0);
+    expect(g.time).toBe(0); // frozen until the player moves
+    for (let i = 0; i < 120; i++) g.step(1, 0);
+    expect(g.time).toBeGreaterThan(0);
+    expect(new Game(getChapter(1), kit, 1).runLength).toBe(300);
+    const p = new Profile(new Mem() as unknown as Storage);
+    p.applyRun(0, { won: false, time: 100, kills: 10, gold: 0, level: 5, bossKills: 0, eliteKills: 0, score: 1 });
+    expect(p.data.stars[0]).toBe(3); // 1:00 and 1:36 stars
+  });
+});

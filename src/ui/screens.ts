@@ -2,7 +2,7 @@ import { GEAR, RARITIES, RARITY_COLORS } from '../meta/gear';
 import type { RunRewards } from '../meta/profile';
 import type { RunResult } from '../sim/game';
 import { gearIcon } from '../render/icons';
-import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, type BossKind } from '../sim/data';
+import { BOSSES, RUN_LENGTH, starTimes, type BossKind } from '../sim/data';
 import { DAILY_TIERS } from '../sim/modes';
 
 /** "What got me, and what do I do about it" — one line, shown on a loss. */
@@ -56,9 +56,11 @@ export function resultsModal(
     );
   }
   // stars: earned before (dim gold), earned this run (bright + "NEW"), not yet (grey)
+  const LEN = r.runLength ?? RUN_LENGTH;
+  const [S1, S2] = starTimes(LEN);
   const starDefs: [number, string][] = [
-    [1, `Survive ${fmtTime(STAR1_TIME).replace(/^0/, '')}`],
-    [2, `Survive ${fmtTime(STAR2_TIME).replace(/^0/, '')}`],
+    [1, `Survive ${fmtTime(S1).replace(/^0/, '')}`],
+    [2, `Survive ${fmtTime(S2).replace(/^0/, '')}`],
     [4, 'Clear'],
   ];
   const stars = rw.mode === 'daily'
@@ -87,9 +89,9 @@ export function resultsModal(
     next = nt ? `${(nt.score - (r.score ?? 0)).toLocaleString()} points from ${nt.name}. Same run all day — try again!` : 'Gold tier! Come back tomorrow for a new challenge.';
   } else if (rw.mode === 'endless') next = rw.newBest ? 'New personal best!' : `Best score ${rw.prevBest.toLocaleString()}. Push a little further!`;
   else if (r.won) next = rw.unlockedSector ? 'Next sector unlocked. Keep the streak going!' : 'Cleared again. Push your score higher!';
-  else if (r.time < STAR1_TIME) next = `${fmtTime(STAR1_TIME - r.time)} short of your first star. ${powerUp ? 'Go again!' : 'Upgrade in the Armory, then go again!'}`;
-  else if (r.time < STAR2_TIME) next = `${fmtTime(STAR2_TIME - r.time)} short of the ${fmtTime(STAR2_TIME).replace(/^0/, '')} star!`;
-  else next = `So close: ${fmtTime(RUN_LENGTH - r.time)} from clearing the sector!`;
+  else if (r.time < S1) next = `${fmtTime(S1 - r.time)} short of your first star. ${powerUp ? 'Go again!' : 'Upgrade in the Armory, then go again!'}`;
+  else if (r.time < S2) next = `${fmtTime(S2 - r.time)} short of the ${fmtTime(S2).replace(/^0/, '')} star!`;
+  else next = `So close: ${fmtTime(LEN - r.time)} from clearing the sector!`;
   if (rw.levelsGained) next += ` Account level up!`;
   if (rw.newCharacter) next += ` New courier unlocked: ${rw.newCharacter}! (Armory)`;
   return h(

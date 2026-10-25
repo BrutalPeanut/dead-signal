@@ -1,4 +1,4 @@
-import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, MAX_PASSIVE_SLOTS, MAX_SKILL_LEVEL, MAX_WEAPON_SLOTS, PASSIVES, WEAPONS } from '../sim/data';
+import { BOSSES, RUN_LENGTH, starTimes, MAX_PASSIVE_SLOTS, MAX_SKILL_LEVEL, MAX_WEAPON_SLOTS, PASSIVES, WEAPONS } from '../sim/data';
 import type { Game } from '../sim/game';
 import { offerDesc, offerTitle } from '../sim/offers';
 import type { Offer, PassiveState, WeaponState } from '../sim/types';
@@ -81,8 +81,8 @@ export class Hud {
         'div.runbar',
         h('div.rb-track', this.runFill),
         this.runBest,
-        mark(50, 'star.boss', fmtTime(STAR1_TIME).replace(/^0/, '')),
-        mark(80, 'star', fmtTime(STAR2_TIME).replace(/^0/, '')),
+        mark(50, 'star.boss', '2:30'),
+        mark(80, 'star', '4:00'),
         mark(100, 'win', 'WIN'),
       ),
       this.toasts,
@@ -107,17 +107,23 @@ export class Hud {
   /** Called at run start with this sector's best survival time (for the BEST marker). */
   private mode: 'campaign' | 'daily' | 'endless' = 'campaign';
 
-  startRun(best: number, mode: 'campaign' | 'daily' | 'endless' = 'campaign', bestScore = 0) {
+  private len = RUN_LENGTH;
+
+  startRun(best: number, mode: 'campaign' | 'daily' | 'endless' = 'campaign', bestScore = 0, len = RUN_LENGTH) {
     this.mode = mode;
+    this.len = len;
+    const [s1, s2] = starTimes(len);
+    this.runMarks[0].querySelector('small')!.textContent = fmtTime(s1).replace(/^0/, '');
+    this.runMarks[1].querySelector('small')!.textContent = fmtTime(s2).replace(/^0/, '');
     this.el.classList.toggle('m-daily', mode === 'daily');
     this.el.classList.toggle('m-endless', mode === 'endless');
-    this.timerSub.textContent = mode === 'endless' ? (best > 0 ? ` BEST ${fmtTime(best)}` : '') : ` / ${fmtTime(RUN_LENGTH)}`;
+    this.timerSub.textContent = mode === 'endless' ? (best > 0 ? ` BEST ${fmtTime(best)}` : '') : ` / ${fmtTime(len)}`;
     this.dailyBest = bestScore;
     this.endlessBest = mode === 'endless' ? best : 0;
     this.beatShown = false;
     this.toasts.replaceChildren();
-    this.runBest.style.display = mode === 'campaign' && best > 5 && best < RUN_LENGTH ? '' : 'none';
-    this.runBest.style.left = `${(best / RUN_LENGTH) * 100}%`;
+    this.runBest.style.display = mode === 'campaign' && best > 5 && best < len ? '' : 'none';
+    this.runBest.style.left = `${(best / len) * 100}%`;
     for (const m of this.runMarks) m.classList.remove('hit');
   }
 
@@ -131,15 +137,16 @@ export class Hud {
   }
 
   update(g: Game, banners: Banner[]) {
-    const frac = Math.min(1, g.time / RUN_LENGTH);
+    const frac = Math.min(1, g.time / this.len);
+    const [s1, s2] = starTimes(this.len);
     this.runFill.style.width = `${(frac * 100).toFixed(2)}%`;
-    this.runMarks[0].classList.toggle('hit', g.time >= STAR1_TIME);
-    this.runMarks[1].classList.toggle('hit', g.time >= STAR2_TIME);
+    this.runMarks[0].classList.toggle('hit', g.time >= s1);
+    this.runMarks[1].classList.toggle('hit', g.time >= s2);
     this.runMarks[2].classList.toggle('hit', g.state === 'won');
     this.set('sc', this.score, g.score().toLocaleString());
     this.xpFill.style.width = `${Math.min(100, (g.xp / g.xpNeed) * 100).toFixed(1)}%`;
     this.set('lvl', this.lvl, `LV ${g.level}`);
-    this.set('t', this.timer, fmtTime(this.mode === 'endless' ? g.time : Math.min(g.time, RUN_LENGTH)));
+    this.set('t', this.timer, fmtTime(this.mode === 'endless' ? g.time : Math.min(g.time, this.len)));
     this.set('k', this.kills, fmtNum(g.kills));
     if (!this.beatShown && ((this.mode === 'daily' && this.dailyBest > 0 && g.score() > this.dailyBest) || (this.mode === 'endless' && this.endlessBest > 30 && g.time > this.endlessBest))) {
       this.beatShown = true;
@@ -257,12 +264,12 @@ function ctag(g: Game, o: Offer) {
   return h('span.ctag.misc', 'BONUS');
 }
 
-export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void) {
+export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string) {
   const cards = h('div.cards', g.offers.map((o, i) => offerCard(g, o, () => onPick(i))));
   return h(
     'div.modal',
     h('h2', { style: { color: '#5ef2ff', textShadow: '0 0 20px rgba(94,242,255,.6)' } }, 'LEVEL UP'),
-    h('div.sub', 'Choose one upgrade'),
+    tip ? h('div.lvl-tip', tip) : h('div.sub', 'Choose one upgrade'),
     h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big')),
     cards,
     h(

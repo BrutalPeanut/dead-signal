@@ -23,7 +23,7 @@ import { CHARACTERS, charById } from '../meta/characters';
 import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../meta/pass';
 import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
 import { gearIcon } from '../render/icons';
-import { BOSSES, RUN_LENGTH, STAR1_TIME, STAR2_TIME, WEAPONS } from '../sim/data';
+import { BOSSES, WEAPONS, runLengthFor, starTimes } from '../sim/data';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
 import { coin, fmtNum, fmtTime, h, haptic, toast } from './dom';
 import { HomeScene } from './homeScene';
@@ -273,12 +273,12 @@ export class Hub {
 
     // sector chest track
     const milestones: { bit: 1 | 2 | 4; label: string }[] = [
-      { bit: 1, label: fmtTime(STAR1_TIME).replace(/^0/, '') },
-      { bit: 2, label: fmtTime(STAR2_TIME).replace(/^0/, '') },
+      { bit: 1, label: fmtTime(starTimes(runLengthFor(this.sector))[0]).replace(/^0/, '') },
+      { bit: 2, label: fmtTime(starTimes(runLengthFor(this.sector))[1]).replace(/^0/, '') },
       { bit: 4, label: 'Clear' },
     ];
     const best = d.best[this.sector] ?? 0;
-    const trackFill = stars & 4 ? 1 : Math.min(1, best / RUN_LENGTH);
+    const trackFill = stars & 4 ? 1 : Math.min(1, best / runLengthFor(this.sector));
     const track = h(
       'div.chest-track',
       h('div.ct-bar', h('i', { style: { width: `${trackFill * 100}%` } })),
@@ -342,7 +342,7 @@ export class Hub {
             { onclick: () => this.sectorMap() },
             h('div.sc-num', `SECTOR ${this.sector + 1} · ${ch.biome.toUpperCase()}`),
             h('div.sc-name', ch.name),
-            h('div.sc-sub', locked ? `Clear Sector ${this.sector} to unlock` : best ? `Best ${fmtTime(Math.min(best, RUN_LENGTH))} · ${(d.bestScore[this.sector] ?? 0).toLocaleString()} pts` : this.sector === 0 ? 'Training sector · free revive' : 'Not attempted', h('span.sc-map', { html: icon('map', 14) }), 'Map'),
+            h('div.sc-sub', locked ? `Clear Sector ${this.sector} to unlock` : best ? `Best ${fmtTime(Math.min(best, runLengthFor(this.sector)))} · ${(d.bestScore[this.sector] ?? 0).toLocaleString()} pts` : this.sector === 0 ? 'Training · 2-minute run · free revive' : 'Not attempted', h('span.sc-map', { html: icon('map', 14) }), 'Map'),
           ),
           h('button.sc-arrow', { onclick: () => go(1), disabled: this.sector === CHAPTER_COUNT - 1, 'aria-label': 'Next sector', html: icon('chevR', 20) }),
         ),
