@@ -77,6 +77,7 @@ export interface SaveData {
   character: string;
   online: { id: string; name: string; crew: string; pending: Submission[] };
   pass: PassState;
+  adKeys?: { date: string; n: number };
 }
 
 export interface RunRewards {
@@ -361,6 +362,22 @@ export class Profile {
   unlockPremiumPass() {
     this.pass().premium = true;
     this.save();
+  }
+
+  /** Rewarded-ad crate keys: 3 per day. */
+  adKeysLeft(now = new Date()) {
+    const k = this.data.adKeys;
+    return k && k.date === now.toDateString() ? Math.max(0, 3 - k.n) : 3;
+  }
+
+  grantAdKey(now = new Date()) {
+    if (this.adKeysLeft(now) <= 0) return false;
+    const k = this.data.adKeys?.date === now.toDateString() ? this.data.adKeys : { date: now.toDateString(), n: 0 };
+    k.n++;
+    this.data.adKeys = k;
+    this.data.keys++;
+    this.save();
+    return true;
   }
 
   charUnlocked(id: string) {
