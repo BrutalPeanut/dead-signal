@@ -535,7 +535,7 @@ export class Hub {
     const p = this.p;
     const o = p.data.online;
     const sheet = h('div.sheet.lb', { onclick: (e: Event) => e.stopPropagation() });
-    this.modal = h('div.modal', { onclick: () => this.closeModal() }, sheet);
+    this.modal = h('div.modal', { onclick: this.backdrop }, sheet);
     document.getElementById('ui')!.append(this.modal);
     if (!o.name) return this.lbSetup(sheet, mode);
     const sc = scope ?? (o.crew ? 'crew' : 'all');
@@ -689,7 +689,7 @@ export class Hub {
     });
     this.modal = h(
       'div.modal',
-      { onclick: () => this.closeModal() },
+      { onclick: this.backdrop },
       h('div.sheet', { onclick: (e: Event) => e.stopPropagation() }, h('h2', { style: { fontSize: '22px', marginBottom: '10px' } }, 'Sector Map'), h('div.map-list', rows)),
     );
     document.getElementById('ui')!.append(this.modal);
@@ -891,6 +891,14 @@ export class Hub {
   }
 
   private modalKey = '';
+  /**
+   * Close only when the dim backdrop itself is tapped. Without this, a button inside a modal
+   * that opens another sheet (e.g. "Inspect" on a crate reveal) had its click bubble up to the old
+   * backdrop and immediately close the sheet it had just opened.
+   */
+  private backdrop = (e: Event) => {
+    if (e.target === e.currentTarget) this.closeModal();
+  };
   private bodyDirty = false;
 
   /**
@@ -907,7 +915,7 @@ export class Hub {
       return false;
     }
     this.closeModal();
-    this.modal = h('div.modal', { onclick: () => this.closeModal() }, sheet);
+    this.modal = h('div.modal', { onclick: this.backdrop }, sheet);
     this.modalKey = key;
     document.getElementById('ui')!.append(this.modal);
     return true;
@@ -1243,7 +1251,7 @@ export class Hub {
     const mergeable = this.p.data.gear.some((g) => this.p.mergeMates(g.uid).length >= MERGE_COUNT - 1);
     this.modal = h(
       'div.modal',
-      { onclick: () => this.closeModal() },
+      { onclick: this.backdrop },
       h(
         'div.sheet.haul',
         { onclick: (e: Event) => e.stopPropagation() },
@@ -1297,7 +1305,7 @@ export class Hub {
     const col = RARITY_COLORS[it.rarity];
     this.modal = h(
       'div.modal',
-      { onclick: () => this.closeModal() },
+      { onclick: this.backdrop },
       h('div.chest-box', { style: { background: `radial-gradient(circle, ${col}88, transparent 70%)` } }, h('img', { src: gearIcon(def.slot, col, it.def), style: { width: '96px', height: '96px' } })),
       h('div.rar', { style: { color: col, fontWeight: '800', letterSpacing: '.14em' } }, RARITIES[it.rarity].toUpperCase()),
       h('h2', def.name),
