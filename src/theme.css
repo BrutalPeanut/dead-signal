@@ -524,3 +524,118 @@
 .hud.pad .hint {
   bottom: calc(var(--safe-bottom) + 30%);
 }
+
+/* ------------------------------------------------------------ rewarded ads */
+
+.ad-btn .ad-play {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 2px;
+  border-radius: 50%;
+  font-size: 10px;
+  color: #0b2a32;
+  background: var(--radio);
+  text-shadow: none;
+}
+
+.ad-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  pointer-events: auto;
+}
+
+.ad-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(var(--safe-top) + 10px) 12px 10px;
+  font-size: 12px;
+  color: #fff;
+}
+
+.ad-tag {
+  padding: 3px 7px;
+  border-radius: 3px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  background: #ffd34d;
+  color: #1c1300;
+}
+
+.ad-count {
+  flex: 1;
+  text-align: right;
+  font-weight: 700;
+}
+
+.ad-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 15px;
+}
+
+.ad-overlay.earned .ad-count {
+  color: #43ffa4;
+}
+
+.ad-overlay.earned .ad-close {
+  background: #43ffa4;
+  color: #002614;
+}
+
+.ad-creative {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.ad-cta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 12px;
+  padding: 12px 16px;
+  background: #fff;
+  color: #222;
+}
+
+.ad-cta b {
+  font-size: 17px;
+  font-family: system-ui, sans-serif;
+}
+
+.ad-cta span {
+  grid-row: 2;
+  font-size: 11.5px;
+  color: #666;
+  font-family: system-ui, sans-serif;
+}
+
+.ad-cta .ad-install {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #2f7bff;
+  color: #fff;
+  font-weight: 800;
+  font-family: system-ui, sans-serif;
+}
+
+.ad-foot {
+  padding: 8px 16px calc(var(--safe-bottom) + 10px);
+  font-size: 12px;
+  color: #9aa3b5;
+  text-align: center;
+  background: #000;
+}

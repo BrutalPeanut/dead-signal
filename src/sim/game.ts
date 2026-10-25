@@ -1173,16 +1173,23 @@ export class Game {
 
   // ------------------------------------------------------------------ death
 
+  /** One extra revive per run if the player watches a rewarded ad (only when ads are on). */
+  adRevive = false;
+
   private onDeath() {
-    if (this.revives > 0) {
+    if (this.revives > 0 || this.adRevive) {
       this.state = 'revive';
     } else {
       this.state = 'dead';
     }
   }
 
-  revive(accept: boolean) {
+  revive(accept: boolean, viaAd = false) {
     if (this.state !== 'revive') return;
+    if (accept && viaAd && this.adRevive) {
+      this.adRevive = false;
+      this.revives++;
+    }
     if (accept && this.revives > 0) {
       this.revives--;
       this.hp = this.maxHp;

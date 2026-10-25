@@ -385,11 +385,16 @@ export function pauseModal(
   );
 }
 
-export function reviveModal(onYes: () => void, onNo: () => void, left: number) {
+export function reviveModal(onYes: () => void, onNo: () => void, left: number, onAd?: () => void) {
+  const byAd = left <= 0 && !!onAd;
   return h(
     'div.modal',
     h('h2', { style: { color: '#43ffa4' } }, 'SECOND WIND'),
-    h('div.sub', `Get back up with full HP and an EMP blast. (${left} left)`),
-    h('div.actions', h('button.btn', { onclick: onNo }, 'Give up'), h('button.btn.cyan.big', { onclick: onYes }, 'Revive')),
+    h('div.sub', byAd ? 'Watch a short ad to get back up with full HP and an EMP blast.' : `Get back up with full HP and an EMP blast. (${left} left)`),
+    h(
+      'div.actions',
+      h('button.btn', { onclick: onNo }, 'Give up'),
+      byAd ? h('button.btn.cyan.big.ad-btn', { onclick: onAd }, h('span.ad-play', '▶'), 'Watch ad · Revive') : h('button.btn.cyan.big', { onclick: onYes }, 'Revive'),
+    ),
   );
 }

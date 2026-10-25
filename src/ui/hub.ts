@@ -15,6 +15,7 @@ import {
 } from '../meta/gear';
 import { RELAY_CAP_H, type Profile } from '../meta/profile';
 import { LOGIN_DAYS, loginReward } from '../meta/login';
+import { ads, adsOn } from '../ads/ads';
 import { DAILY_TIERS, ENDLESS_BOSS_EVERY, dailyChallenge, type RunMode } from '../sim/modes';
 import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
 import { drawHero } from '../render/art';
@@ -1093,6 +1094,24 @@ export class Hub {
           },
           h('span', 'Open ', coin('key'), ` 1  (have ${d.keys})`),
         ),
+        adsOn()
+          ? h(
+              'button.btn.ad-btn',
+              {
+                style: { marginTop: '8px' },
+                disabled: p.adKeysLeft() <= 0,
+                onclick: () =>
+                  ads.showRewarded('key').then((ok) => {
+                    if (ok && p.grantAdKey()) {
+                      audio.pickup('chest');
+                      toast('+1 crate key', '#5ef2ff');
+                    }
+                  }),
+              },
+              h('span.ad-play', '▶'),
+              p.adKeysLeft() > 0 ? `Watch ad · Free key (${p.adKeysLeft()} left today)` : 'Free keys: back tomorrow',
+            )
+          : null,
         d.keys > 1
           ? h(
               'button.btn.primary',

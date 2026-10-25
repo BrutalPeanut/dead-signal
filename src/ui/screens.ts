@@ -35,6 +35,7 @@ export function resultsModal(
   onContinue: () => void,
   powerUp: string | null = null,
   onPowerUp: () => void = onContinue,
+  onDoubleAd?: () => Promise<boolean>,
 ) {
   const title = rw.mode === 'endless' ? (rw.newBest ? 'NEW RECORD' : 'SIGNAL LOST') : rw.mode === 'daily' ? (r.won ? 'CHALLENGE CLEARED' : 'CHALLENGE OVER') : r.won ? 'SECTOR CLEARED' : 'SIGNAL LOST';
   const color = r.won || (rw.mode === 'endless' && rw.newBest) ? '#43ffa4' : '#ff3b5c';
@@ -113,6 +114,18 @@ export function resultsModal(
       h('div', h('b', r.level), h('span', 'Level')),
     ),
     h('div.rewards', rewards),
+    onDoubleAd && rw.gold > 0
+      ? (() => {
+          const btn = h('button.btn.cyan.ad-btn', { style: { margin: '8px auto 0' } }, h('span.ad-play', '▶'), `Watch ad · Double gold (+${fmtNum(rw.gold)})`) as HTMLButtonElement;
+          btn.onclick = () =>
+            onDoubleAd().then((ok) => {
+              if (!ok) return;
+              btn.disabled = true;
+              btn.replaceChildren(`✓ Gold doubled: +${fmtNum(rw.gold * 2)}`);
+            });
+          return h('div', { style: { textAlign: 'center' } }, btn);
+        })()
+      : null,
     h('div.next-goal', next),
     (() => {
       const tip = r.won ? null : deathTip(r.killedBy, r.killedByBoss);

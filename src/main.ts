@@ -18,6 +18,7 @@ import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics, toast } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
 import { LEVELUP_TIP, Tutorial } from './ui/tutorial';
+import { ads, adsOn } from './ads/ads';
 import { Hud, chestModal, levelUpModal, pauseModal, reviveModal } from './ui/hud';
 import { introModal, resultsModal, settingsModal } from './ui/screens';
 
@@ -161,6 +162,7 @@ class App {
       if (this.tutorialOn) sub = 'Training run · 2 minutes · follow the tips';
       this.hud.startRun(this.profile.data.best[sector] ?? 0, 'campaign', 0, this.game.runLength);
     }
+    this.game.adRevive = adsOn();
     this.renderer.setGame(this.game);
     this.renderer.fx.parts.length = 0;
     this.renderer.fx.decals.length = 0;
@@ -279,7 +281,7 @@ class App {
     const goNext = rw.unlockedSector;
     const coach = !r.won ? this.profile.coach() : null;
     this.showModal(
-      resultsModal(r, rw, mode === 'campaign' ? `Sector ${this.sector + 1} · ${g.chapter.name}` : mode === 'daily' ? `Daily Challenge · ${dailyChallenge().mods.map((m) => m.name).join(' + ')}` : 'Endless', () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false)),
+      resultsModal(r, rw, mode === 'campaign' ? `Sector ${this.sector + 1} · ${g.chapter.name}` : mode === 'daily' ? `Daily Challenge · ${dailyChallenge().mods.map((m) => m.name).join(' + ')}` : 'Endless', () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false), adsOn() ? () => ads.showRewarded('double').then((ok) => (ok && (this.profile.grant({ gold: rw.gold }), this.profile.save()), ok)) : undefined),
       'results',
     );
     if (r.won) audio.evolve();
@@ -347,6 +349,13 @@ class App {
                 this.closeModal();
               },
               g.revives,
+              g.revives <= 0 && g.adRevive
+                ? () =>
+                    ads.showRewarded('revive').then((ok) => {
+                      g.revive(ok, ok);
+                      this.closeModal();
+                    })
+                : undefined,
             ),
             'revive',
           );
