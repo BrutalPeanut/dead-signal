@@ -20,6 +20,7 @@ await page.reload();
 await page.waitForTimeout(500);
 await page.locator('.modal .btn').first().tap({ timeout: 3000 }).catch(() => {});
 if (sector > 0) await page.evaluate((s) => { const a = window.__ds.app; a.profile.data.unlocked = s; a.profile.save(); a.hub.sector = s; a.hub.refresh(); }, sector);
+if (process.env.MODE) { await page.locator('.mode-tabs .mt', { hasText: process.env.MODE }).click(); await page.waitForTimeout(300); }
 await page.tap('.battle-row .go');
 const cdp = await ctx.newCDPSession(page);
 const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
