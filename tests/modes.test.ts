@@ -112,3 +112,20 @@ describe('starter kit', () => {
     expect(new Game(getChapter(1), kit, 5, defaultMods('daily')).loadout.maxW).toBe(6);
   });
 });
+
+describe('pickups', () => {
+  it('magnet pulls shards straight in: distance to the courier only ever shrinks', () => {
+    const g = new Game(getChapter(1), kit, 2);
+    g.enemies.length = 0;
+    const gem = g.addPickup('xp', g.px + 300, g.py + 40, 1);
+    g.addPickup('magnet', g.px, g.py, 0);
+    let last = Infinity;
+    for (let i = 0; i < 120 && gem.alive; i++) {
+      g.step(i % 40 < 20 ? 1 : -1, 0.5); // courier keeps moving around
+      const d = Math.hypot(gem.x - g.px, gem.y - g.py);
+      if (gem.alive) expect(d).toBeLessThanOrEqual(last + 92 / 60 + 0.01); // can only lag by the courier's own step
+      last = d;
+    }
+    expect(gem.alive).toBe(false);
+  });
+});
