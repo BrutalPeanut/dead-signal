@@ -21,7 +21,11 @@ export function buildOffers(
   weapons: WeaponState[],
   passives: PassiveState[],
   n = 3,
+  rules: { maxW: number; maxP: number; weapons: string[] | null } = { maxW: MAX_WEAPON_SLOTS, maxP: MAX_PASSIVE_SLOTS, weapons: null },
 ): Offer[] {
+  // starter kit: only these weapons, and only the supports that pair with them
+  const allowW = rules.weapons ? new Set([...rules.weapons, ...weapons.map((w) => w.id)]) : null;
+  const allowP = allowW ? new Set([...allowW].map((id) => WEAPONS[id as keyof typeof WEAPONS].partner as string)) : null;
   const cands: { o: Offer; w: number }[] = [];
   const ownedW = new Map(weapons.map((w) => [w.id, w]));
   const ownedP = new Map(passives.map((p) => [p.id, p]));
@@ -35,7 +39,7 @@ export function buildOffers(
     if (st) {
       if (!st.evolved && st.level < MAX_SKILL_LEVEL)
         cands.push({ o: { type: 'weapon', id, level: st.level + 1, isNew: false }, w: 3.2 });
-    } else if (weapons.length < MAX_WEAPON_SLOTS) {
+    } else if (weapons.length < rules.maxW && (!allowW || allowW.has(id))) {
       const early = weapons.length < 3 ? 1.6 : 1;
       cands.push({ o: { type: 'weapon', id, level: 1, isNew: true }, w: 1.4 * early });
     }
@@ -50,7 +54,7 @@ export function buildOffers(
       w = 2.2;
       lvl = st.level + 1;
       isNew = false;
-    } else if (passives.length < MAX_PASSIVE_SLOTS) {
+    } else if (passives.length < rules.maxP && (!allowP || allowP.has(id))) {
       w = 1.1;
     } else continue;
     if (neededPartners.has(id) && isNew) w *= 16;

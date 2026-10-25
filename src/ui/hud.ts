@@ -159,10 +159,10 @@ export class Hud {
     }
     this.set('g', this.gold, fmtNum(g.gold));
 
-    const key = g.weapons.map((w) => `${w.id}${w.level}${w.evolved ? 'e' : ''}`).join() + '|' + g.passives.map((p) => p.id + p.level).join();
+    const key = g.weapons.map((w) => `${w.id}${w.level}${w.evolved ? 'e' : ''}`).join() + '|' + g.passives.map((p) => p.id + p.level).join() + '|' + g.loadout.maxW;
     if (key !== this.skillKey) {
       this.skillKey = key;
-      this.renderSkills(g.weapons, g.passives);
+      this.renderSkills(g.weapons, g.passives, g.loadout.maxW, g.loadout.maxP);
     }
 
     if (g.boss) {
@@ -184,8 +184,8 @@ export class Hud {
     this.banner.style.opacity = b ? String(Math.min(1, b.t * 2)) : '0';
   }
 
-  private renderSkills(ws: WeaponState[], ps: PassiveState[]) {
-    this.skills.replaceChildren(...loadoutRows(ws, ps, 'hud'));
+  private renderSkills(ws: WeaponState[], ps: PassiveState[], maxW = MAX_WEAPON_SLOTS, maxP = MAX_PASSIVE_SLOTS) {
+    this.skills.replaceChildren(...loadoutRows(ws, ps, 'hud', maxW, maxP));
   }
 }
 
@@ -195,13 +195,14 @@ export class Hud {
  * Two labelled rows of 6 slots: Attack (weapons) and Support (passives). Empty slots are drawn so
  * players always know how many abilities they can still add.
  */
-export function loadoutRows(ws: WeaponState[], ps: PassiveState[], variant: 'hud' | 'big') {
+export function loadoutRows(ws: WeaponState[], ps: PassiveState[], variant: 'hud' | 'big', maxW = MAX_WEAPON_SLOTS, maxP = MAX_PASSIVE_SLOTS) {
   const row = (kind: 'atk' | 'sup', label: string, filled: HTMLElement[]) => {
+    const max = kind === 'atk' ? maxW : maxP;
     const slots: HTMLElement[] = [...filled];
-    for (let i = filled.length; i < MAX_WEAPON_SLOTS; i++) slots.push(h('div.sk.empty'));
+    for (let i = filled.length; i < max; i++) slots.push(h('div.sk.empty'));
     return h(
       `div.line.${kind}`,
-      h('span.ltag', variant === 'hud' ? h('b', label[0]) : h('b', label), h('small', `${filled.length}/${MAX_WEAPON_SLOTS}`)),
+      h('span.ltag', variant === 'hud' ? h('b', label[0]) : h('b', label), h('small', `${filled.length}/${max}`)),
       slots,
     );
   };
@@ -295,11 +296,11 @@ function combo(g: Game, o: Offer) {
 /** Category chip: which slot row this upgrade fills, and whether it takes a new slot. */
 function ctag(g: Game, o: Offer) {
   if (o.type === 'weapon') {
-    const txt = o.isNew ? `ATTACK · new slot ${g.weapons.length + 1}/${MAX_WEAPON_SLOTS}` : `ATTACK · Lv ${o.level}`;
+    const txt = o.isNew ? `ATTACK · new slot ${g.weapons.length + 1}/${g.loadout.maxW}` : `ATTACK · Lv ${o.level}`;
     return h('span.ctag.atk', txt);
   }
   if (o.type === 'passive') {
-    const txt = o.isNew ? `SUPPORT · new slot ${g.passives.length + 1}/${MAX_PASSIVE_SLOTS}` : `SUPPORT · Lv ${o.level}`;
+    const txt = o.isNew ? `SUPPORT · new slot ${g.passives.length + 1}/${g.loadout.maxP}` : `SUPPORT · Lv ${o.level}`;
     return h('span.ctag.sup', txt);
   }
   return h('span.ctag.misc', 'BONUS');
@@ -311,7 +312,7 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
     'div.modal',
     h('h2', { style: { color: '#5ef2ff', textShadow: '0 0 20px rgba(94,242,255,.6)' } }, 'LEVEL UP'),
     tip ? h('div.lvl-tip', tip) : h('div.sub', 'Choose one upgrade'),
-    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big')),
+    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big', g.loadout.maxW, g.loadout.maxP)),
     cards,
     h(
       'div.actions',
@@ -373,7 +374,7 @@ export function pauseModal(
     'div.modal',
     h('h2', 'PAUSED'),
     h('div.sub', `${g.chapter.name} · ${fmtTime(g.time)} · ${fmtNum(g.kills)} kills`),
-    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big')),
+    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big', g.loadout.maxW, g.loadout.maxP)),
     h('div', { style: { width: 'min(100%, 380px)' } }, toggle('Sound effects', 'sfx'), toggle('Music', 'music'), controlsPicker(controls, onControls)),
     h(
       'div.actions',

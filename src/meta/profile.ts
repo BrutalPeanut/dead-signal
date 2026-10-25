@@ -99,6 +99,8 @@ export interface RunRewards {
   mode?: RunMode;
   /** Character unlocked by this clear, if any. */
   newCharacter?: string;
+  /** Loadout grew with this clear (starter kit opens up over Sectors 1-3). */
+  newLoadout?: string;
 }
 
 function fresh(): SaveData {
@@ -773,7 +775,8 @@ export class Profile {
     }
     this.save();
     const newCharacter = unlockedSector ? CHARACTERS.find((c) => c.unlock === d.unlocked)?.name : undefined;
-    return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector, score, newBest, prevBest, starsBefore: prevStars, starsAfter: stars, newCharacter };
+    const newLoadout = !unlockedSector ? undefined : d.unlocked === 2 ? 'More slots! You can now carry 4 attack + 4 support upgrades, and every weapon type can appear.' : d.unlocked === 3 ? 'Full loadout unlocked: 6 attack + 6 support slots.' : undefined;
+    return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector, score, newBest, prevBest, starsBefore: prevStars, starsAfter: stars, newCharacter, newLoadout };
   }
 
   // ------------------------------------------------------------------ idle relay + daily

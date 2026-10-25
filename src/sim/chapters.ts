@@ -71,17 +71,20 @@ export function getChapter(index: number): ChapterDef {
   const act2 = Math.max(0, index - 9);
   const hpMul = Math.pow(1.8, early) * Math.pow(1.55, mid) * Math.pow(1.24, late) * Math.pow(1.12, act2);
   const dmgMul = Math.pow(1.38, early) * Math.pow(1.28, mid) * Math.pow(1.12, late) * Math.pow(1.07, act2);
+  // On-ramp: Sector 2 is the first full 5-minute run, so it's cut roughly in half (playtesters
+  // needed 3 tries); Sector 3 is eased too so the step up to it isn't a cliff.
+  const onramp = [1, 0.55, 0.8][index] ?? 1;
   return {
     index,
     name,
     biome,
-    hpMul,
+    hpMul: hpMul * onramp,
     // Sector 1 is the training ground: softer hits so a first run can end in a win.
-    dmgMul: index === 0 ? dmgMul * 0.8 : dmgMul,
+    dmgMul: index === 0 ? dmgMul * 0.8 : dmgMul * onramp,
     midBoss,
     finalBoss,
     goldMul: 1 + index * 0.45,
     // Calibrated to the power a player following Power Up actually clears each sector at (+~10%).
-    power: Math.round((450 * Math.pow(1.28, Math.min(index, 9)) * Math.pow(1.07, act2)) / 10) * 10,
+    power: Math.round((450 * Math.pow(1.28, Math.min(index, 9)) * Math.pow(1.07, act2) * ([1, 0.75, 0.9][index] ?? 1)) / 10) * 10,
   };
 }
