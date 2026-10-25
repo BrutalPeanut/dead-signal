@@ -1,3 +1,4 @@
+import { SPLAT_SCALE, SPLAT_SIZE, splat } from './blood';
 import type { Game } from '../sim/game';
 import { WEAPONS } from '../sim/data';
 import type { FxEvent } from '../sim/types';
@@ -46,6 +47,8 @@ interface Decal {
   color: string;
   life: number;
   rot: number;
+  /** Splatter sprite variant; undefined = plain scorch (explosions). */
+  v?: number;
 }
 
 export interface Banner {
@@ -57,17 +60,18 @@ export interface Banner {
 
 // Infected bleed dark signal-magenta/maroon tones on purpose: green belongs to XP shards only,
 // so loot never camouflages in the gore.
+// Infected bleed dark arterial red; the bloater's bile and the hive's ichor stay sickly.
 const GOO: Record<string, string> = {
-  shambler: '#6b2350',
-  runner: '#8a2236',
-  crawler: '#5a3a8a',
-  brute: '#5e1f48',
-  spitter: '#7a3d1e',
-  bloater: '#8a6a1a',
-  warden: '#b0208e',
-  hive: '#6a2a7a',
-  colossus: '#b0208e',
-  broadcaster: '#b0208e',
+  shambler: '#7a0f14',
+  runner: '#8a1216',
+  crawler: '#6e0e18',
+  brute: '#650c12',
+  spitter: '#6e2a10',
+  bloater: '#6e6a14',
+  warden: '#760c14',
+  hive: '#4e3a12',
+  colossus: '#760c14',
+  broadcaster: '#760c14',
 };
 
 export class Fx {
@@ -110,7 +114,9 @@ export class Fx {
         case 'death': {
           const c = GOO[e.kind] ?? '#6b2350';
           const big = e.elite || e.r > 25;
-          this.decals.push({ x: e.x, y: e.y + e.r * 0.5, r: e.r * (big ? 1.6 : 1.1) * (0.8 + Math.random() * 0.4), color: c, life: 9, rot: Math.random() * 3 });
+          // spray is thrown away from the courier (the direction the shot was travelling)
+          const away = Math.atan2(e.y - g.py, e.x - g.px) + (Math.random() - 0.5) * 0.6;
+          this.decals.push({ x: e.x, y: e.y + e.r * 0.4, r: e.r * (big ? 1.5 : 1.05) * (0.8 + Math.random() * 0.4), color: c, life: 12, rot: away, v: Math.floor(Math.random() * 6) });
           if (this.decals.length > 140) this.decals.shift();
           this.burst(e.x, e.y, big ? 22 : 7, c, big ? 220 : 130, PK.Goo, 0.45, big ? 4 : 2.6);
           this.burst(e.x, e.y - 6, big ? 8 : 3, '#3a2a35', 160, PK.Chunk, 0.5, 2.4);
@@ -216,11 +222,25 @@ export class Fx {
 
   drawDecals(ctx: CanvasRenderingContext2D) {
     for (const d of this.decals) {
-      ctx.globalAlpha = Math.min(1, d.life / 2) * 0.55;
-      ctx.fillStyle = d.color;
-      ctx.beginPath();
-      ctx.ellipse(d.x, d.y, d.r, d.r * 0.6, d.rot, 0, Math.PI * 2);
-      ctx.fill();
+      const fade = Math.min(1, d.life / 3);
+      if (d.v === undefined) {
+        ctx.globalAlpha = fade * 0.55;
+        ctx.fillStyle = d.color;
+        ctx.beginPath();
+        ctx.ellipse(d.x, d.y, d.r, d.r * 0.6, d.rot, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
+      // fresh blood is glossy; it dries darker and soaks in as it fades
+      ctx.globalAlpha = fade * 0.9;
+      const img = splat(d.color, d.v);
+      const s = d.r * SPLAT_SCALE;
+      ctx.save();
+      ctx.translate(d.x, d.y);
+      ctx.rotate(d.rot);
+      ctx.scale(s, s * 0.8);
+      ctx.drawImage(img, -SPLAT_SIZE * 0.42, -SPLAT_SIZE / 2);
+      ctx.restore();
     }
     ctx.globalAlpha = 1;
   }
