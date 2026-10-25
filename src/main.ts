@@ -1,7 +1,7 @@
 import './style.css';
 import { audio } from './audio';
 import { Input } from './input';
-import { Profile } from './meta/profile';
+import { KEY, Profile } from './meta/profile';
 import { Renderer } from './render/renderer';
 import { botChoose, botMove } from './sim/bot';
 import { getChapter } from './sim/chapters';
@@ -16,10 +16,30 @@ import { introModal, resultsModal, settingsModal } from './ui/screens';
 
 type Mode = 'hub' | 'run';
 
+/**
+ * ?fresh plays as a brand-new player every load (great for trying the first-time experience)
+ * without touching your real save; ?profile=name keeps a separate named save.
+ */
+function makeProfile() {
+  const q = new URLSearchParams(location.search);
+  const store = typeof localStorage !== 'undefined' ? localStorage : null;
+  if (q.has('fresh')) {
+    try {
+      store?.removeItem(KEY + ':fresh');
+    } catch {
+      /* ignore */
+    }
+    return new Profile(store, KEY + ':fresh');
+  }
+  const name = q.get('profile');
+  if (name && /^[\w-]{1,24}$/.test(name)) return new Profile(store, `${KEY}:${name}`);
+  return new Profile(store);
+}
+
 class App {
   canvas = document.getElementById('game') as HTMLCanvasElement;
   ui = document.getElementById('ui')!;
-  profile = new Profile();
+  profile = makeProfile();
   input = new Input(this.canvas);
   mode: Mode = 'hub';
   game: Game;

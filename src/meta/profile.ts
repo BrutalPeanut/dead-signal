@@ -34,7 +34,7 @@ export interface CoachAction {
   apply: () => boolean;
 }
 
-const KEY = 'deadsignal.save.v1';
+export const KEY = 'deadsignal.save.v1';
 export const RELAY_CAP_H = 8;
 
 export interface Settings {
@@ -136,7 +136,7 @@ export class Profile {
   data: SaveData;
   private listeners: (() => void)[] = [];
 
-  constructor(private storage: Storage | null = typeof localStorage !== 'undefined' ? localStorage : null) {
+  constructor(private storage: Storage | null = typeof localStorage !== 'undefined' ? localStorage : null, private key = KEY) {
     this.data = this.load();
   }
 
@@ -146,7 +146,7 @@ export class Profile {
 
   private load(): SaveData {
     try {
-      const raw = this.storage?.getItem(KEY);
+      const raw = this.storage?.getItem(this.key);
       if (raw) {
         const d = JSON.parse(raw) as SaveData;
         if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless, character: d.character ?? 'courier', online: d.online ?? fresh().online, pass: d.pass ?? fresh().pass };
@@ -159,7 +159,7 @@ export class Profile {
 
   save() {
     try {
-      this.storage?.setItem(KEY, JSON.stringify(this.data));
+      this.storage?.setItem(this.key, JSON.stringify(this.data));
     } catch {
       /* storage full / private mode: keep playing in memory */
     }
