@@ -1,0 +1,490 @@
+/* ==========================================================================
+   Dead Signal UI theme: "field equipment"
+   Controls are built like the courier's gear: chamfered gunmetal plates with a
+   pressable lip, hazard-striped frames on the calls to action, stencilled crate
+   lettering, radio-panel screens with scanlines, hex badges for the dock.
+   Loaded after style.css; it restyles the shared components in one place.
+   ========================================================================== */
+
+:root {
+  --stencil: 'Saira Stencil One', 'Chakra Petch', system-ui, sans-serif;
+  --steel-hi: #3b4658;
+  --steel: #262f3d;
+  --steel-lo: #151b25;
+  --rim-hi: #6d7b92;
+  --rim-lo: #2a3240;
+  --haz: #ff8a1f;
+  --haz-hi: #ffc070;
+  --haz-lo: #c45a0c;
+  --haz-ink: #1c0f02;
+  --stripe-a: #ffb000;
+  --stripe-b: #17110a;
+  --radio: #5ef2ff;
+  --radio-face: #0b2a32;
+  --cut: 9px;
+}
+
+/* chamfer: top-left and bottom-right corners cut, like stamped plate */
+.btn,
+.sc-arrow,
+.icon-btn,
+.lb-btn {
+  --c: var(--cut);
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+}
+
+/* ------------------------------------------------------------ the plate button */
+
+.btn {
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  padding: 12px 20px 15px;
+  color: #e6ebf3;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  transition: transform 0.07s ease-out, filter 0.15s;
+}
+
+/* rim (and the visible lip along the bottom edge) */
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: linear-gradient(180deg, var(--rim-hi), var(--rim-lo) 70%, #0d1117);
+}
+
+/* face: inset 2px with a 4px lip below; rivets on the left/right */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 2px 2px 4px 2px;
+  z-index: -1;
+  --c2: calc(var(--c) - 1.5px);
+  clip-path: polygon(var(--c2) 0, 100% 0, 100% calc(100% - var(--c2)), calc(100% - var(--c2)) 100%, 0 100%, 0 var(--c2));
+  background:
+    radial-gradient(circle at 7px 50%, rgba(255, 255, 255, 0.28) 0 1.2px, rgba(0, 0, 0, 0.55) 1.6px 2.2px, transparent 2.6px),
+    radial-gradient(circle at calc(100% - 7px) 50%, rgba(255, 255, 255, 0.28) 0 1.2px, rgba(0, 0, 0, 0.55) 1.6px 2.2px, transparent 2.6px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 22%),
+    linear-gradient(180deg, var(--steel-hi), var(--steel) 55%, var(--steel-lo));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.btn:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+.btn:active::after {
+  inset: 2px;
+  filter: brightness(0.92);
+}
+
+.btn:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 0 0 #fff) brightness(1.15);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+}
+
+.btn.small {
+  padding: 7px 13px 10px;
+  font-size: 12px;
+  border-radius: 0;
+  --c: 6px;
+}
+
+.btn.small::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 22%),
+    linear-gradient(180deg, var(--steel-hi), var(--steel) 55%, var(--steel-lo));
+}
+
+.btn.big {
+  padding: 15px 30px 19px;
+  font-size: 20px;
+  border-radius: 0;
+  --c: 13px;
+}
+
+/* primary: hazard-striped frame, orange face, stencilled label */
+.btn.primary {
+  color: var(--haz-ink);
+  text-shadow: 0 1px 0 rgba(255, 220, 170, 0.5);
+  box-shadow: none;
+  border: 0;
+  background: none;
+}
+
+.btn.primary::before {
+  background: repeating-linear-gradient(-45deg, var(--stripe-a) 0 7px, var(--stripe-b) 7px 14px);
+}
+
+.btn.primary::after {
+  inset: 3px 3px 6px 3px;
+  background:
+    radial-gradient(circle at 8px 50%, rgba(255, 240, 210, 0.7) 0 1.2px, rgba(90, 40, 0, 0.6) 1.6px 2.3px, transparent 2.7px),
+    radial-gradient(circle at calc(100% - 8px) 50%, rgba(255, 240, 210, 0.7) 0 1.2px, rgba(90, 40, 0, 0.6) 1.6px 2.3px, transparent 2.7px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35), transparent 30%),
+    linear-gradient(180deg, var(--haz-hi), var(--haz) 50%, var(--haz-lo));
+  box-shadow: inset 0 -2px 0 rgba(120, 50, 0, 0.35);
+}
+
+.btn.primary:active::after {
+  inset: 3px;
+}
+
+.btn.primary.big,
+.btn.primary.go {
+  font-family: var(--stencil);
+  font-weight: 400;
+  letter-spacing: 0.1em;
+}
+
+/* cyan: a radio-panel screen with scanlines */
+.btn.cyan {
+  color: var(--radio);
+  text-shadow: 0 0 8px rgba(94, 242, 255, 0.7);
+  box-shadow: none;
+  border: 0;
+  background: none;
+}
+
+.btn.cyan::before {
+  background: linear-gradient(180deg, #9ff8ff, #2aa7bd 60%, #0d4752);
+}
+
+.btn.cyan::after {
+  background:
+    repeating-linear-gradient(180deg, rgba(94, 242, 255, 0.07) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 40%, rgba(94, 242, 255, 0.22), transparent 70%),
+    linear-gradient(180deg, #123c46, var(--radio-face));
+  box-shadow: inset 0 0 12px rgba(94, 242, 255, 0.25);
+}
+
+/* ghost: a flat stencil label on bare metal, no lip */
+.btn.ghost {
+  color: #aeb7c7;
+  text-shadow: none;
+  background: none;
+  box-shadow: none;
+}
+
+.btn.ghost::before {
+  background: linear-gradient(180deg, #3a4456, #232a36);
+}
+
+.btn.ghost::after {
+  inset: 1.5px;
+  background: linear-gradient(180deg, #121821, #0d1219);
+  box-shadow: none;
+}
+
+.btn.ghost:active {
+  transform: none;
+}
+
+/* ------------------------------------------------------------ BATTLE: the one loud control */
+
+.btn.go {
+  min-width: 260px;
+  padding: 14px 28px 20px;
+  font-size: 30px;
+  --c: 16px;
+  animation: none;
+}
+
+.btn.go::after {
+  inset: 4px 4px 8px 4px;
+}
+
+.btn.go:active::after {
+  inset: 4px;
+}
+
+.btn.go small {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  opacity: 0.8;
+}
+
+/* a slow sweep of light across the plate instead of a pulsing glow */
+.btn.go span::after {
+  content: '';
+  position: absolute;
+  inset: 4px 4px 8px 4px;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.38) 50%, transparent 60%);
+  background-size: 300% 100%;
+  animation: plateSweep 4.5s ease-in-out infinite;
+  mix-blend-mode: overlay;
+}
+
+.btn.go:disabled span::after {
+  display: none;
+}
+
+@keyframes plateSweep {
+  0%,
+  55% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}
+
+.lobby-body .battle-row .btn.go {
+  border-radius: 0;
+}
+
+/* ------------------------------------------------------------ small hardware */
+
+.icon-btn {
+  --c: 7px;
+  border-radius: 0 !important;
+  background: linear-gradient(180deg, var(--steel-hi), var(--steel-lo)) !important;
+  border: 0 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -2px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+.lobby-body .sc-arrow,
+.sc-arrow {
+  --c: 7px;
+  border-radius: 0;
+  border: 0;
+  background: linear-gradient(180deg, var(--steel-hi), var(--steel-lo));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.sc-arrow:active,
+.icon-btn:active {
+  transform: translateY(1px);
+}
+
+.lb-btn {
+  --c: 6px;
+  border-radius: 0;
+}
+
+/* wallet readouts: inset LCD strips rather than pills */
+.topbar .w {
+  border-radius: 4px;
+  background: linear-gradient(180deg, #0a0e14, #121822);
+  border: 1px solid #2c3546;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.topbar .w .plus {
+  border-radius: 3px;
+}
+
+/* mode switcher: a three-position selector switch */
+.mode-tabs {
+  border-radius: 6px;
+  padding: 3px;
+  gap: 3px;
+  background: linear-gradient(180deg, #0a0e14, #141a24);
+  border: 1px solid #2f3949;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.6);
+}
+
+.mode-tabs .mt {
+  border-radius: 3px;
+  --c: 5px;
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11.5px;
+}
+
+.mode-tabs .mt.on {
+  color: var(--haz-ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 45%),
+    linear-gradient(180deg, var(--haz-hi), var(--haz) 55%, var(--haz-lo));
+  box-shadow: inset 0 -2px 0 rgba(120, 50, 0, 0.45);
+}
+
+/* rail buttons: hex badges bolted to the scene */
+.lobby-body .rail-btn .ri {
+  border-radius: 0;
+  border: 0;
+  clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%);
+  width: 50px;
+  height: 46px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 40%),
+    linear-gradient(180deg, #2f394a, #141a24);
+  box-shadow: none;
+  position: relative;
+}
+
+.lobby-body .rail-btn .ri::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+.lobby-body .rail-btn .rring {
+  width: 50px;
+  height: 46px;
+}
+
+.lobby-body .rail-btn .rl {
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+/* bottom dock: a steel bar; Battle sits in a raised hex */
+.nav {
+  background: linear-gradient(180deg, #1b2230, #0d1118) !important;
+  border-top: 1px solid #36425a !important;
+  box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+.nav button .lbl {
+  letter-spacing: 0.1em;
+}
+
+.nav button.battle .ico {
+  border-radius: 0 !important;
+  clip-path: polygon(25% 2%, 75% 2%, 100% 50%, 75% 98%, 25% 98%, 0 50%);
+  background:
+    repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.12) 0 5px, transparent 5px 10px),
+    linear-gradient(180deg, var(--haz-hi), var(--haz) 55%, var(--haz-lo)) !important;
+  box-shadow: none !important;
+  color: var(--haz-ink) !important;
+}
+
+.nav button.on:not(.battle) .ico {
+  color: var(--haz);
+}
+
+/* ------------------------------------------------------------ panels: stamped plate with corner brackets */
+
+.sheet,
+.lobby-body .sector-card,
+.crate-card {
+  --pc: 14px;
+  border-radius: 0 !important;
+  clip-path: polygon(var(--pc) 0, 100% 0, 100% calc(100% - var(--pc)), calc(100% - var(--pc)) 100%, 0 100%, 0 var(--pc));
+  background:
+    linear-gradient(var(--haz), var(--haz)) top right / 18px 2px no-repeat,
+    linear-gradient(var(--haz), var(--haz)) top right / 2px 18px no-repeat,
+    linear-gradient(var(--haz), var(--haz)) bottom left / 18px 2px no-repeat,
+    linear-gradient(var(--haz), var(--haz)) bottom left / 2px 18px no-repeat,
+    linear-gradient(180deg, rgba(30, 37, 50, 0.97), rgba(13, 17, 24, 0.98)) !important;
+  border: 1px solid #323d50 !important;
+}
+
+/* level-up / chest cards: equipment tags */
+/* (no clip-path here: the badges sit on the card's top edge and must not be cut) */
+.modal .card {
+  border-radius: 4px !important;
+  background:
+    linear-gradient(var(--haz), var(--haz)) top left / 12px 2px no-repeat,
+    linear-gradient(var(--haz), var(--haz)) top left / 2px 12px no-repeat,
+    linear-gradient(180deg, #1c2330, #11161f) !important;
+}
+
+.modal .card .badge {
+  border-radius: 2px;
+}
+
+.ctag {
+  border-radius: 2px !important;
+}
+
+/* modal headings get the stencil */
+.modal h2,
+.sheet h2 {
+  font-family: var(--stencil);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+
+/* settings switches: a physical toggle with a hazard-lit "on" */
+.toggle .sw {
+  border-radius: 3px !important;
+  background: linear-gradient(180deg, #0a0e14, #161c27) !important;
+  border: 1px solid #36425a;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.toggle .sw::after {
+  border-radius: 2px !important;
+  background: linear-gradient(180deg, #8e9ab0, #4c566a) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.toggle .sw.on {
+  background: linear-gradient(180deg, #4a2a06, #2a1704) !important;
+  border-color: var(--haz-lo);
+}
+
+.toggle .sw.on::after {
+  background: linear-gradient(180deg, var(--haz-hi), var(--haz)) !important;
+}
+
+/* Power Up: a signal-green readout strip */
+.lobby-body .coach {
+  border-radius: 0;
+  --c: 9px;
+  clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+  background:
+    repeating-linear-gradient(180deg, rgba(67, 255, 164, 0.05) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #0f2a20, #0a1a14);
+  border: 1px solid rgba(67, 255, 164, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.go span::after {
+    animation: none;
+    display: none;
+  }
+}
+
+/* progress rings follow the hex badge outline */
+.lobby-body .rail-btn .rring {
+  top: 0;
+  left: 0;
+  width: 50px;
+  height: 46px;
+}
+
+.lobby-body .rail-btn .rring svg {
+  transform: none;
+}
+
+.rail-btn .rring polygon {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 3px var(--cyan));
+}
+
+.rail-btn .rring.pass polygon {
+  stroke: #ffd34d;
+  filter: drop-shadow(0 0 3px #ffd34d);
+}
+
+/* loadout tray and slot tiles: squared-off hardware */
+.loadout-big,
+.loadout-big .lr-tag {
+  border-radius: 4px !important;
+}
