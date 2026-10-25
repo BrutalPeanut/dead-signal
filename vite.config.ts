@@ -2,6 +2,11 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   base: './',
-  build: { target: 'es2020', outDir: 'dist', assetsInlineLimit: 100000 },
+  build: {
+    target: 'es2020',
+    outDir: 'dist',
+    // inline small images/sounds, but ship fonts as cached files (the single-file build inlines them itself)
+    assetsInlineLimit: (file: string) => (/\.(woff2?|ttf)$/.test(file) ? false : undefined),
+  },
   server: { host: true },
 });

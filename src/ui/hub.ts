@@ -268,8 +268,8 @@ export class Hub {
     const relayFrac = relay.hours / RELAY_CAP_H;
     const ps = p.pass();
     const passFrac = (ps.sp % SP_PER_TIER) / SP_PER_TIER;
-    const passRing = h('span.rring.pass', { html: `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="${Math.round(passFrac * 100)} 100"/></svg>` });
-    const relayRing = h('span.rring', { html: `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" pathLength="100" stroke-dasharray="${Math.round(relayFrac * 100)} 100"/></svg>` });
+    const passRing = h('span.rring.pass', { html: `<svg viewBox="0 0 36 36" preserveAspectRatio="none"><polygon vector-effect="non-scaling-stroke" points="9.5,2.5 26.5,2.5 34.5,18 26.5,33.5 9.5,33.5 1.5,18" pathLength="100" stroke-dasharray="${Math.round(passFrac * 100)} 100"/></svg>` });
+    const relayRing = h('span.rring', { html: `<svg viewBox="0 0 36 36" preserveAspectRatio="none"><polygon vector-effect="non-scaling-stroke" points="9.5,2.5 26.5,2.5 34.5,18 26.5,33.5 9.5,33.5 1.5,18" pathLength="100" stroke-dasharray="${Math.round(relayFrac * 100)} 100"/></svg>` });
 
     // sector chest track
     const milestones: { bit: 1 | 2 | 4; label: string }[] = [

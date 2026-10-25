@@ -1,4 +1,11 @@
+// Fonts are self-hosted (bundled) so the game looks right offline, in app wrappers and in previews.
+import '@fontsource/chakra-petch/latin-500.css';
+import '@fontsource/chakra-petch/latin-600.css';
+import '@fontsource/chakra-petch/latin-700.css';
+import '@fontsource/chakra-petch/latin-700-italic.css';
+import '@fontsource/saira-stencil-one/latin-400.css';
 import './style.css';
+import './theme.css';
 import { audio } from './audio';
 import { Input } from './input';
 import { KEY, Profile } from './meta/profile';
