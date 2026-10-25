@@ -141,4 +141,4 @@ export class Tutorial {
 }
 
 /** Shown on the first level-up cards during the tutorial. */
-export const LEVELUP_TIP = 'Pick one! A = attack (new weapons fire on their own). S = support (boosts your weapons). Max a weapon to evolve it.';
+export const LEVELUP_TIP = 'Pick one! A = attack (new weapons fire on their own). S = support (boosts your weapons). 🔗 Each weapon pairs with one support: max the weapon while holding its partner to evolve it.';

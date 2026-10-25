@@ -233,7 +233,7 @@ export function offerCard(g: Game, o: Offer, onPick: (() => void) | null) {
   if (o.type === 'passive') {
     const partner = PASSIVES[o.id].partnerOf;
     const w = g.weapons.find((x) => x.id === partner);
-    if (w && !w.evolved && o.isNew) badge = h('span.badge.evo', w.level >= MAX_SKILL_LEVEL ? 'EVOLVES ' + WEAPONS[partner].name.toUpperCase() : 'EVO PARTNER');
+    if (w && !w.evolved && o.isNew) badge = h('span.badge.evo', w.level >= MAX_SKILL_LEVEL ? 'EVOLVES ' + WEAPONS[partner].name.toUpperCase() : '🔗 PAIRS WITH YOUR ' + WEAPONS[partner].name.toUpperCase());
     else if (o.isNew) badge = h('span.badge', 'NEW');
   }
   if (o.type === 'weapon' && !o.isNew && o.level === MAX_SKILL_LEVEL) {
@@ -247,8 +247,44 @@ export function offerCard(g: Game, o: Offer, onPick: (() => void) | null) {
     { onclick: onPick ?? undefined, style: { borderColor: col + '88' } },
     badge,
     h('img', { src: offerIcon(o), alt: '' }),
-    h('div', h('div.ctag-row', ctag(g, o)), h('div.name', offerTitle(o)), h('div.desc', offerDesc(o)), lvl),
+    h('div', h('div.ctag-row', ctag(g, o)), h('div.name', offerTitle(o)), h('div.desc', offerDesc(o)), combo(g, o), lvl),
   );
+}
+
+/**
+ * The evolution pairing spelled out: every weapon has one support item; max the weapon while
+ * holding its partner and the next chest evolves it. Shows exactly what this card pairs with.
+ */
+function combo(g: Game, o: Offer) {
+  if (o.type === 'passive') {
+    const wid = PASSIVES[o.id].partnerOf;
+    const wd = WEAPONS[wid];
+    const w = g.weapons.find((x) => x.id === wid);
+    let txt: string;
+    let cls = '';
+    if (w?.evolved) return null;
+    if (!w) txt = `Pairs with ${wd.name} (you don't have it yet) to evolve it into ${wd.evoName}`;
+    else if (w.level >= MAX_SKILL_LEVEL) {
+      txt = `Pairs with your maxed ${wd.name}: your next chest evolves it into ${wd.evoName}!`;
+      cls = '.hot';
+    } else {
+      txt = `Pairs with your ${wd.name} (Lv ${w.level}/${MAX_SKILL_LEVEL}). Max it while holding this to evolve it into ${wd.evoName}`;
+      cls = '.warm';
+    }
+    return h('div.combo' + cls, h('i', '🔗'), txt);
+  }
+  if (o.type === 'weapon') {
+    const wd = WEAPONS[o.id];
+    if (g.weapons.find((x) => x.id === o.id)?.evolved) return null;
+    const has = g.passives.some((p) => p.id === wd.partner);
+    const pname = PASSIVES[wd.partner].name;
+    return h(
+      'div.combo' + (has ? '.warm' : ''),
+      h('i', '🔗'),
+      has ? `You have its partner ${pname}. Max this to evolve it into ${wd.evoName}` : `Pairs with ${pname} (support): max both to evolve into ${wd.evoName}`,
+    );
+  }
+  return null;
 }
 
 /** Category chip: which slot row this upgrade fills, and whether it takes a new slot. */

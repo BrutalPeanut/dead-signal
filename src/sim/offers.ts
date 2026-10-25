@@ -90,7 +90,7 @@ export function offerDesc(o: Offer): string {
       return o.isNew ? WEAPONS[o.id].desc : WEAPONS[o.id].levelText[o.level - 1] ?? 'Upgrade';
     case 'passive': {
       const p = PASSIVES[o.id];
-      return `${p.desc}. Evolves ${WEAPONS[p.partnerOf].name}.`;
+      return `${p.desc}.`;
     }
     case 'heal':
       return 'Restore 30% HP.';
