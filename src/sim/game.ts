@@ -997,18 +997,15 @@ export class Game {
       const d2 = dist2(p.x, p.y, px, py);
       if (!p.pulled && (p.kind === 'xp' || p.kind === 'gold') && d2 < r2) p.pulled = true;
       if (p.pulled) {
+        // straight-line homing: always aimed at the courier (no sideways momentum, so nothing
+        // orbits), accelerating from a gentle start so a magnet sweep reads as a rush inward
         const d = Math.sqrt(d2) || 1;
-        const acc = 900;
-        p.vx += ((px - p.x) / d) * acc * dt;
-        p.vy += ((py - p.y) / d) * acc * dt;
-        const sp = Math.hypot(p.vx, p.vy);
-        const max = 520;
-        if (sp > max) {
-          p.vx *= max / sp;
-          p.vy *= max / sp;
-        }
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
+        const sp = Math.min(900, Math.hypot(p.vx, p.vy) + 1400 * dt);
+        const step = Math.min(d, Math.max(sp, 180) * dt);
+        p.vx = ((px - p.x) / d) * Math.max(sp, 180);
+        p.vy = ((py - p.y) / d) * Math.max(sp, 180);
+        p.x += ((px - p.x) / d) * step;
+        p.y += ((py - p.y) / d) * step;
       }
       if (dist2(p.x, p.y, px, py) < 18 * 18) this.collect(p);
     }
