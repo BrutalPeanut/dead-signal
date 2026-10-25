@@ -29,6 +29,7 @@ export class Tutorial {
   private surroundCd = 0;
   private wall = 0;
   target: { x: number; y: number } | null = null;
+  controls: 'drag' | 'left' | 'right' = 'drag';
 
   constructor() {
     this.text = h('span.tt-text');
@@ -80,7 +81,7 @@ export class Tutorial {
 
     // 0: nothing moves until you do
     if (g.waitingForMove) {
-      if (this.cur?.id !== 'move') this.show({ id: 'move', icon: '👆', text: 'Drag anywhere to move. Try it!', until: 1e9, hand: true }, g);
+      if (this.cur?.id !== 'move') this.show({ id: 'move', icon: '👆', text: this.controls === 'drag' ? 'Drag anywhere to move. Try it!' : `Use the pad in the bottom ${this.controls} corner to move. Try it!`, until: 1e9, hand: this.controls === 'drag' }, g);
       this.target = null;
       return;
     }

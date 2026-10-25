@@ -100,7 +100,9 @@ export class Hub {
     this.el.classList.toggle('lobby', this.tab === 'deploy');
     this.renderTop();
     this.renderNav();
-    this.renderBody();
+    // while a sheet is open the page behind it is hidden: rebuild it once, on close
+    if (this.modal) this.bodyDirty = true;
+    else this.renderBody();
   }
 
   private locked(t: Tab) {
@@ -467,7 +469,6 @@ export class Hub {
 
   /** Signal Pass: season track with free + premium rewards. */
   passSheet() {
-    this.closeModal();
     const p = this.p;
     const ps = p.pass();
     const se = seasonOf();
@@ -520,9 +521,7 @@ export class Hub {
       ps.premium ? null : h('button.btn.big', { style: { width: '100%', marginTop: '10px' }, disabled: true }, 'Signal Pass+ · coming with the app'),
       h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
     );
-    this.modal = h('div.modal', { onclick: () => this.closeModal() }, sheet);
-    document.getElementById('ui')!.append(this.modal);
-    requestAnimationFrame(() => sheet.querySelector('.ps-cell.ready, .ps-row:not(.reached)')?.scrollIntoView({ block: 'center' }));
+    if (this.present(sheet, 'pass')) requestAnimationFrame(() => sheet.querySelector('.ps-cell.ready, .ps-row:not(.reached)')?.scrollIntoView({ block: 'center' }));
   }
 
   private lbButton(mode: 'daily' | 'endless') {
@@ -883,10 +882,37 @@ export class Hub {
   closeModal() {
     this.modal?.remove();
     this.modal = null;
+    this.modalKey = '';
+    if (this.bodyDirty) {
+      this.bodyDirty = false;
+      this.renderBody();
+    }
+  }
+
+  private modalKey = '';
+  private bodyDirty = false;
+
+  /**
+   * Show a sheet. Re-showing the same sheet (after an upgrade, a claim...) swaps its contents in
+   * place: no fade, no re-blur, scroll kept. Re-creating the modal on every tap made the gear
+   * screen flash and stall on phones.
+   */
+  private present(sheet: HTMLElement, key: string) {
+    if (this.modal && this.modalKey === key) {
+      const old = this.modal.querySelector('.sheet');
+      const scrolls = old ? [old, ...Array.from(old.querySelectorAll('.ps-list, .map-list, .lb-list'))].map((e) => e.scrollTop) : [];
+      this.modal.replaceChildren(sheet);
+      [sheet, ...Array.from(sheet.querySelectorAll('.ps-list, .map-list, .lb-list'))].forEach((e, i) => (e.scrollTop = scrolls[i] ?? 0));
+      return false;
+    }
+    this.closeModal();
+    this.modal = h('div.modal', { onclick: () => this.closeModal() }, sheet);
+    this.modalKey = key;
+    document.getElementById('ui')!.append(this.modal);
+    return true;
   }
 
   itemSheet(uid: string) {
-    this.closeModal();
     const p = this.p;
     const it = p.item(uid);
     if (!it) return;
@@ -992,8 +1018,7 @@ export class Hub {
       ),
       h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
     );
-    this.modal = h('div.modal', { onclick: () => this.closeModal() }, sheet);
-    document.getElementById('ui')!.append(this.modal);
+    this.present(sheet, 'item:' + uid);
   }
 
   // ------------------------------------------------------------------ talents
@@ -1132,7 +1157,6 @@ export class Hub {
   }
 
   calendar() {
-    this.closeModal();
     const p = this.p;
     const lg = p.data.login;
     const today = lg.claimed % LOGIN_DAYS;
@@ -1171,9 +1195,7 @@ export class Hub {
         this.calendar();
       }
     };
-    this.modal = h(
-      'div.modal',
-      { onclick: () => this.closeModal() },
+    this.present(
       h(
         'div.sheet.cal',
         { onclick: (e: Event) => e.stopPropagation() },
@@ -1187,8 +1209,8 @@ export class Hub {
         ),
         h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
       ),
+      'cal',
     );
-    document.getElementById('ui')!.append(this.modal);
   }
 
   /** Results of "Open all": every item at once, best first, with the haul summarised. */

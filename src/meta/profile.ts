@@ -42,7 +42,11 @@ export interface Settings {
   music: boolean;
   haptics: boolean;
   damageNumbers: boolean;
+  /** Movement: drag anywhere, or a fixed thumb pad in the bottom-left / bottom-right corner. */
+  controls: ControlMode;
 }
+
+export type ControlMode = 'drag' | 'left' | 'right';
 
 export interface SaveData {
   v: 1;
@@ -116,7 +120,7 @@ function fresh(): SaveData {
     tracks: { atk: 0, hp: 0, def: 0, heal: 0 },
     relayAt: Date.now(),
     lastDaily: '',
-    settings: { sfx: true, music: true, haptics: true, damageNumbers: true },
+    settings: { sfx: true, music: true, haptics: true, damageNumbers: true, controls: 'drag' },
     stats: { runs: 0, kills: 0, bossKills: 0, wins: 0 },
     seenIntro: false,
     uidSeq: 3,

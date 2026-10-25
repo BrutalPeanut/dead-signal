@@ -1,7 +1,11 @@
 /**
- * Floating virtual joystick: touch anywhere, drag to move. The stick re-centres when the thumb
- * strays past the rim so you never "run out" of stick. Keyboard (WASD / arrows) for desktop.
+ * Movement input. Two touch schemes:
+ *  - 'drag': floating joystick, touch anywhere and drag; the base follows the thumb past the rim.
+ *  - 'left' / 'right': a fixed thumb pad in a bottom corner, so the hand never covers the action.
+ *    Touches must start on the pad; the knob is clamped to the rim.
+ * Keyboard (WASD / arrows) always works on desktop.
  */
+export type ControlMode = 'drag' | 'left' | 'right';
 export class Input {
   mx = 0;
   my = 0;
@@ -9,6 +13,7 @@ export class Input {
   private pointerId: number | null = null;
   private keys = new Set<string>();
   private readonly R = 52;
+  mode: ControlMode = 'drag';
   enabled = true;
   /** Set the first time the player moves in a run; drives the controls hint. */
   moved = false;
@@ -28,8 +33,25 @@ export class Input {
     });
   }
 
+  /** Centre of the fixed pad in CSS pixels (bottom corner, above the home indicator). */
+  padCenter(): { x: number; y: number } {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const inset = Math.max(78, Math.min(vw, vh) * 0.2);
+    return { x: this.mode === 'right' ? vw - inset : inset, y: vh - inset - 34 };
+  }
+
   private down = (e: PointerEvent) => {
     if (!this.enabled || this.pointerId !== null) return;
+    if (this.mode !== 'drag') {
+      const c = this.padCenter();
+      // generous catch zone around the pad so a sloppy thumb still lands
+      if (Math.hypot(e.clientX - c.x, e.clientY - c.y) > this.R * 2.1) return;
+      e.preventDefault();
+      this.pointerId = e.pointerId;
+      this.stick = { ox: c.x, oy: c.y, x: e.clientX, y: e.clientY };
+      return;
+    }
     e.preventDefault();
     this.pointerId = e.pointerId;
     this.stick = { ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY };
@@ -42,6 +64,12 @@ export class Input {
     let dx = e.clientX - s.ox;
     let dy = e.clientY - s.oy;
     const d = Math.hypot(dx, dy);
+    if (d > this.R && this.mode !== 'drag') {
+      // fixed pad: the knob stops at the rim
+      s.x = s.ox + (dx / d) * this.R;
+      s.y = s.oy + (dy / d) * this.R;
+      return;
+    }
     if (d > this.R) {
       // drag the base along behind the thumb
       s.ox = e.clientX - (dx / d) * this.R;

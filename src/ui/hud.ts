@@ -4,7 +4,7 @@ import { offerDesc, offerTitle } from '../sim/offers';
 import type { Offer, PassiveState, WeaponState } from '../sim/types';
 import type { Banner } from '../render/fx';
 import { skillIcon } from '../render/icons';
-import { coin, fmtNum, fmtTime, h } from './dom';
+import { coin, controlsPicker, fmtNum, fmtTime, h } from './dom';
 
 /**
  * HUD values update at most when they change, and the skill row only rebuilds when the build
@@ -98,6 +98,11 @@ export class Hud {
       this.cache[key] = v;
       el.textContent = v;
     }
+  }
+
+  setHintText(t: string) {
+    const last = this.hint.lastChild;
+    if (last && last.nodeType === 3) last.textContent = t;
   }
 
   showHint(on: boolean) {
@@ -347,6 +352,8 @@ export function pauseModal(
   onResume: () => void,
   onToggle: (k: 'sfx' | 'music') => void,
   onQuit: () => void,
+  controls = 'drag',
+  onControls: (m: 'drag' | 'left' | 'right') => void = () => {},
 ) {
   const toggle = (label: string, key: 'sfx' | 'music') => {
     const sw = h('span.sw' + (settings[key] ? '.on' : ''));
@@ -367,7 +374,7 @@ export function pauseModal(
     h('h2', 'PAUSED'),
     h('div.sub', `${g.chapter.name} · ${fmtTime(g.time)} · ${fmtNum(g.kills)} kills`),
     h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big')),
-    h('div', { style: { width: 'min(100%, 380px)' } }, toggle('Sound effects', 'sfx'), toggle('Music', 'music')),
+    h('div', { style: { width: 'min(100%, 380px)' } }, toggle('Sound effects', 'sfx'), toggle('Music', 'music'), controlsPicker(controls, onControls)),
     h(
       'div.actions',
       h('button.btn', { onclick: onQuit }, 'Retreat'),

@@ -63,6 +63,7 @@ class App {
 
   constructor() {
     useSkin(this.profile.data.character);
+    this.input.mode = this.profile.data.settings.controls ?? 'drag';
     this.profile.flushScores();
     const s = this.profile.data.settings;
     audio.setSfx(s.sfx);
@@ -133,6 +134,8 @@ class App {
     this.endT = -1;
     this.tutorialOn = false;
     this.tutorial.reset();
+    this.hud.el.classList.toggle('pad', this.input.mode !== 'drag');
+    this.hud.setHintText(this.input.mode !== 'drag' ? `Use the pad in the bottom ${this.input.mode} corner to move` : 'Drag anywhere to move');
     let title = getChapter(sector).name.toUpperCase();
     let sub = `Sector ${sector + 1} · survive 5:00`;
     if (mode === 'daily') {
@@ -209,6 +212,8 @@ class App {
           this.paused = false;
           this.finishRun();
         },
+        s.controls ?? 'drag',
+        (m) => this.setControls(m),
       ),
       'pause',
     );
@@ -218,6 +223,13 @@ class App {
     this.paused = false;
     this.closeModal();
     this.last = performance.now();
+  }
+
+  private setControls(m: 'drag' | 'left' | 'right') {
+    this.profile.data.settings.controls = m;
+    this.profile.save();
+    this.input.mode = m;
+    this.input.release();
   }
 
   private openSettings() {
@@ -237,6 +249,7 @@ class App {
           location.reload();
         },
         () => this.closeModal(),
+        (m) => this.setControls(m),
       ),
       'settings',
     );
@@ -450,11 +463,15 @@ class App {
 
     this.playSounds(this.game.fx);
     this.renderer.joystick = this.mode === 'run' ? this.input.stick : null;
+    const padMode = this.input.mode !== 'drag' && this.mode === 'run';
+    this.renderer.joystickFixed = padMode;
+    this.renderer.padIdle = padMode && !this.input.stick ? this.input.padCenter() : null;
     this.renderer.render(this.mode === 'run' && (this.paused || this.game.state !== 'play') ? 0 : dt);
     if (this.mode === 'run') {
       this.hud.update(this.game, this.renderer.fx.banners);
       if (this.tutorialOn) {
         if (!this.tutorial.el.isConnected) this.hud.el.append(this.tutorial.el);
+        this.tutorial.controls = this.input.mode;
         if (!this.paused) this.tutorial.update(this.game, dt);
         this.renderer.guide = this.tutorial.target;
         this.hud.showHint(false);
