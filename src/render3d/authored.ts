@@ -145,8 +145,14 @@ function filterClip(clip: THREE.AnimationClip, bones: string[], keep: boolean) {
 // ------------------------------------------------------------------ the courier
 
 const AIM_ARM = ['upperarmr', 'lowerarmr', 'wristr', 'handr', 'handslotr'];
-/** Courier head size relative to the KayKit original (which is about half the body height). */
-const HEAD_SCALE = 0.7;
+/**
+ * Adult proportions for the courier. KayKit is a chibi build (head ≈ half the body, stub legs):
+ * the head shrinks and the legs grow, so the figure reads as a person in a helmet, not a bobblehead.
+ * Uniform scales on the thigh bones (undone on the feet) lengthen the legs without shearing them.
+ */
+const HEAD_SCALE = 0.47;
+const LEG_SCALE = 1.36;
+const ARM_SCALE = 1.12;
 
 export interface HeroState {
   moving: boolean;
@@ -166,13 +172,20 @@ export class AuthoredHero {
   private chest: THREE.Object3D;
   private spine: THREE.Object3D;
   private head: THREE.Object3D;
+  private hips: THREE.Object3D;
+  private legs: THREE.Object3D[];
+  private feet: THREE.Object3D[];
+  private arms: THREE.Object3D[];
+  private hands: THREE.Object3D[];
+  /** How far the longer legs push the feet below the floor (bone space), added back to the hips. */
+  private lift = 0;
   private muzzle!: THREE.Object3D;
   private acts: Record<string, THREE.AnimationAction> = {};
   private mode = '';
   private hitT = 0;
 
   constructor(src: Gltf, readonly skin: HeroSkin) {
-    this.r = instantiate(src, 54, {
+    this.r = instantiate(src, 62, {
       r1c0: skin.jacket[0],
       r2c5: skin.jacketBack[0],
       r1c1: skin.collar[0],
@@ -188,6 +201,21 @@ export class AuthoredHero {
     this.chest = bone(m, 'chest');
     this.spine = bone(m, 'spine');
     this.head = bone(m, 'head');
+    this.hips = bone(m, 'hips');
+    this.legs = ['upperleg.l', 'upperleg.r'].map((n) => bone(m, n));
+    this.feet = ['foot.l', 'foot.r'].map((n) => bone(m, n));
+    this.arms = ['upperarm.l', 'upperarm.r'].map((n) => bone(m, n));
+    this.hands = ['hand.l', 'hand.r'].map((n) => bone(m, n));
+    // measure in the bind pose how much lower the soles sit once the legs are stretched
+    const sole = () => {
+      m.updateMatrixWorld(true);
+      return Math.min(...this.feet.map((f) => f.getWorldPosition(new THREE.Vector3()).y));
+    };
+    const y0 = sole();
+    this.reshape();
+    const y1 = sole();
+    this.lift = (y0 - y1) / this.hips.parent!.getWorldScale(new THREE.Vector3()).y;
+    this.hips.position.y += this.lift;
     const clip = (n: string) => src.animations.find((c) => c.name === n)!;
     const mixer = this.r.mixer;
     // legs and torso play the body clip; the gun arm holds an aim on top of it
@@ -216,7 +244,7 @@ export class AuthoredHero {
       const head = bone(m, 'head');
       // open-face shell: everything but a window over the face (+Z)
       const shell = new THREE.Mesh(
-        new THREE.SphereGeometry(0.62, 28, 16, Math.PI / 2 + 0.85, Math.PI * 2 - 1.7, 0, 2.05),
+        new THREE.SphereGeometry(0.575, 28, 16, Math.PI / 2 + 0.85, Math.PI * 2 - 1.7, 0, 2.05),
         new THREE.MeshStandardMaterial({ color: s.helmet[0], roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide }),
       );
       shell.position.set(0.01, 0.44, 0);
@@ -226,27 +254,27 @@ export class AuthoredHero {
       head.add(
         solid(
           new Part()
-            .box(0.1, 0.12, 0.95, s.accent, [0.01, 1.02, -0.05])
-            .cyl(0.09, 0.09, 0.08, '#2c323f', [0.62, 0.5, 0], [0, 0, Math.PI / 2])
-            .cyl(0.09, 0.09, 0.08, '#2c323f', [-0.6, 0.5, 0], [0, 0, Math.PI / 2]),
+            .box(0.09, 0.1, 0.85, s.accent, [0.01, 0.96, -0.05])
+            .cyl(0.08, 0.08, 0.08, '#2c323f', [0.58, 0.5, 0], [0, 0, Math.PI / 2])
+            .cyl(0.08, 0.08, 0.08, '#2c323f', [-0.56, 0.5, 0], [0, 0, Math.PI / 2]),
         ),
       );
       const glass = new THREE.Mesh(
-        new THREE.SphereGeometry(0.645, 24, 6, Math.PI / 2 - 0.95, 1.9, 1.02, 0.42),
+        new THREE.SphereGeometry(0.6, 24, 6, Math.PI / 2 - 0.95, 1.9, 1.02, 0.42),
         new THREE.MeshStandardMaterial({ color: s.visorDark, roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
       );
       glass.position.copy(shell.position);
       head.add(glass);
-      const line = new THREE.Mesh(new THREE.SphereGeometry(0.66, 24, 2, Math.PI / 2 - 0.8, 1.6, 1.3, 0.05), glow);
+      const line = new THREE.Mesh(new THREE.SphereGeometry(0.615, 24, 2, Math.PI / 2 - 0.8, 1.6, 1.3, 0.05), glow);
       line.position.copy(shell.position);
       head.add(line);
 
       this.chest.add(
         solid(
           new Part()
-            .box(0.5, 0.55, 0.26, s.pack[0], [0, 0.18, -0.36])
-            .box(0.52, 0.08, 0.28, s.pack[1], [0, 0.02, -0.36])
-            .box(0.52, 0.08, 0.28, s.pack[1], [0, 0.3, -0.36])
+            .box(0.42, 0.5, 0.2, s.pack[0], [0, 0.18, -0.33])
+            .box(0.44, 0.07, 0.22, s.pack[1], [0, 0.02, -0.33])
+            .box(0.44, 0.07, 0.22, s.pack[1], [0, 0.3, -0.33])
             .cyl(0.02, 0.025, 0.7, '#1b2029', [0.16, 0.75, -0.42]),
         ),
       );
@@ -291,16 +319,26 @@ export class AuthoredHero {
     } else if (this.mode !== 'hit' || this.hitT < 0.5) this.to(s.moving ? 'run' : 'idle');
     const aiming = !s.dead && !s.won;
     this.acts.aim.weight = aiming ? 1 : 0;
+    // undo last frame's lift first: clips that don't key the hips would otherwise accumulate it
+    this.hips.position.y -= this.lift;
     this.r.mixer.update(dt);
-    // KayKit heads are chibi-sized; shrink the head (and the helmet on it) to adult proportions.
-    // Applied after the mixer so clips can't undo it.
-    this.head.scale.setScalar(HEAD_SCALE);
+    // applied after the mixer so clips can't undo it
+    this.reshape();
+    this.hips.position.y += this.lift;
     // upper body turns toward the target while the legs keep running
     if (aiming) {
       const tw = Math.max(-1.3, Math.min(1.3, s.twist));
       this.spine.rotation.y += tw * 0.45;
       this.chest.rotation.y += tw * 0.55;
     }
+  }
+
+  private reshape() {
+    this.head.scale.setScalar(HEAD_SCALE);
+    for (const b of this.legs) b.scale.setScalar(LEG_SCALE);
+    for (const b of this.feet) b.scale.setScalar(1 / LEG_SCALE);
+    for (const b of this.arms) b.scale.setScalar(ARM_SCALE);
+    for (const b of this.hands) b.scale.setScalar(1 / ARM_SCALE);
   }
 
   /** World position of the pistol muzzle. */
