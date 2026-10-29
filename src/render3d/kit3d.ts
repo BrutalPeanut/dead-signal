@@ -12,10 +12,17 @@ export const SIGNAL = '#ff3bd4';
 
 const tmpC = new THREE.Color();
 
+/**
+ * Palette slots: a colour of '$skin', '$skinD', '$shirt' or '$pants' marks the vertices so the
+ * crowd shader can recolour them per instance (variants without extra geometry or draw calls).
+ */
+export const SLOTS: Record<string, number> = { $skin: 1, $skinD: 2, $shirt: 3, $pants: 4 };
+
 /** Paint a flat colour into a geometry's vertex colour attribute (non-destructive copy). */
 export function tint(geo: THREE.BufferGeometry, color: string): THREE.BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo.clone();
-  tmpC.set(color);
+  const slot = SLOTS[color] ?? 0;
+  tmpC.set(slot ? '#ffffff' : color);
   const n = g.attributes.position.count;
   const arr = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
@@ -24,6 +31,7 @@ export function tint(geo: THREE.BufferGeometry, color: string): THREE.BufferGeom
     arr[i * 3 + 2] = tmpC.b;
   }
   g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+  g.setAttribute('slot', new THREE.BufferAttribute(new Float32Array(n).fill(slot), 1));
   // uv attributes are dropped so every part merges cleanly
   g.deleteAttribute('uv');
   return g;
