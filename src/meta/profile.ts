@@ -225,7 +225,6 @@ export class Profile {
     const ch = charById(d.character);
     atk *= 1 + p.atkPct + (ch.atkPct ?? 0);
     hp *= 1 + p.hpPct + (ch.hpPct ?? 0);
-    const weapon = this.data.equipped.weapon ? this.item(this.data.equipped.weapon) : undefined;
     return {
       atk: Math.round(Math.max(atk, this.boost?.atk ?? 0)),
       hp: Math.round(Math.max(hp, this.boost?.hp ?? 0)),
@@ -238,10 +237,8 @@ export class Profile {
       goldMul: 1 + this.milestone('gold'),
       rerolls: 1 + this.milestone('reroll'),
       revives: this.milestone('revive') + p.revive,
-      // your primary gun always starts the run; weapon gear with its own weapon (Arc Gauntlet,
-      // Frag Tube...) brings it along as a second weapon instead of replacing the gun
+      // one primary weapon: always the gun picked in the Armory (weapon gear only adds stats)
       startWeapon: this.gun(),
-      gearWeapon: weapon && GEAR[weapon.def].startWeapon !== 'pistol' ? GEAR[weapon.def].startWeapon : undefined,
       startLevels: this.milestone('startLevel') + p.startLevel,
       regen: p.regen + (ch.regen ?? 0),
       bonusWeapon: ch.bonusWeapon,
