@@ -5,8 +5,13 @@ import { bladePositions, bladesActive, weaponStats } from '../sim/weapons';
 import { currentHeroSkin, type HeroSkin } from '../render/hero';
 import { Fx } from '../render/fx';
 import { Decals } from './decals';
-import { GlowBatch, TriBatch } from './batches';
-import { Part, SIGNAL, outlineMat, rgbC, toonMat } from './kit3d';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GLOW, GlowBatch, TriBatch } from './batches';
+import { Part, RIM, SIGNAL, detailed, outlineMat, rgbC, toonMat } from './kit3d';
 import { BOSS_BUILDERS, RIG_BUILDERS, buildHero, type BossModel, type HeroModel, type RigDef } from './models';
 import { drawOverlay } from './overlay';
 import { ATMOS, World } from './world';
@@ -26,7 +31,43 @@ const MAX_PER_KIND = 520;
 // fx.ts particle kinds (a const enum there): Spark, Goo, Ring, Smoke, Flash, Chunk
 const PK_SPARK = 0, PK_GOO = 1, PK_RING = 2, PK_SMOKE = 3, PK_FLASH = 4, PK_CHUNK = 5;
 
+/**
+ * Quality tiers, picked from the device and then adjusted from real frame times:
+ * 0 = no shadows / no bloom, 1 = sun shadows for hero, bosses and props + half-res bloom,
+ * 2 = every infected casts a shadow + full-res bloom.
+ */
+export type Tier = 0 | 1 | 2;
+
+interface Corpse {
+  kind: string;
+  x: number;
+  y: number;
+  yaw: number;
+  ph: number;
+  sc: number;
+  t: number;
+}
+
+interface Light {
+  x: number;
+  y: number;
+  r: number;
+  c: [number, number, number];
+  a: number;
+  life: number;
+  max: number;
+}
+
+interface Mote {
+  x: number;
+  y: number;
+  h: number;
+  s: number;
+  p: number;
+}
+
 const WHITE = new THREE.Color(1, 1, 1);
+const CORPSE = new THREE.Color(0.5, 0.46, 0.5);
 const FLASH = new THREE.Color(2.6, 2.6, 2.6);
 const FLASH_ELITE = new THREE.Color(1.7, 1.7, 1.7);
 
@@ -105,6 +146,14 @@ export class Renderer3D {
 
   private slowT = 0;
   private fastT = 0;
+  tier: Tier = 1;
+  private maxTier: Tier = 1;
+  private composer: EffectComposer | null = null;
+  private bloom: UnrealBloomPass | null = null;
+  private corpses: Corpse[] = [];
+  private lights: Light[] = [];
+  private motes: Mote[] = [];
+  private muzzle = 0;
   private m4 = new THREE.Matrix4();
   private m4b = new THREE.Matrix4();
   private q = new THREE.Quaternion();
@@ -121,11 +170,22 @@ export class Renderer3D {
     canvas.parentElement!.insertBefore(this.glCanvas, canvas);
     this.gl = new THREE.WebGLRenderer({ canvas: this.glCanvas, antialias: true, powerPreference: 'high-performance' });
     this.gl.outputColorSpace = THREE.SRGBColorSpace;
+    this.gl.toneMapping = THREE.NeutralToneMapping;
+    this.gl.toneMappingExposure = 1.05;
+    this.gl.shadowMap.type = THREE.PCFSoftShadowMap;
+    const pm = new THREE.PMREMGenerator(this.gl);
+    this.scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environmentIntensity = 0.18;
+    pm.dispose();
     this.octx = canvas.getContext('2d')!;
     canvas.classList.add('overlay3d');
 
     this.scene.add(this.hemi, this.sun, this.sun.target);
-    this.sun.position.set(-260, 700, 380);
+    this.sun.position.set(-400, 900, 250);
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 1.2;
+    this.sun.shadow.camera.near = 50;
+    this.sun.shadow.camera.far = 2600;
 
     this.flatAlpha.mesh.renderOrder = 1;
     this.flatAdd.mesh.renderOrder = 2;
@@ -182,8 +242,55 @@ export class Renderer3D {
 
     this.scene.add(this.decals.group);
 
+    const touch = matchMedia('(pointer:coarse)').matches;
+    this.maxTier = touch ? 1 : 2;
     this.setGame(game);
     this.resize();
+    this.setTier(this.maxTier);
+  }
+
+  /** Switch shadows and bloom for a quality tier. */
+  setTier(t: Tier) {
+    this.tier = t;
+    const shadows = t >= 1;
+    this.gl.shadowMap.enabled = shadows;
+    this.sun.castShadow = shadows;
+    const size = t === 2 ? 2048 : 1024;
+    if (this.sun.shadow.mapSize.x !== size) {
+      this.sun.shadow.mapSize.set(size, size);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
+    for (const km of this.kinds.values()) for (const m of km.main) m.castShadow = t === 2;
+    if (t >= 1) {
+      if (!this.composer) {
+        this.composer = new EffectComposer(this.gl);
+        this.composer.addPass(new RenderPass(this.scene, this.camera));
+        this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.42, 0.45, 0.92);
+        this.composer.addPass(this.bloom);
+        this.composer.addPass(new OutputPass());
+      }
+    } else if (this.composer) {
+      this.composer.dispose();
+      this.composer = null;
+      this.bloom = null;
+    }
+    // additive light piles up faster in linear HDR with bloom on top: tone it down to match tier 0
+    GLOW.uBoost.value = t >= 1 ? 1.35 : 1;
+    GLOW.uGain.value = t >= 1 ? 0.55 : 1;
+    this.scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+      if (m) for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true;
+    });
+    this.resize();
+  }
+
+  /** Cast shadows from a model's coloured meshes (not its ink hull). */
+  private shadowCaster(o: THREE.Object3D) {
+    o.traverse((c) => {
+      const m = c as THREE.Mesh;
+      if (m.isMesh && m.material !== this.ink) m.castShadow = true;
+    });
   }
 
   // ------------------------------------------------------------------ lifecycle
@@ -203,6 +310,10 @@ export class Renderer3D {
     this.hemi.intensity = at.hemi;
     this.sun.color.set(at.sun);
     this.sun.intensity = at.sunI;
+    RIM.uRimColor.value.set(at.rim);
+    this.motes.length = 0;
+    this.corpses.length = 0;
+    this.lights.length = 0;
     this.camX = g.px;
     this.camY = g.py;
     this.yaw.clear();
@@ -220,14 +331,20 @@ export class Renderer3D {
       this.slowT = Math.max(0, this.slowT - frameMs / 2000);
     }
     const native = Math.min(window.devicePixelRatio || 1, 2);
-    if (this.slowT > 1.5 && this.dprCap > 1) {
-      this.dprCap = Math.max(1, this.dprCap - 0.5);
+    // slow: drop effects first (cheapest to lose), then resolution; fast: restore in reverse
+    if (this.slowT > 1.5) {
       this.slowT = 0;
-      this.resize();
-    } else if (this.fastT > 8 && this.dprCap < native) {
-      this.dprCap = Math.min(native, this.dprCap + 0.5);
+      if (this.tier > 0) this.setTier((this.tier - 1) as Tier);
+      else if (this.dprCap > 1) {
+        this.dprCap = Math.max(1, this.dprCap - 0.5);
+        this.resize();
+      }
+    } else if (this.fastT > 8) {
       this.fastT = 0;
-      this.resize();
+      if (this.dprCap < native) {
+        this.dprCap = Math.min(native, this.dprCap + 0.5);
+        this.resize();
+      } else if (this.tier < this.maxTier) this.setTier((this.tier + 1) as Tier);
     }
   }
 
@@ -248,6 +365,12 @@ export class Renderer3D {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     for (const b of [this.glowAdd, this.softAlpha]) b.setScale(h * dpr, FOV);
+    if (this.composer) {
+      this.composer.setPixelRatio(dpr);
+      this.composer.setSize(w, h);
+      // bloom is blurry by nature: half resolution on the middle tier costs a quarter as much
+      if (this.bloom && this.tier < 2) this.bloom.setSize(Math.round((w * dpr) / 2), Math.round((h * dpr) / 2));
+    }
     this.applyView();
   }
 
@@ -285,6 +408,13 @@ export class Renderer3D {
     cam.updateProjectionMatrix();
     const at = ATMOS[this.game.chapter.biome];
     this.scene.fog = new THREE.Fog(at.bg, hi * at.fogNear * 1.12, hi * 1.75);
+    const S = Math.max(hw, hh) * 1.35 + 80;
+    const sc = this.sun.shadow.camera;
+    sc.left = -S;
+    sc.right = S;
+    sc.top = S;
+    sc.bottom = -S;
+    sc.updateProjectionMatrix();
   }
 
   // ------------------------------------------------------------------ frame
@@ -295,6 +425,7 @@ export class Renderer3D {
     if (cw && ch && (Math.abs(cw - this.cssW) > 0.5 || Math.abs(ch - this.cssH) > 0.5)) this.resize();
     const g = this.game;
     this.time += dt;
+    this.scanEvents(g, dt);
     this.fx.consume(g.fx, g);
     g.fx.length = 0;
     this.fx.update(dt);
@@ -310,8 +441,11 @@ export class Renderer3D {
     this.camera.lookAt(cx, 0, cz);
     this.camera.updateMatrixWorld();
     this.camera.getWorldDirection(this.ribbons.view);
-    this.sun.target.position.set(cx, 0, cz);
-    this.sun.position.set(cx - 260, 700, cz + 380);
+    // follow the camera with the sun, snapped to whole shadow texels so edges don't shimmer
+    const texel = (this.sun.shadow.camera.right * 2) / this.sun.shadow.mapSize.x;
+    const sxs = Math.round(cx / texel) * texel, szs = Math.round(cz / texel) * texel;
+    this.sun.target.position.set(sxs, 0, szs);
+    this.sun.position.set(sxs - 400, 900, szs + 250);
 
     this.footprint();
     const v = this.view;
@@ -323,7 +457,13 @@ export class Renderer3D {
     this.flatAlpha.begin();
     this.ribbons.begin();
 
-    for (const sg of this.world.glows) this.glowAdd.add(sg.x, sg.y, sg.z, sg.size * (0.85 + 0.15 * Math.sin(this.time * 3 + sg.x)), rgbC(sg.color), 0.5);
+    for (const sg of this.world.glows) {
+      const fl = 0.85 + 0.15 * Math.sin(this.time * 3 + sg.x);
+      this.glowAdd.add(sg.x, sg.y, sg.z, sg.size * fl, rgbC(sg.color), 0.5);
+      this.light(sg.x, sg.z, sg.size * 2.2, rgbC(sg.color), 0.12 * fl);
+    }
+    this.drawLights(dt);
+    this.drawWeather(dt);
     this.drawDecals();
     this.drawPools();
     this.drawField();
@@ -345,7 +485,8 @@ export class Renderer3D {
     this.flatAlpha.end();
     this.ribbons.end();
 
-    this.gl.render(this.scene, this.camera);
+    if (this.composer) this.composer.render(dt);
+    else this.gl.render(this.scene, this.camera);
 
     drawOverlay({
       ctx: this.octx,
@@ -368,6 +509,102 @@ export class Renderer3D {
     const v = this.pv.set(x, h, y).project(this.camera);
     return { x: (v.x * 0.5 + 0.5) * this.cssW, y: (-v.y * 0.5 + 0.5) * this.cssH, ok: v.z < 1 && v.z > -1 };
   };
+
+  // ------------------------------------------------------------------ light & life
+
+  /** Read this frame's sim events before Fx consumes them: corpses, muzzle flashes, flash lights. */
+  private scanEvents(g: Game, dt: number) {
+    for (const e of g.fx) {
+      switch (e.t) {
+        case 'death':
+          if (RIG_BUILDERS[e.kind] && this.corpses.length < [40, 80, 140][this.tier] && this.seen(e.x, e.y, 60)) {
+            this.corpses.push({ kind: e.kind, x: e.x, y: e.y, yaw: -Math.atan2(g.py - e.y, g.px - e.x), ph: Math.random() * 6, sc: (e.elite ? 1.3 : 1) * ACTOR_SCALE, t: 0 });
+          }
+          break;
+        case 'shoot':
+          if (e.weapon === 'pistol') this.muzzle = 0.07;
+          break;
+        case 'explode':
+          this.flashLight(e.x, e.y, e.r * 2.4, e.color, 0.5, 0.3);
+          break;
+        case 'bossDown':
+          this.flashLight(e.x, e.y, 420, '#ff3bd4', 1, 0.9);
+          break;
+        case 'emp':
+          this.flashLight(e.x, e.y, 700, '#5ef2ff', 0.45, 0.6);
+          break;
+        case 'levelup':
+          this.flashLight(g.px, g.py, 130, '#5ef2ff', 0.35, 0.45);
+          break;
+        case 'slash':
+          this.flashLight(e.x, e.y, e.r * 1.6, e.evo ? '#ffb3c6' : '#ff5470', 0.35, 0.2);
+          break;
+      }
+    }
+    for (const c of this.corpses) c.t += dt;
+    if (this.corpses.length && this.corpses[0].t > 1.1) this.corpses = this.corpses.filter((c) => c.t <= 1.1);
+    this.muzzle = Math.max(0, this.muzzle - dt);
+  }
+
+  private flashLight(x: number, y: number, r: number, color: string, a: number, life: number) {
+    if (this.lights.length > 60) this.lights.shift();
+    this.lights.push({ x, y, r, c: rgbC(color), a, life, max: life });
+  }
+
+  /** A pool of coloured light on the floor: the cheap stand-in for hundreds of point lights. */
+  private light(x: number, y: number, r: number, c: ArrayLike<number>, a: number) {
+    a *= 0.6;
+    if (a < 0.01 || !this.seen(x, y, r)) return;
+    this.flatAdd.disc(x, y, r, 0.9, c, a, 0, 10);
+  }
+
+  private drawLights(dt: number) {
+    for (const l of this.lights) {
+      l.life -= dt;
+      const k = Math.max(0, l.life / l.max);
+      this.light(l.x, l.y, l.r * (1.15 - k * 0.15), l.c, l.a * k * k);
+    }
+    if (this.lights.length && this.lights[0].life <= 0) this.lights = this.lights.filter((l) => l.life > 0);
+  }
+
+  /** Per-biome ambient weather drifting through the frame (rain, spores, dust, embers). */
+  private drawWeather(dt: number) {
+    const at = ATMOS[this.game.chapter.biome];
+    const v = this.view;
+    const n = this.tier === 0 ? 50 : 110;
+    while (this.motes.length < n) this.motes.push({ x: v.x0 + Math.random() * (v.x1 - v.x0), y: v.y0 + Math.random() * (v.y1 - v.y0), h: Math.random() * 140, s: 0.5 + Math.random(), p: Math.random() * 6 });
+    this.motes.length = n;
+    const c = rgbC(at.weatherCol);
+    const W = v.x1 - v.x0, H = v.y1 - v.y0;
+    for (const m of this.motes) {
+      if (at.weather === 'rain') {
+        m.h -= dt * 420 * m.s;
+        m.x += dt * 40;
+        if (m.h < 0) {
+          this.flatAdd.band(m.x, m.y, 2, 3.4, 0.8, c, 0.25);
+          m.h += 160;
+        }
+        this.ribbons.seg(m.x, m.h, m.y, m.x - 4, m.h + 22, m.y, 0.9, c, 0.22, 0);
+      } else if (at.weather === 'embers') {
+        m.h += dt * 26 * m.s;
+        m.x += Math.sin(this.time + m.p) * dt * 12;
+        if (m.h > 150) m.h = 0;
+        this.glowAdd.add(m.x, m.h, m.y, 3.4 * m.s, c, 0.6 * Math.min(1, (150 - m.h) / 40));
+      } else {
+        // spores and dust hang in the air and drift
+        m.x += Math.sin(this.time * 0.6 + m.p) * dt * 10 + dt * 6;
+        m.y += Math.cos(this.time * 0.5 + m.p) * dt * 8;
+        m.h = 20 + ((m.p * 37) % 100) + Math.sin(this.time + m.p) * 6;
+        if (at.weather === 'spores') this.glowAdd.add(m.x, m.h, m.y, 4 * m.s, c, 0.45);
+        else this.softAlpha.add(m.x, m.h, m.y, 3 * m.s, c, 0.25);
+      }
+      // wrap around the visible ground
+      if (m.x < v.x0) m.x += W;
+      else if (m.x > v.x1) m.x -= W;
+      if (m.y < v.y0) m.y += H;
+      else if (m.y > v.y1) m.y -= H;
+    }
+  }
 
   // ------------------------------------------------------------------ ground layers
 
@@ -415,6 +652,7 @@ export class Renderer3D {
         const fl = (Math.sin(t * 13 + i * 3) + 1.5) * 3.5;
         this.glowAdd.add(p.x + Math.cos(a2) * p.r * 0.5, 3 + fl, p.y + Math.sin(a2) * p.r * 0.5, 7 + fl * 1.4, rgbC('#ffaa3c'), a * 0.8);
       }
+      this.light(p.x, p.y, p.r * 1.9, rgbC('#ff8a2a'), a * (0.3 + 0.06 * Math.sin(t * 17 + p.x)));
     }
   }
 
@@ -472,6 +710,7 @@ export class Renderer3D {
         this.ribbons.seg(tg.x, 30, tg.y, ex, 24, ez, w * 3.2, rgbC(SIGNAL), 0.45);
         this.ribbons.seg(tg.x, 30, tg.y, ex, 24, ez, w, rgbC('#ffd6f6'), 1);
         this.flatAdd.rect(tg.x, tg.y, tg.a, tg.len, w * 1.6, 1.5, rgbC(SIGNAL), 0.4);
+        this.flatAdd.rect(tg.x, tg.y, tg.a, tg.len, w * 5, 1.4, rgbC(SIGNAL), 0.07);
       }
     }
   }
@@ -502,6 +741,7 @@ export class Renderer3D {
       this.m4.makeTranslation(x, 0, z);
       this.pylonMesh.setMatrixAt(i, this.m4);
       this.glowAdd.add(x, 14, z, 14, rgbC(SIGNAL), 0.8 + Math.sin(t * 6 + i) * 0.2);
+      this.light(x, z, 40, rgbC(SIGNAL), 0.25);
     }
     this.pylonMesh.count = 12;
     this.pylonMesh.instanceMatrix.needsUpdate = true;
@@ -520,7 +760,7 @@ export class Renderer3D {
     const cyan = rgbC('#5ef2ff');
     this.flatAdd.disc(g.px, g.py, 24, 0.7, cyan, 0.28, 0, 24);
     this.flatAdd.band(g.px, g.py, 15, 16.6, 0.8, cyan, 0.55);
-    if (this.fx.levelPulse > 0) this.glowAdd.add(g.px, 26, g.py, 90, cyan, this.fx.levelPulse);
+    if (this.fx.levelPulse > 0) this.glowAdd.add(g.px, 26, g.py, 90, cyan, this.fx.levelPulse * 0.6);
   }
 
   // ------------------------------------------------------------------ pickups
@@ -574,6 +814,7 @@ export class Renderer3D {
           this.gemMesh.setColorAt(gems, this.tmpCol.set(tierCol[tier]));
           gems++;
           this.glowAdd.add(p.x, y, p.y, s * 5.2, rgbC(tierCol[tier]), 0.75 * tw);
+          this.light(p.x, p.y, s * 3.4, rgbC(tierCol[tier]), 0.14);
           break;
         }
         case 'gold': {
@@ -590,6 +831,7 @@ export class Renderer3D {
           const bob = Math.sin(t * 3 + p.x) * 2;
           const col = p.kind === 'ration' ? '#43ffa4' : p.kind === 'magnet' ? '#ff4fd8' : '#ff8a2a';
           this.glowAdd.add(p.x, 9 + bob, p.y, 40, rgbC(col), 0.6 + Math.sin(t * 5) * 0.2);
+          this.light(p.x, p.y, 34, rgbC(col), 0.22);
           const o = take(p.kind, () => this.powerupModel(p.kind));
           o.position.set(p.x, 7 + bob, p.y);
           o.rotation.y = t * 1.5;
@@ -600,6 +842,7 @@ export class Renderer3D {
           const col = p.big ? '#ffd34d' : '#5ef2ff';
           const bob = Math.sin(t * 3) * 1.5;
           this.glowAdd.add(p.x, 10 + bob, p.y, 68, rgbC(col), 0.7);
+          this.light(p.x, p.y, 70, rgbC(col), 0.3);
           const o = take(p.big ? 'chestBig' : 'chest', () => this.chestModel(p.big));
           o.position.set(p.x, 1 + bob, p.y);
           o.rotation.y = Math.sin(t * 0.8) * 0.4;
@@ -699,6 +942,7 @@ export class Renderer3D {
       m.setColorAt(0, WHITE);
       m.instanceColor!.setUsage(THREE.DynamicDrawUsage);
       m.count = 0;
+      m.castShadow = this.tier === 2;
       const o = new THREE.InstancedMesh(part.geo, this.ink, MAX_PER_KIND);
       o.instanceMatrix = m.instanceMatrix;
       o.frustumCulled = false;
@@ -771,6 +1015,22 @@ export class Renderer3D {
       }
       if (e.burn > 0) this.glowAdd.add(e.x, 14, e.y, 26, rgbC('#ff8a1f'), 0.6);
     }
+    // the fallen: tip over backwards, then sink into the floor
+    for (const c of this.corpses) {
+      const km = this.kindMesh(c.kind);
+      if (km.count >= MAX_PER_KIND) continue;
+      const i = km.count++;
+      km.rig.pose(c.ph, km.rot);
+      const tip = Math.min(1, c.t / 0.28);
+      const ease = 1 - (1 - tip) * (1 - tip);
+      const sink = Math.max(0, c.t - 0.45) * 40;
+      this.q.setFromEuler(this.e3.set(0, c.yaw, ease * 1.45, 'YXZ'));
+      this.m4.compose(this.v3.set(c.x, -sink, c.y), this.q, this.s3.set(c.sc, c.sc, c.sc));
+      for (let p = 0; p < km.main.length; p++) {
+        km.main[p].setMatrixAt(i, this.m4);
+        km.main[p].setColorAt(i, CORPSE);
+      }
+    }
     for (const km of this.kinds.values()) {
       for (let p = 0; p < km.main.length; p++) {
         km.main[p].count = km.count;
@@ -792,7 +1052,9 @@ export class Renderer3D {
       seen.add(b.boss);
       let m = this.bosses.get(b.boss);
       if (!m) {
-        m = BOSS_BUILDERS[b.boss]();
+        const kind = b.boss;
+        m = detailed(1.8, () => BOSS_BUILDERS[kind]());
+        this.shadowCaster(m.group);
         this.bosses.set(b.boss, m);
         this.scene.add(m.group);
       }
@@ -812,6 +1074,7 @@ export class Renderer3D {
         this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, s, rgbC(gl.color), 0.95);
       }
       if (b.state === 1 || b.phase2) this.glowAdd.add(b.x, m.height * 0.5, b.y, m.height * 1.3, rgbC(SIGNAL), 0.12 + 0.08 * pulse);
+      this.light(b.x, b.y, m.height * 1.4, rgbC(SIGNAL), (b.phase2 ? 0.26 : 0.16) * pulse);
     }
     for (const [k, m] of this.bosses) if (!seen.has(k)) m.group.visible = false;
   }
@@ -821,7 +1084,8 @@ export class Renderer3D {
     const skin = currentHeroSkin();
     if (skin !== this.heroSkin) {
       if (this.hero) this.scene.remove(this.hero.group);
-      this.hero = buildHero(skin);
+      this.hero = detailed(2, () => buildHero(skin));
+      this.shadowCaster(this.hero.group);
       this.heroSkin = skin;
       this.scene.add(this.hero.group);
     }
@@ -836,6 +1100,8 @@ export class Renderer3D {
     h.group.rotation.y = this.heroYaw;
     h.group.scale.setScalar(ACTOR_SCALE);
     h.torso.position.y = bob;
+    // recoil: the torso kicks back a touch on every pulse bolt
+    h.torso.position.x = -this.muzzle * 22;
     h.torso.rotation.z = g.moving ? -0.08 : 0;
     const sw = g.moving ? Math.sin(ph) * 0.6 : 0;
     h.legL.rotation.z = sw;
@@ -846,6 +1112,14 @@ export class Renderer3D {
     for (const gl of h.glows) {
       this.v3.copy(gl.at).applyMatrix4(gl.obj.matrixWorld);
       this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, gl.size * 1.6, rgbC(gl.color), 0.9);
+    }
+    this.light(g.px, g.py, 48, rgbC(this.heroSkin!.glow), 0.12);
+    if (this.muzzle > 0) {
+      const tip = h.glows[h.glows.length - 1];
+      this.v3.copy(tip.at).applyMatrix4(tip.obj.matrixWorld);
+      const k = this.muzzle / 0.07;
+      this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, 34 * k, rgbC('#bffbff'), 1);
+      this.light(this.v3.x, this.v3.z, 70, rgbC('#5ef2ff'), 0.35 * k);
     }
   }
 
@@ -867,6 +1141,7 @@ export class Renderer3D {
       const x = pos[k], z = pos[k + 1];
       const a = Math.atan2(z - g.py, x - g.px);
       this.glowAdd.add(x, 16, z, r * 4, col, 0.45);
+      this.light(x, z, r * 2.6, col, 0.2);
       this.q.setFromEuler(this.e3.set(0, w.evolved ? -this.time * 20 : -a - Math.PI / 2, 0));
       const s = w.evolved ? r : r * 0.9;
       this.m4.compose(this.v3.set(x, 16, z), this.q, this.s3.set(s, w.evolved ? r * 0.8 : r, s));
@@ -886,6 +1161,7 @@ export class Renderer3D {
         case 'bolt': {
           const sp = Math.hypot(p.vx, p.vy) || 1;
           this.glowAdd.add(p.x, 34, p.y, 20, rgbC('#5ef2ff'), 1);
+          this.light(p.x, p.y, 30, rgbC('#5ef2ff'), 0.2);
           this.ribbons.seg(p.x, 34, p.y, p.x - (p.vx / sp) * 16, 34, p.y - (p.vy / sp) * 16, p.r * 1.1, rgbC('#bffbff'), 1, 0.1);
           break;
         }
@@ -894,6 +1170,7 @@ export class Renderer3D {
           const bx = p.x - (p.vx / sp) * 46, bz = p.y - (p.vy / sp) * 46;
           this.ribbons.seg(p.x, 34, p.y, bx, 34, bz, p.r * 2.4, rgbC('#5ef2ff'), 0.6, 0);
           this.ribbons.seg(p.x, 34, p.y, bx, 34, bz, p.r * 0.8, rgbC('#ffffff'), 1, 0.2);
+          this.light(p.x, p.y, 40, rgbC('#5ef2ff'), 0.25);
           break;
         }
         case 'shell':
@@ -909,6 +1186,7 @@ export class Renderer3D {
             this.shellMesh.setColorAt(shells++, this.tmpCol.set(p.kind === 'shell' ? '#ffffff' : '#ffb07a'));
           }
           this.glowAdd.add(p.x, hgt, p.y, 18, rgbC(col), 0.9);
+          this.light(p.x, p.y, 26, rgbC(col), 0.12);
           break;
         }
         case 'bomblet':
@@ -917,6 +1195,7 @@ export class Renderer3D {
         case 'disc': {
           const col = p.evo ? '#ff8ff0' : '#ff4fd8';
           this.glowAdd.add(p.x, 18, p.y, p.r * 5, rgbC(col), 0.9);
+          this.light(p.x, p.y, p.r * 4, rgbC(col), 0.22);
           if (discs < 60) {
             this.q.setFromEuler(this.e3.set(0, -p.spin, 0));
             this.m4.compose(this.v3.set(p.x, 18, p.y), this.q, this.s3.set(p.r * 0.85, p.r * 0.85, p.r * 0.85));
@@ -947,6 +1226,7 @@ export class Renderer3D {
     for (const s of this.game.shots) {
       const col = s.kind === 'acid' ? '#9dff4a' : '#ff4fd8';
       this.glowAdd.add(s.x, 18, s.y, s.r * 5.2, rgbC(col), 1);
+      this.light(s.x, s.y, s.r * 4.5, rgbC(col), 0.25);
       this.flatAlpha.disc(s.x, s.y, s.r * 0.8, 0.5, [0, 0, 0], 0.3, 0.05, 10);
       if (n >= 400) continue;
       const r = Math.max(0.5, s.r * 0.75);

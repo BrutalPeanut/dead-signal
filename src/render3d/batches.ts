@@ -3,9 +3,12 @@ import * as THREE from 'three';
 /**
  * Dynamic geometry batches, rebuilt every frame. They carry everything that is cheap to describe
  * but numerous: glows, sparks, beams, ground rings, telegraphs, shadows. One draw call each.
- * Colours are sRGB 0..1 and are written straight to the screen (no colour management), matching
- * how the 2D canvas composited its additive glows.
+ * Colours are given as sRGB 0..1, converted to linear in the shader, and pass through the same
+ * output conversion as the rest of the scene (so bloom and tone mapping treat them correctly).
  */
+
+/** Shared HDR boost for additive light: raised when bloom is on so hot cores spill into a halo. */
+export const GLOW = { uBoost: { value: 1 }, uGain: { value: 1 } };
 
 export type Blend = 'add' | 'alpha';
 
@@ -45,21 +48,25 @@ export class GlowBatch {
     g.setAttribute('col', new THREE.BufferAttribute(this.col, 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('size', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage));
     this.mat = new THREE.ShaderMaterial({
-      uniforms: { uScale: { value: 500 } },
+      uniforms: { uScale: { value: 500 }, uBoost: GLOW.uBoost, uGain: GLOW.uGain },
       vertexShader: /* glsl */ `
         attribute vec4 col; attribute float size; uniform float uScale; varying vec4 vCol;
         void main(){ vCol = col; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv;
           gl_PointSize = max(1.0, size * uScale / -mv.z); }`,
       fragmentShader:
         kind === 'glow'
-          ? /* glsl */ `varying vec4 vCol;
+          ? /* glsl */ `varying vec4 vCol; uniform float uBoost; uniform float uGain;
         void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard;
           float a = d < 0.18 ? 1.0 : d < 0.45 ? mix(1.0, 0.35, (d - 0.18) / 0.27) : mix(0.35, 0.0, (d - 0.45) / 0.55);
-          vec3 c = mix(vCol.rgb, vec3(1.0), smoothstep(0.2, 0.0, d));
-          float al = a * vCol.a; gl_FragColor = vec4(c * al, al); }`
+          vec3 c = mix(pow(vCol.rgb, vec3(2.2)), vec3(1.0), smoothstep(0.2, 0.0, d)) * mix(1.0, uBoost, smoothstep(0.45, 0.0, d));
+          float al = a * vCol.a; gl_FragColor = vec4(c * al * uGain, al);
+          #include <colorspace_fragment>
+        }`
           : /* glsl */ `varying vec4 vCol;
         void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; if (d > 1.0) discard;
-          float al = smoothstep(1.0, 0.55, d) * vCol.a; gl_FragColor = vec4(vCol.rgb * al, al); }`,
+          float al = smoothstep(1.0, 0.55, d) * vCol.a; gl_FragColor = vec4(pow(vCol.rgb, vec3(2.2)) * al, al);
+          #include <colorspace_fragment>
+        }`,
     });
     blendInto(this.mat, mode);
     this.points = new THREE.Points(g, this.mat);
@@ -115,9 +122,13 @@ export class TriBatch {
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('col', new THREE.BufferAttribute(this.col, 4).setUsage(THREE.DynamicDrawUsage));
     const m = new THREE.ShaderMaterial({
+      uniforms: { uGain: mode === 'add' ? GLOW.uGain : { value: 1 } },
       vertexShader: /* glsl */ `attribute vec4 col; varying vec4 vCol;
         void main(){ vCol = col; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: /* glsl */ `varying vec4 vCol; void main(){ gl_FragColor = vec4(vCol.rgb * vCol.a, vCol.a); }`,
+      fragmentShader: /* glsl */ `varying vec4 vCol; uniform float uGain;
+        void main(){ gl_FragColor = vec4(pow(vCol.rgb, vec3(2.2)) * vCol.a * uGain, vCol.a);
+          #include <colorspace_fragment>
+        }`,
       side: THREE.DoubleSide,
     });
     blendInto(m, mode);
