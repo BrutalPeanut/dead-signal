@@ -208,10 +208,10 @@ async function init() {
 
 // ------------------------------------------------------------------ UI
 
-const state = { view: 'game', show: 'both', scene: 'lineup', hero: 'Idle', boss: 'Walking_D_Skeletons' };
+const state = { view: 'close', show: 'both', scene: 'lineup', hero: 'Idle', boss: 'Walking_D_Skeletons' };
 const top = document.createElement('div');
 top.className = 'top';
-top.innerHTML = `<div class="ttl">Option D<small>Authored hero + boss · rebuilt crowd</small></div><div class="note">Left: today's models. Right: KayKit rig (CC0, Kay Lousberg) in courier and Warden colours with bolted-on sci-fi gear, plus rebuilt procedural infected with knees and elbows.</div>`;
+top.innerHTML = `<div class="ttl">Option D<small>Authored hero + boss / rebuilt crowd</small></div><div class="note">Left: today's models. Right: KayKit rig (CC0, Kay Lousberg) in courier and Warden colours with bolted-on sci-fi gear, plus rebuilt procedural infected with knees and elbows.</div>`;
 document.body.append(top);
 const tagNow = Object.assign(document.createElement('div'), { className: 'tag now', textContent: 'NOW' });
 const tagD = Object.assign(document.createElement('div'), { className: 'tag d', textContent: 'OPTION D' });
@@ -347,5 +347,11 @@ function loop() {
   composer.render(dt);
 }
 
-init();
+init().catch((e) => {
+  // never fail silently: show what broke instead of an empty page
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;left:16px;right:16px;top:40%;text-align:center;color:#ff3b5c;font:600 14px Chakra Petch,sans-serif';
+  box.textContent = 'Preview failed to load: ' + (e?.message ?? e);
+  document.body.append(box);
+});
 (window as unknown as Record<string, unknown>).__pv = { state, applyState };

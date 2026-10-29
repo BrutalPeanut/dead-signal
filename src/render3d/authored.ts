@@ -25,10 +25,38 @@ const cache = new Map<string, Promise<{ scene: THREE.Group; animations: THREE.An
 export function loadGlb(url: string) {
   let p = cache.get(url);
   if (!p) {
-    p = new GLTFLoader().loadAsync(url).then((g) => ({ scene: g.scene, animations: g.animations }));
+    // Inline data: URIs are decoded here instead of fetched: sandboxed hosts (artifact viewers,
+    // strict CSPs) refuse fetch() of data: URLs, which made the whole scene fail to load.
+    const loader = new GLTFLoader();
+    const job = url.startsWith('data:') ? parseNoFetch(loader, dataToBuffer(url)) : loader.loadAsync(url);
+    p = job.then((g) => ({ scene: g.scene, animations: g.animations }));
     cache.set(url, p);
   }
   return p;
+}
+
+/**
+ * GLTFLoader decodes embedded textures with createImageBitmap(fetch(blob:)), and strict CSPs
+ * block fetching blob: URLs. With createImageBitmap hidden while the parser is constructed it
+ * falls back to plain <img> loading, which those hosts allow.
+ */
+function parseNoFetch(loader: GLTFLoader, buf: ArrayBuffer) {
+  const w = window as unknown as { createImageBitmap?: typeof createImageBitmap };
+  const saved = w.createImageBitmap;
+  w.createImageBitmap = undefined;
+  try {
+    return loader.parseAsync(buf, '');
+  } finally {
+    w.createImageBitmap = saved;
+  }
+}
+
+function dataToBuffer(uri: string): ArrayBuffer {
+  const b64 = uri.slice(uri.indexOf(',') + 1);
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
 }
 
 function bone(root: THREE.Object3D, name: string) {
