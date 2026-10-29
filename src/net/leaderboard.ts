@@ -24,7 +24,7 @@ export function setFetcher(f: FetchLike) {
   fetcher = f;
 }
 
-async function rpc<T>(fn: string, body: Record<string, unknown>, timeoutMs = 7000): Promise<T | null> {
+export async function rpc<T>(fn: string, body: Record<string, unknown>, timeoutMs = 7000): Promise<T | null> {
   const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
   try {

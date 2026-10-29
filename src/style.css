@@ -4202,3 +4202,51 @@ button {
 .new-gun span { display: block; font-size: 11px; opacity: 0.8; }
 @keyframes newgun { from { transform: scale(0.85); opacity: 0; } to { transform: none; opacity: 1; } }
 .roster.guns .ch-card img { background: none; }
+
+/* cloud save */
+.toggle .chev { font-size: 22px; opacity: 0.6; padding-right: 4px; }
+.sync-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(94, 242, 255, 0.35);
+  border-radius: 12px;
+  background: rgba(94, 242, 255, 0.06);
+}
+.sync-code b { font: 800 22px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace; letter-spacing: 0.08em; color: #bffbff; }
+.sync-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font: 700 20px ui-monospace, Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.sync-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sync-row span { opacity: 0.65; font-size: 13px; }
+.sync-found { margin: 4px 0 8px; padding: 14px; border-radius: 12px; background: rgba(67, 255, 164, 0.08); border: 1px solid rgba(67, 255, 164, 0.35); text-align: center; }
+.sync-found small { display: block; font-size: 11px; letter-spacing: 0.12em; opacity: 0.7; text-transform: uppercase; }
+.sync-found b { display: block; font-size: 20px; margin: 4px 0; }
+.sync-found span { font-size: 12px; opacity: 0.7; }

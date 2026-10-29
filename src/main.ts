@@ -17,6 +17,8 @@ import { GUN_IDS, type WeaponId } from './sim/data';
 import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes';
 import { DT, Game } from './sim/game';
 import { Interp } from './render/interp';
+import { CloudSync } from './meta/sync';
+import { cloudModal, statusText } from './ui/cloud';
 import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics, toast } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
@@ -38,6 +40,12 @@ function want3d(graphics: '3d' | '2d' | undefined) {
   } catch {
     return false;
   }
+}
+
+/** Cloud save is for the real save only (not ?fresh, ?playtest or ?profile=name test saves). */
+function syncAllowed() {
+  const q = new URLSearchParams(location.search);
+  return playtestSector() === null && !q.has('fresh') && !q.get('profile') && !q.has('nosync');
 }
 
 /** ?playtest=N (1-based sector), or null. */
@@ -91,6 +99,7 @@ class App {
   canvas = document.getElementById('game') as HTMLCanvasElement;
   ui = document.getElementById('ui')!;
   profile = makeProfile();
+  sync = new CloudSync(this.profile, syncAllowed());
   input = new Input(this.canvas);
   mode: Mode = 'hub';
   game: Game;
@@ -154,6 +163,20 @@ class App {
     } else setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
     const pt = playtestSector();
     if (pt !== null) setTimeout(() => this.startRun(pt, 'campaign'), 400);
+    // cloud save: take a further-along save from another device (only between runs), else back up
+    this.sync.onAdopted = () => this.reloadSynced();
+    void this.sync.startup(() => this.mode === 'hub');
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) void this.sync.pushNow();
+    });
+    try {
+      if (sessionStorage.getItem('ds.synced')) {
+        sessionStorage.removeItem('ds.synced');
+        setTimeout(() => toast('Progress loaded from the cloud', '#43ffa4'), 600);
+      }
+    } catch {
+      /* ignore */
+    }
     requestAnimationFrame(this.frame);
   }
 
@@ -224,6 +247,8 @@ class App {
   }
 
   private backToHub(goNext = false) {
+    // the cloud was ahead when we launched mid-run: take it now that the run is over
+    if (this.sync.behind) void this.sync.startup(() => this.mode === 'hub');
     this.closeModal();
     this.hud.el.remove();
     this.mode = 'hub';
@@ -294,6 +319,7 @@ class App {
         },
         () => {
           this.profile.reset();
+          this.sync.fresh(); // new code: old cloud backups stay safe and can't sync this back
           location.reload();
         },
         () => this.closeModal(),
@@ -306,9 +332,27 @@ class App {
             location.reload();
           },
         },
+        this.sync.enabled ? { status: statusText(this.sync), open: () => this.openCloud() } : undefined,
       ),
       'settings',
     );
+  }
+
+  private openCloud() {
+    this.showModal(
+      cloudModal(this.sync, () => this.openSettings(), () => this.reloadSynced()),
+      'cloud',
+    );
+  }
+
+  /** A save from the cloud replaced this device's: restart cleanly on it. */
+  private reloadSynced() {
+    try {
+      sessionStorage.setItem('ds.synced', '1');
+    } catch {
+      /* ignore */
+    }
+    location.reload();
   }
 
   private showModal(el: HTMLElement, key: string) {

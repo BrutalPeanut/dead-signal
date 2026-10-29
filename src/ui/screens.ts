@@ -173,6 +173,7 @@ export function settingsModal(
   onClose: () => void,
   onControls: (m: 'drag' | 'left' | 'right') => void = () => {},
   graphics?: { on3d: boolean; toggle: () => void },
+  cloud?: { status: string; open: () => void },
 ) {
   const toggle = (label: string, key: 'sfx' | 'music' | 'haptics') => {
     const sw = h('span.sw' + (s[key] ? '.on' : ''));
@@ -201,9 +202,12 @@ export function settingsModal(
       graphics
         ? h('button.toggle', { onclick: graphics.toggle }, h('span', { style: { textAlign: 'left' } }, '3D graphics', h('small', { style: { display: 'block', fontSize: '11px', opacity: 0.65, fontWeight: 400 } }, graphics.on3d ? 'On · turn off for the classic 2D art' : 'Off · classic 2D art')), h('span.sw' + (graphics.on3d ? '.on' : '')))
         : null,
+      cloud
+        ? h('button.toggle', { onclick: cloud.open }, h('span', { style: { textAlign: 'left' } }, 'Cloud save', h('small', { style: { display: 'block', fontSize: '11px', opacity: 0.65, fontWeight: 400 } }, `${cloud.status} · play on any device`)), h('span.chev', '›'))
+        : null,
       controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),
-      h('div.help', 'Dead Signal · v0.1 · progress is saved on this device'),
+      h('div.help', cloud ? 'Dead Signal · v0.1 · progress backs up to the cloud' : 'Dead Signal · v0.1 · progress is saved on this device'),
       h('button.btn', { style: { width: '100%', marginTop: '12px' }, onclick: onClose }, 'Done'),
     ),
   );

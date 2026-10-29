@@ -82,6 +82,8 @@ export interface SaveData {
   adKeys?: { date: string; n: number };
   /** Chosen primary gun (replaces the Pulse Pistol). Unset = the newest one unlocked. */
   gun?: WeaponId;
+  /** Cloud save sync code (see meta/sync.ts). */
+  sync?: { code: string };
 }
 
 export interface RunRewards {
@@ -145,6 +147,20 @@ function fresh(): SaveData {
   };
 }
 
+/** Validate and fill in a parsed save (from storage or the cloud); null if it isn't one. */
+export function normalizeSave(raw: unknown): SaveData | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const d = raw as SaveData;
+  if (d.v !== 1 || typeof d.unlocked !== 'number' || !Array.isArray(d.gear)) return null;
+  const f = fresh();
+  return { ...f, ...d, settings: { ...f.settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? f.daily, endless: d.endless ?? f.endless, character: d.character ?? 'courier', online: d.online ?? f.online, pass: d.pass ?? f.pass };
+}
+
+/** How far along a save is, for "keep the furthest" merges: sector, then account level, then XP. */
+export function progressOf(d: SaveData): number {
+  return d.unlocked * 1e9 + Math.min(d.accountLevel, 9999) * 1e5 + Math.min(Math.max(0, d.accountXp | 0), 99999);
+}
+
 export class Profile {
   data: SaveData;
   /** Playtest links only (never saved): floor for ATK/HP so a test save can hold its own deep in the campaign. */
@@ -163,13 +179,28 @@ export class Profile {
     try {
       const raw = this.storage?.getItem(this.key);
       if (raw) {
-        const d = JSON.parse(raw) as SaveData;
-        if (d.v === 1) return { ...fresh(), ...d, settings: { ...fresh().settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? fresh().daily, endless: d.endless ?? fresh().endless, character: d.character ?? 'courier', online: d.online ?? fresh().online, pass: d.pass ?? fresh().pass };
+        const d = normalizeSave(JSON.parse(raw));
+        if (d) return d;
       }
     } catch {
       /* corrupted save → start fresh */
     }
     return fresh();
+  }
+
+  /**
+   * Replace this device's progress with a save from the cloud. Keeps this device's settings
+   * (sound, controls, graphics) and sync code. Returns false (and changes nothing) if the save
+   * isn't a valid Dead Signal save.
+   */
+  adopt(raw: unknown, code?: string): boolean {
+    const d = normalizeSave(raw);
+    if (!d) return false;
+    d.settings = this.data.settings;
+    d.sync = code ? { code } : this.data.sync;
+    this.data = d;
+    this.save();
+    return true;
   }
 
   save() {
@@ -181,6 +212,8 @@ export class Profile {
     for (const l of this.listeners) l();
   }
 
+  /** Erase this device's progress. The old cloud backups are left alone under the old code; this
+   *  device starts a fresh code so the reset can't be undone by a sync. */
   reset() {
     this.data = fresh();
     this.save();
