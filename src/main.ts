@@ -16,6 +16,7 @@ import { CHAPTER_COUNT, getChapter } from './sim/chapters';
 import { GUN_IDS, type WeaponId } from './sim/data';
 import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes';
 import { DT, Game } from './sim/game';
+import { Interp } from './render/interp';
 import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics, toast } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
@@ -101,6 +102,7 @@ class App {
   modal: HTMLElement | null = null;
   modalFor = '';
   private acc = 0;
+  private interp = new Interp();
   private last = performance.now();
   private endT = -1;
 
@@ -497,6 +499,7 @@ class App {
           break;
         }
         const [mx, my] = botMove(g);
+        this.interp.capture(g);
         g.step(mx, my);
       }
       this.hub.tick(dt);
@@ -508,6 +511,7 @@ class App {
         while (this.acc >= DT && n < 6 && g.state === 'play') {
           this.acc -= DT;
           const [mx, my] = this.input.read();
+          this.interp.capture(g);
           g.step(mx, my);
           n++;
         }
@@ -527,7 +531,14 @@ class App {
     const padMode = this.input.mode !== 'drag' && this.mode === 'run';
     this.renderer.joystickFixed = padMode;
     this.renderer.padIdle = padMode && !this.input.stick ? this.input.padCenter() : null;
-    this.renderer.render(this.mode === 'run' && (this.paused || this.game.state !== 'play') ? 0 : dt);
+    const frozen = this.mode === 'run' && (this.paused || this.game.state !== 'play');
+    // draw between the last two sim steps so motion is smooth on 120/144 Hz screens
+    this.interp.apply(this.game, frozen ? 1 : Math.min(1, this.acc / DT));
+    try {
+      this.renderer.render(frozen ? 0 : dt);
+    } finally {
+      this.interp.restore(this.game);
+    }
     if (this.mode === 'run') {
       this.hud.update(this.game, this.renderer.fx.banners);
       if (this.tutorialOn) {
