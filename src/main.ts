@@ -10,6 +10,7 @@ import { audio } from './audio';
 import { Input } from './input';
 import { KEY, Profile } from './meta/profile';
 import { Renderer } from './render/renderer';
+import { Renderer3D } from './render3d/renderer3d';
 import { botChoose, botMove } from './sim/bot';
 import { getChapter } from './sim/chapters';
 import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes';
@@ -23,6 +24,19 @@ import { Hud, chestModal, levelUpModal, pauseModal, reviveModal } from './ui/hud
 import { introModal, resultsModal, settingsModal } from './ui/screens';
 
 type Mode = 'hub' | 'run';
+
+/** 3D unless the player picked the classic 2D art (or ?r=2d), or the device has no WebGL. */
+function want3d(graphics: '3d' | '2d' | undefined) {
+  const q = new URLSearchParams(location.search).get('r');
+  if (q === '2d') return false;
+  if (q !== '3d' && graphics === '2d') return false;
+  try {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * ?fresh plays as a brand-new player every load (great for trying the first-time experience)
@@ -51,7 +65,7 @@ class App {
   input = new Input(this.canvas);
   mode: Mode = 'hub';
   game: Game;
-  renderer: Renderer;
+  renderer: Renderer | Renderer3D;
   hud: Hud;
   hub: Hub;
   sector = 0;
@@ -72,7 +86,7 @@ class App {
     setHaptics(s.haptics);
 
     this.game = this.demoGame(this.profile.data.unlocked);
-    this.renderer = new Renderer(this.canvas, this.game);
+    this.renderer = want3d(s.graphics) ? new Renderer3D(this.canvas, this.game) : new Renderer(this.canvas, this.game);
     this.hud = new Hud(() => this.pause());
     this.hub = new Hub(
       this.profile,
@@ -252,6 +266,14 @@ class App {
         },
         () => this.closeModal(),
         (m) => this.setControls(m),
+        {
+          on3d: this.renderer instanceof Renderer3D,
+          toggle: () => {
+            s.graphics = this.renderer instanceof Renderer3D ? '2d' : '3d';
+            this.profile.save();
+            location.reload();
+          },
+        },
       ),
       'settings',
     );

@@ -7,7 +7,8 @@ A one-thumb sci-fi zombie survivor-like ("bullet heaven") for mobile web, in the
 - **Run:** 10 minutes per sector. Auto-firing weapons, hordes, elites with chests, a mid-boss at 5:00 and a final boss at 10:00 in a caged arena.
 - **Build:** 8 weapons × 8 passives. Max a weapon, own its partner passive, and the next chest evolves it.
 - **Progression:** 10 sectors, 6-slot gear with 6 rarities and 3→1 merging, talents with account-level milestones, supply crates, an idle Signal Relay and a daily ration.
-- **No assets:** every character, icon, floor and sound is generated in code. ~45 KB gzipped.
+- **3D by default:** a Three.js renderer draws the same sim with low-poly, cel-shaded models of every infected, boss and courier skin. The original 2D art is one tap away (Settings → 3D graphics, or `?r=2d`).
+- **No assets:** every character, icon, floor and sound is generated in code.
 
 The design rationale (with sources) is in [`docs/DESIGN.md`](docs/DESIGN.md).
 
@@ -41,7 +42,13 @@ flowchart LR
   subgraph meta[src/meta]
     P[Profile: save, gear, talents, relay]
   end
-  subgraph render[src/render]
+  subgraph render3d[src/render3d — default]
+    R3[Renderer3D] --> MD[models.ts rigs + bosses]
+    R3 --> WD[World: painted floor tiles as 3D chunks]
+    R3 --> BT[Batches: glows, beams, ground fx]
+    R3 --> OV[2D overlay: numbers, bars, arrows, pad]
+  end
+  subgraph render[src/render — classic 2D]
     R[Renderer] --> A[art.ts procedural characters]
     R --> SC[SpriteCache]
     R --> GR[Ground chunks]
@@ -50,13 +57,15 @@ flowchart LR
   UI[src/ui DOM screens] --> P
   M[main.ts loop] --> G
   M --> R
+  M --> R3
   M --> UI
   G -- FxEvent queue --> R
+  G -- FxEvent queue --> R3
   G -- FxEvent queue --> AU[audio.ts synth]
   P -- BaseStats --> G
 ```
 
-The simulation never touches the DOM, so the same code runs in the browser, in unit tests, and in the headless balance bot.
+The simulation never touches the DOM, so the same code runs in the browser, in unit tests, and in the headless balance bot. Both renderers read the same sim state and the same `Fx` event queue, which is why the 3D port plays identically: only the picture differs. `scripts/shot3d.mjs` screenshots a full 3D run (hub, mid-boss, final boss, every biome).
 
 ## Deploy
 

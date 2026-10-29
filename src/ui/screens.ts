@@ -164,6 +164,7 @@ export function settingsModal(
   onReset: () => void,
   onClose: () => void,
   onControls: (m: 'drag' | 'left' | 'right') => void = () => {},
+  graphics?: { on3d: boolean; toggle: () => void },
 ) {
   const toggle = (label: string, key: 'sfx' | 'music' | 'haptics') => {
     const sw = h('span.sw' + (s[key] ? '.on' : ''));
@@ -189,6 +190,9 @@ export function settingsModal(
       toggle('Sound effects', 'sfx'),
       toggle('Music', 'music'),
       toggle('Vibration', 'haptics'),
+      graphics
+        ? h('button.toggle', { onclick: graphics.toggle }, '3D graphics', h('span.sw' + (graphics.on3d ? '.on' : '')))
+        : null,
       controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),
       h('div.help', 'Dead Signal · v0.1 · progress is saved on this device'),

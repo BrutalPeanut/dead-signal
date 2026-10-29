@@ -34,6 +34,12 @@ export class Ground {
       }
   }
 
+  /** Painted floor tile for chunk (cx, cy) at a fixed texture scale (used by the 3D renderer). */
+  chunkCanvas(cx: number, cy: number, scale: number) {
+    this.setScale(scale);
+    return this.chunk(cx, cy);
+  }
+
   private chunk(cx: number, cy: number) {
     const k = `${cx},${cy}`;
     let c = this.cache.get(k);

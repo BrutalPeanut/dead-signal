@@ -35,7 +35,8 @@ body {
   touch-action: none;
 }
 
-#game {
+#game,
+#game3d {
   position: fixed;
   inset: 0;
   width: 100%;
