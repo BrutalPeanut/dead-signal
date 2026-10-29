@@ -392,10 +392,23 @@ export class AuthoredHero {
   setGun(id: string) {
     if (id === this.gunId) return;
     this.gunId = id;
-    if (this.gunMesh) this.hand.remove(this.gunMesh);
+    this.gunMesh?.parent?.remove(this.gunMesh);
     const [part, muzzle] = detailed(2.2, () => gunModel(id, this.skin.glow));
     this.gunMesh = solid(part);
-    this.hand.add(this.gunMesh);
+    if (id === 'bazooka') {
+      // shoulder-mounted on the chest so it points where the upper body aims, instead of
+      // swinging with the running hand like a club
+      const mount = new THREE.Object3D();
+      mount.position.set(SHOULDER_MOUNT[0], SHOULDER_MOUNT[1], SHOULDER_MOUNT[2]);
+      mount.rotation.x = Math.PI / 2;
+      mount.add(this.gunMesh);
+      this.gunMesh = mount;
+      this.chest.add(mount);
+      mount.add(this.muzzle);
+    } else {
+      this.hand.add(this.gunMesh);
+      this.hand.add(this.muzzle);
+    }
     this.muzzle.position.set(0, muzzle, 0);
   }
 
@@ -408,6 +421,9 @@ export class AuthoredHero {
     for (const m of this.r.mats) m.emissive.setRGB(0.6 * k, 0.05 * k, 0.1 * k);
   }
 }
+
+/** Chest-space spot on the right shoulder where the bazooka rests. */
+const SHOULDER_MOUNT: [number, number, number] = [-0.34, 0.62, 0.05];
 
 /**
  * Hand-held guns in the courier's right-hand slot space: the barrel runs along +Y, the grip

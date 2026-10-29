@@ -122,6 +122,7 @@ export class Renderer3D {
   private authHero: AuthoredHero | null = null;
   private heroSkin: HeroSkin | null = null;
   private heroYaw = 0;
+  private twist = 0;
   private moveAng = 0;
   private lastPx = 0;
   private lastPy = 0;
@@ -1185,6 +1186,11 @@ export class Renderer3D {
     let tw = (-g.aim - this.heroYaw) % (Math.PI * 2);
     if (tw > Math.PI) tw -= Math.PI * 2;
     if (tw < -Math.PI) tw += Math.PI * 2;
+    // ease the upper body toward each new target instead of snapping (fast guns retarget several
+    // times a second, and a long bazooka tube made every snap obvious)
+    tw = Math.max(-1.3, Math.min(1.3, tw));
+    this.twist += (tw - this.twist) * Math.min(1, dt * 9);
+    tw = this.twist;
     const hitNow = g.hurtT > 0 && this.lastHurt <= 0;
     this.lastHurt = g.hurtT;
     h.group.position.set(g.px, 0, g.py);
