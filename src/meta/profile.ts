@@ -44,6 +44,8 @@ export interface Settings {
   damageNumbers: boolean;
   /** Movement: drag anywhere, or a fixed thumb pad in the bottom-left / bottom-right corner. */
   controls: ControlMode;
+  /** Renderer: '3d' (default) or the original '2d' art. */
+  graphics?: '3d' | '2d';
 }
 
 export type ControlMode = 'drag' | 'left' | 'right';

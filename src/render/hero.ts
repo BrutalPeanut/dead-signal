@@ -84,6 +84,9 @@ function shade(hex: string) {
 }
 setHeroSkin('courier');
 
+/** The skin currently used by drawHero (the 3D renderer rebuilds its model when this changes). */
+export const currentHeroSkin = () => SKIN;
+
 /**
  * The courier. Design space: 100 units tall, feet at y=0, facing +x. The blaster arm is drawn in
  * a separate pass rotated toward the auto-aim target so the gun always points where shots go.
