@@ -799,7 +799,7 @@ export class Game {
         if (p.life <= 0) {
           p.alive = false;
           this.src = p.extra ? 'bazooka' : 'frag';
-          this.explode(p.x, p.y, p.area, p.dmg, '#ffb03d', false);
+          this.explode(p.x, p.y, p.area, p.dmg, '#ffb03d', false, p.extra ? 0 : 2.5);
         }
         continue;
       }
@@ -822,7 +822,7 @@ export class Game {
         if (hit) {
           p.alive = false;
           this.src = 'bazooka';
-          this.explode(p.x, p.y, p.area, p.dmg, '#ff4d3d', p.evo);
+          this.explode(p.x, p.y, p.area, p.dmg, '#ff4d3d', p.evo, 0);
         }
         continue;
       }
@@ -888,9 +888,10 @@ export class Game {
     }
   }
 
-  explode(x: number, y: number, r: number, dmg: number, color: string, cluster: boolean) {
+  explode(x: number, y: number, r: number, dmg: number, color: string, cluster: boolean, shake = 2.5) {
     this.fx.push({ t: 'explode', x, y, r, color });
-    this.fx.push({ t: 'shake', amt: 2.5 });
+    // a steady stream of rocket blasts shaking the camera made the courier look jittery
+    if (shake) this.fx.push({ t: 'shake', amt: shake });
     const es = this.enemies;
     this.grid.query(x, y, r + 30, (j) => {
       const e = es[j];
