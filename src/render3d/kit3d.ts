@@ -32,6 +32,8 @@ export function tint(geo: THREE.BufferGeometry, color: string): THREE.BufferGeom
   }
   g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
   g.setAttribute('slot', new THREE.BufferAttribute(new Float32Array(n).fill(slot), 1));
+  // per-vertex light multiplier (baked occlusion / painted shading); 1 = unchanged
+  g.setAttribute('shade', new THREE.BufferAttribute(new Float32Array(n).fill(1), 1));
   // uv attributes are dropped so every part merges cleanly
   g.deleteAttribute('uv');
   return g;

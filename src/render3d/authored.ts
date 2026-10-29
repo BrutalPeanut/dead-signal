@@ -144,6 +144,58 @@ function filterClip(clip: THREE.AnimationClip, bones: string[], keep: boolean) {
 
 // ------------------------------------------------------------------ the courier
 
+const smoothstep = THREE.MathUtils.smoothstep;
+const bump = (t: number, c: number, w: number) => Math.exp(-((t - c) * (t - c)) / (w * w));
+
+/**
+ * Reshape the courier's body from KayKit's soft, round build into an athletic V-taper: broad
+ * shoulders and chest, a narrow waist with no belly, thick arms and solid thighs. Done once on the
+ * bind-pose vertices (KayKit space: +Y up, +Z front, arms out along ±X), so the rig and every
+ * animation clip just follow.
+ */
+function jacked(model: THREE.Object3D) {
+  const v = new THREE.Vector3();
+  model.traverse((o) => {
+    const mesh = o as THREE.SkinnedMesh;
+    if (!mesh.isMesh) return;
+    const name = mesh.name;
+    const part = /Body/.test(name) ? 'body' : /ArmLeft|ArmRight/.test(name) ? 'arm' : /LegLeft|LegRight/.test(name) ? 'leg' : null;
+    if (!part) return;
+    mesh.geometry = mesh.geometry.clone();
+    const pos = mesh.geometry.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      if (part === 'body') {
+        // torso spans y 0.38 (belt) → 1.25 (shoulders)
+        const t = THREE.MathUtils.clamp((v.y - 0.38) / 0.87, 0, 1);
+        const cx = 0.05;
+        // narrow from the belt up to the ribs, then flare into the chest and shoulders
+        const waist = 1 - 0.3 * (1 - smoothstep(t, 0.32, 0.72));
+        const chest = 1 + 0.22 * smoothstep(t, 0.58, 0.95);
+        v.x = cx + (v.x - cx) * waist * chest;
+        if (v.z > 0) v.z *= (1 - 0.3 * (1 - smoothstep(t, 0.35, 0.7))) * (1 + 0.12 * bump(t, 0.8, 0.13)); // flat gut, pecs
+        else v.z *= 1 - 0.14 * (1 - smoothstep(t, 0.35, 0.7)) + 0.07 * smoothstep(t, 0.6, 0.95); // lats
+      } else if (part === 'arm') {
+        // arms lie along ±X at shoulder height; thicken around their axis, biggest at the biceps
+        const ax = Math.abs(v.x);
+        const k = ax > 0.82 ? 1 : 1 + 0.32 * bump(ax, 0.38, 0.2) + 0.18 * bump(ax, 0.66, 0.12);
+        v.y = 1.105 + (v.y - 1.105) * k;
+        v.z *= k;
+        v.x += Math.sign(v.x) * 0.035 * smoothstep(ax, 0.1, 0.3); // sit on the wider shoulders
+      } else {
+        // thighs: thicker toward the hip
+        const cx = Math.sign(v.x) * 0.17;
+        const k = 1 + 0.16 * smoothstep(v.y, 0.15, 0.45);
+        v.x = cx + (v.x - cx) * k;
+        v.z = 0.06 + (v.z - 0.06) * k;
+      }
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    mesh.geometry.computeVertexNormals();
+    mesh.geometry.computeBoundingSphere();
+  });
+}
+
 const AIM_ARM = ['upperarmr', 'lowerarmr', 'wristr', 'handr', 'handslotr'];
 /**
  * Adult proportions for the courier. KayKit is a chibi build (head ≈ half the body, stub legs):
@@ -198,6 +250,7 @@ export class AuthoredHero {
     });
     this.group = this.r.group;
     const m = this.r.model;
+    jacked(m);
     this.chest = bone(m, 'chest');
     this.spine = bone(m, 'spine');
     this.head = bone(m, 'head');
