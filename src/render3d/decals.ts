@@ -67,7 +67,10 @@ export class Decals {
         void main(){ vUv = (uv + iOff) * vec2(${(1 / COLS).toFixed(4)}, ${(1 / ROWS).toFixed(4)}); vA = iAlpha;
           gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`,
       fragmentShader: /* glsl */ `uniform sampler2D map; varying vec2 vUv; varying float vA;
-        void main(){ vec4 c = texture2D(map, vUv); float a = c.a * vA; if (a < 0.01) discard; gl_FragColor = vec4(c.rgb * a, a); }`,
+        void main(){ vec4 c = texture2D(map, vUv); float a = c.a * vA; if (a < 0.01) discard;
+          gl_FragColor = vec4(pow(c.rgb, vec3(2.2)) * a, a);
+          #include <colorspace_fragment>
+        }`,
       transparent: true,
       depthWrite: false,
       blending: THREE.CustomBlending,

@@ -2,14 +2,29 @@ import * as THREE from 'three';
 import type { Biome } from '../sim/chapters';
 import { Rng } from '../sim/math';
 import { CHUNK, Ground } from '../render/ground';
-import { Part, toonMat } from './kit3d';
+import { Part, detailed, toonMat } from './kit3d';
 
 /** Per-biome lighting and atmosphere. */
-export const ATMOS: Record<Biome, { bg: string; sky: string; floor: string; hemi: number; sun: string; sunI: number; fogNear: number }> = {
-  downtown: { bg: '#121419', sky: '#b8c4dc', floor: '#2a2230', hemi: 1.7, sun: '#ffd9b0', sunI: 1.5, fogNear: 0.9 },
-  biolab: { bg: '#3a4249', sky: '#e8f2f6', floor: '#5a646c', hemi: 1.5, sun: '#ffffff', sunI: 1.1, fogNear: 0.95 },
-  spaceport: { bg: '#0d1016', sky: '#a8c0e0', floor: '#1c2230', hemi: 1.7, sun: '#cfe4ff', sunI: 1.5, fogNear: 0.9 },
-  reactor: { bg: '#090d0c', sky: '#a8d8c8', floor: '#14201c', hemi: 1.7, sun: '#d8ffe8', sunI: 1.4, fogNear: 0.9 },
+export interface Atmos {
+  bg: string;
+  sky: string;
+  floor: string;
+  hemi: number;
+  sun: string;
+  sunI: number;
+  fogNear: number;
+  /** Character rim-light colour. */
+  rim: string;
+  /** Ambient weather drifting through the frame. */
+  weather: 'rain' | 'spores' | 'dust' | 'embers';
+  weatherCol: string;
+}
+
+export const ATMOS: Record<Biome, Atmos> = {
+  downtown: { bg: '#121419', sky: '#b8c4dc', floor: '#2a2230', hemi: 1.45, sun: '#ffd2a0', sunI: 2.1, fogNear: 0.9, rim: '#8fd4ff', weather: 'rain', weatherCol: '#9fb4d8' },
+  biolab: { bg: '#3a4249', sky: '#e8f2f6', floor: '#5a646c', hemi: 1.25, sun: '#ffffff', sunI: 1.6, fogNear: 0.95, rim: '#bff6e6', weather: 'spores', weatherCol: '#9dff4a' },
+  spaceport: { bg: '#0d1016', sky: '#a8c0e0', floor: '#1c2230', hemi: 1.45, sun: '#cfe4ff', sunI: 2.0, fogNear: 0.9, rim: '#7fc8ff', weather: 'dust', weatherCol: '#cfd8e8' },
+  reactor: { bg: '#090d0c', sky: '#a8d8c8', floor: '#14201c', hemi: 1.45, sun: '#d8ffe8', sunI: 1.9, fogNear: 0.9, rim: '#7dffcf', weather: 'embers', weatherCol: '#43ffa4' },
 };
 
 export interface StaticGlow {
@@ -30,6 +45,7 @@ interface Chunk {
 }
 
 const TEX_SCALE = 2;
+const BUMP: Record<Biome, number> = { downtown: 1.6, biolab: 0.9, spaceport: 1.4, reactor: 1.8 };
 
 /**
  * Infinite floor: the 2D renderer's painted floor tiles become textures on 3D ground chunks,
@@ -92,7 +108,12 @@ export class World {
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = this.anisotropy;
-    const floor = new THREE.Mesh(this.floorGeo, new THREE.MeshLambertMaterial({ map: tex }));
+    // the painted tile doubles as its own bump map: grates, seams and cracks catch the light
+    const floor = new THREE.Mesh(
+      this.floorGeo,
+      new THREE.MeshStandardMaterial({ map: tex, bumpMap: tex, bumpScale: BUMP[this.biome], roughness: 0.8, metalness: 0.1 }),
+    );
+    floor.receiveShadow = true;
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(cx * CHUNK + CHUNK / 2, 0, cy * CHUNK + CHUNK / 2);
     this.group.add(floor);
@@ -100,12 +121,16 @@ export class World {
     const p = new Part();
     const rng = new Rng(((cx * 92837111) ^ (cy * 689287499) ^ 0x51ed) >>> 0);
     const n = rng.int(3, 7);
-    for (let i = 0; i < n; i++) PROPS[this.biome](p, rng, cx * CHUNK + rng.range(16, CHUNK - 16), cy * CHUNK + rng.range(16, CHUNK - 16), glows);
+    detailed(1.6, () => {
+      for (let i = 0; i < n; i++) PROPS[this.biome](p, rng, cx * CHUNK + rng.range(16, CHUNK - 16), cy * CHUNK + rng.range(16, CHUNK - 16), glows);
+    });
     let props: THREE.Mesh | null = null;
     let ink: THREE.Mesh | null = null;
     if (p.list.length) {
       const g = p.build();
       props = new THREE.Mesh(g, this.propMat);
+      props.castShadow = true;
+      props.receiveShadow = true;
       ink = new THREE.Mesh(g, this.inkMat);
       this.group.add(ink, props);
     }

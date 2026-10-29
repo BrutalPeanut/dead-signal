@@ -41,6 +41,19 @@ function place(g: THREE.BufferGeometry, pos: V3, rot: V3 = [0, 0, 0], scl: V3 = 
   return g;
 }
 
+let DETAIL = 1;
+/** Build with finer tessellation (the hero, bosses and pickups are few, so they can afford it). */
+export function detailed<T>(k: number, fn: () => T): T {
+  const prev = DETAIL;
+  DETAIL = k;
+  try {
+    return fn();
+  } finally {
+    DETAIL = prev;
+  }
+}
+const sd = (n: number) => Math.max(3, Math.round(n * DETAIL));
+
 /** A list of coloured primitives that becomes one merged geometry. */
 export class Part {
   list: THREE.BufferGeometry[] = [];
@@ -50,19 +63,19 @@ export class Part {
   }
   /** Ellipsoid. */
   ball(rx: number, ry: number, rz: number, col: string, pos: V3, rot?: V3, seg = 7) {
-    this.list.push(place(tint(new THREE.SphereGeometry(1, seg, Math.max(4, seg - 2)), col), pos, rot, [rx, ry, rz]));
+    this.list.push(place(tint(new THREE.SphereGeometry(1, sd(seg), sd(Math.max(4, seg - 2))), col), pos, rot, [rx, ry, rz]));
     return this;
   }
   cyl(rTop: number, rBot: number, h: number, col: string, pos: V3, rot?: V3, seg = 8) {
-    this.list.push(place(tint(new THREE.CylinderGeometry(rTop, rBot, h, seg), col), pos, rot));
+    this.list.push(place(tint(new THREE.CylinderGeometry(rTop, rBot, h, sd(seg)), col), pos, rot));
     return this;
   }
   cone(r: number, h: number, col: string, pos: V3, rot?: V3, seg = 6) {
-    this.list.push(place(tint(new THREE.ConeGeometry(r, h, seg), col), pos, rot));
+    this.list.push(place(tint(new THREE.ConeGeometry(r, h, sd(seg)), col), pos, rot));
     return this;
   }
   torus(r: number, tube: number, col: string, pos: V3, rot?: V3, arc = Math.PI * 2) {
-    this.list.push(place(tint(new THREE.TorusGeometry(r, tube, 5, 14, arc), col), pos, rot));
+    this.list.push(place(tint(new THREE.TorusGeometry(r, tube, sd(5), sd(14), arc), col), pos, rot));
     return this;
   }
   /** Capsule limb between two points, radius r. */
@@ -70,7 +83,7 @@ export class Part {
     const va = new THREE.Vector3(...a);
     const vb = new THREE.Vector3(...b);
     const len = va.distanceTo(vb);
-    const g = tint(new THREE.CapsuleGeometry(r, Math.max(0.01, len), 2, 6), col);
+    const g = tint(new THREE.CapsuleGeometry(r, Math.max(0.01, len), sd(2), sd(6)), col);
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize());
     g.applyMatrix4(new THREE.Matrix4().compose(va.clone().add(vb).multiplyScalar(0.5), q, new THREE.Vector3(1, 1, 1)));
     this.list.push(g);
@@ -81,7 +94,7 @@ export class Part {
     const va = new THREE.Vector3(...a);
     const vb = new THREE.Vector3(...b);
     const len = va.distanceTo(vb);
-    const g = tint(new THREE.CylinderGeometry(r2, r1, Math.max(0.01, len), 7), col);
+    const g = tint(new THREE.CylinderGeometry(r2, r1, Math.max(0.01, len), sd(7)), col);
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), vb.clone().sub(va).normalize());
     g.applyMatrix4(new THREE.Matrix4().compose(va.clone().add(vb).multiplyScalar(0.5), q, new THREE.Vector3(1, 1, 1)));
     this.list.push(g);
@@ -106,16 +119,37 @@ let gradient: THREE.DataTexture | null = null;
 /** Three-step cel ramp so characters read like the inked 2D art. */
 export function toonRamp() {
   if (gradient) return gradient;
-  const d = new Uint8Array([90, 90, 90, 255, 175, 175, 175, 255, 255, 255, 255, 255]);
-  gradient = new THREE.DataTexture(d, 3, 1, THREE.RGBAFormat);
+  const d = new Uint8Array([78, 78, 78, 255, 140, 140, 140, 255, 205, 205, 205, 255, 255, 255, 255, 255]);
+  gradient = new THREE.DataTexture(d, 4, 1, THREE.RGBAFormat);
   gradient.minFilter = THREE.NearestFilter;
   gradient.magFilter = THREE.NearestFilter;
   gradient.needsUpdate = true;
   return gradient;
 }
 
+/**
+ * Shared rim light: a cool fresnel edge on every character, like the 2D art's rim highlight.
+ * The renderer retunes it per biome.
+ */
+export const RIM = {
+  uRimColor: { value: new THREE.Color('#9fdcff') },
+  uRimStrength: { value: 0.55 },
+};
+
 export function toonMat(opts: THREE.MeshToonMaterialParameters = {}) {
-  return new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp(), ...opts });
+  const m = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp(), ...opts });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uRimColor = RIM.uRimColor;
+    sh.uniforms.uRimStrength = RIM.uRimStrength;
+    sh.fragmentShader = 'uniform vec3 uRimColor;\nuniform float uRimStrength;\n' + sh.fragmentShader.replace(
+      '#include <opaque_fragment>',
+      `{ vec3 V = normalize(vViewPosition); float f = 1.0 - clamp(dot(normal, V), 0.0, 1.0);
+         float rim = smoothstep(0.55, 0.95, f) * uRimStrength; outgoingLight += uRimColor * rim * (0.35 + 0.65 * diffuseColor.rgb); }
+       #include <opaque_fragment>`,
+    );
+  };
+  m.customProgramCacheKey = () => 'toonrim';
+  return m;
 }
 
 /** Inverted-hull ink outline: back faces pushed out along normals, drawn in near-black. */
