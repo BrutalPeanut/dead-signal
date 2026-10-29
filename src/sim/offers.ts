@@ -28,6 +28,7 @@ export function buildOffers(
   const allowP = allowW ? new Set([...allowW].map((id) => WEAPONS[id as keyof typeof WEAPONS].partner as string)) : null;
   const cands: { o: Offer; w: number }[] = [];
   const ownedW = new Map(weapons.map((w) => [w.id, w]));
+  const hasGun = weapons.some((w) => WEAPONS[w.id].gun);
   const ownedP = new Map(passives.map((p) => [p.id, p]));
   const neededPartners = new Set(
     weapons.filter((w) => !w.evolved && w.level >= MAX_SKILL_LEVEL).map((w) => WEAPONS[w.id].partner),
@@ -39,8 +40,9 @@ export function buildOffers(
     if (st) {
       if (!st.evolved && st.level < MAX_SKILL_LEVEL)
         cands.push({ o: { type: 'weapon', id, level: st.level + 1, isNew: false }, w: 3.2 });
-    } else if (WEAPONS[id].gun && id !== 'pistol') {
-      // primary guns are picked in the Armory, never found mid-run
+    } else if (WEAPONS[id].gun && (id !== 'pistol' || hasGun)) {
+      // one primary gun at a time: guns are picked in the Armory, never found mid-run. (The Pulse
+      // Pistol can still turn up for a run that started with non-gun weapon gear.)
       continue;
     } else if (weapons.length < rules.maxW && (!allowW || allowW.has(id))) {
       const early = weapons.length < 3 ? 1.6 : 1;

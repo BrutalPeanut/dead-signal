@@ -50,6 +50,19 @@ describe('primary guns', () => {
     expect(ups.has('smgfalse')).toBe(true);
   });
 
+  it('only one primary gun at a time: the pistol is never offered alongside another gun', () => {
+    const rng = new Rng(2);
+    for (const id of ['smg', 'flamer', 'mg', 'bazooka'] as const)
+      for (let i = 0; i < 300; i++)
+        for (const o of buildOffers(rng, [{ id, level: 1, evolved: false, timer: 0, active: 0, angle: 0, sourceId: 1 }], []))
+          if (o.type === 'weapon') expect(o.id === id || !WEAPONS[o.id].gun).toBe(true);
+    // a run that started with non-gun gear (e.g. the Arc Gauntlet) can still find the pistol
+    const seen = new Set<string>();
+    for (let i = 0; i < 300; i++)
+      for (const o of buildOffers(rng, [{ id: 'arc', level: 1, evolved: false, timer: 0, active: 0, angle: 0, sourceId: 1 }], [])) if (o.type === 'weapon') seen.add(o.id);
+    expect(seen.has('pistol')).toBe(true);
+  });
+
   it('all pair with the Targeting Chip so they can evolve', () => {
     for (const id of GUN_IDS) expect(WEAPONS[id].partner).toBe('chip');
   });
