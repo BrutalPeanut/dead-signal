@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   base: './',
+  // rigged character models (Option D) are imported as assets
+  assetsInclude: ['**/*.glb'],
   build: {
     target: 'es2020',
     outDir: 'dist',
