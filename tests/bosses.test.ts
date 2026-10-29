@@ -9,22 +9,30 @@ const base: BaseStats = {
   rerolls: 0, revives: 0, startWeapon: 'pistol', startLevels: 0, regen: 0,
 };
 
-function advanceTo(g: Game, seconds: number) {
-  while (g.time < seconds && g.state !== 'dead' && g.state !== 'won') {
+/**
+ * Jump straight to the situation instead of simulating five minutes (which took ~2 s per test and
+ * flaked on slower CI runners): mid-boss up, clock at the final whistle.
+ */
+function midBossAtFinalWhistle() {
+  const g = new Game(getChapter(13), base, 7);
+  g.step(0, 0);
+  g.midBossSpawned = true;
+  (g as any).spawnBoss(g.chapter.midBoss, true);
+  g.time = g.runLength + 1;
+  for (let i = 0; i < 120; i++) {
     if (g.state === 'levelup') g.choose(0);
     else if (g.state === 'chest') g.closeChest();
     g.step(0, 0);
     g.fx.length = 0;
   }
+  return g;
 }
 
 const bosses = (g: Game) => g.enemies.filter((e) => e.alive && e.kind === 'boss');
 
 describe('boss fights', () => {
   it('never runs two bosses at once when the mid-boss outlives the run clock', () => {
-    const g = new Game(getChapter(13), base, 7);
-    advanceTo(g, g.runLength + 20);
-    expect(g.midBossSpawned).toBe(true);
+    const g = midBossAtFinalWhistle();
     // the mid-boss is still up: the final boss waits, and the arena + health bar stay with it
     expect(bosses(g).length).toBe(1);
     expect(g.finalBossSpawned).toBe(false);
@@ -41,8 +49,7 @@ describe('boss fights', () => {
   });
 
   it('keeps the cage and health bar while any boss is still alive', () => {
-    const g = new Game(getChapter(13), base, 7);
-    advanceTo(g, g.runLength + 1);
+    const g = midBossAtFinalWhistle();
     const first = g.boss!;
     // force the old overlap (two bosses) and kill one of them
     (g as any).spawnBoss('warden', false);
