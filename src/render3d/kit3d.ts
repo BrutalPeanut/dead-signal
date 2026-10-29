@@ -206,3 +206,34 @@ export function radialTexture(stops: [number, number][] = [[0, 1], [0.18, 0.9], 
   t.colorSpace = THREE.NoColorSpace;
   return t;
 }
+
+/** Viewport size in CSS px for screen-space outlines; the renderer updates it on resize. */
+export const OUTLINE_RES = { value: new THREE.Vector2(1, 1) };
+
+/**
+ * Screen-space ink outline (inverted hull pushed out in clip space): a constant `px` thick on
+ * screen whatever the zoom or bone scale, like the 2D art's ink line. Works on skinned meshes.
+ */
+export function screenOutlineMat(px: number, color = INK) {
+  const m = new THREE.MeshBasicMaterial({ color, side: THREE.BackSide });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uPx = { value: px };
+    sh.uniforms.uRes = OUTLINE_RES;
+    sh.vertexShader = 'uniform float uPx;\nuniform vec2 uRes;\n' + sh.vertexShader.replace(
+      '#include <project_vertex>',
+      `#include <project_vertex>
+       {
+       #ifdef USE_SKINNING
+         vec3 vn = normalize(transformedNormal);
+       #else
+         vec3 vn = normalize(normalMatrix * normal);
+       #endif
+         vec2 cn = (projectionMatrix * vec4(vn, 0.0)).xy;
+         float l = length(cn);
+         if (l > 1e-5) gl_Position.xy += cn / l * uPx * 2.0 / uRes * gl_Position.w;
+       }`,
+    );
+  };
+  m.customProgramCacheKey = () => 'soutline' + px;
+  return m;
+}

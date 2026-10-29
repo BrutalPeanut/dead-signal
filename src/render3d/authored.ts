@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { HeroSkin } from '../render/hero';
-import { Part, SIGNAL, detailed } from './kit3d';
+import { Part, SIGNAL, detailed, screenOutlineMat } from './kit3d';
 import courierUrl from '../assets/models/courier.glb?url';
 import animsUrl from '../assets/models/skel_anims.glb?url';
 import warriorUrl from '../assets/models/skel_warrior.glb?url';
@@ -144,6 +144,47 @@ function filterClip(clip: THREE.AnimationClip, bones: string[], keep: boolean) {
 
 // ------------------------------------------------------------------ the courier
 
+/**
+ * Give every opaque lit mesh under `root` an ink outline (skinned meshes get a skinned twin on
+ * the same skeleton). Glows and glass are skipped. The courier read soft and blobby without it,
+ * especially against the dark floors.
+ */
+let heroInk: THREE.Material | null = null;
+const HERO_INK = () => (heroInk ??= screenOutlineMat(2.1));
+const mixHex = (a: string, b: string, t: number) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString();
+
+function inkOutline(root: THREE.Object3D, mat: THREE.Material) {
+  const todo: THREE.Mesh[] = [];
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || m.userData.outline || m.userData.inked) return;
+    const mt = m.material as THREE.Material;
+    if (mt.transparent || (mt as THREE.MeshBasicMaterial).isMeshBasicMaterial) return;
+    todo.push(m);
+  });
+  for (const m of todo) {
+    m.userData.inked = true;
+    let o: THREE.Mesh;
+    if ((m as THREE.SkinnedMesh).isSkinnedMesh) {
+      const sm = m as THREE.SkinnedMesh;
+      const so = new THREE.SkinnedMesh(sm.geometry, mat);
+      so.bindMode = sm.bindMode;
+      so.bind(sm.skeleton, sm.bindMatrix);
+      so.position.copy(sm.position);
+      so.quaternion.copy(sm.quaternion);
+      so.scale.copy(sm.scale);
+      sm.parent!.add(so);
+      o = so;
+    } else {
+      o = new THREE.Mesh(m.geometry, mat);
+      m.add(o);
+    }
+    o.userData.outline = true;
+    o.castShadow = false;
+    o.frustumCulled = false;
+  }
+}
+
 const smoothstep = THREE.MathUtils.smoothstep;
 const bump = (t: number, c: number, w: number) => Math.exp(-((t - c) * (t - c)) / (w * w));
 
@@ -244,11 +285,17 @@ export class AuthoredHero {
       r0c5: '#30343d',
       r0c6: '#24262c',
       r0c3: '#c9ced6',
-      r1c7: skin.pants[1],
-      r2c3: skin.pants[0],
+      // a notch lighter than the 2D art: dark trousers vanished against the dark floors
+      r1c7: mixHex(skin.pants[1], skin.pants[0], 0.5),
+      r2c3: mixHex(skin.pants[0], skin.pants[2], 0.45),
       r0c1: '#3a2a22',
     });
     this.group = this.r.group;
+    // a little sheen so the suit's forms (shoulders, arms, chest) read under the top-down light
+    for (const mt of this.r.mats) {
+      mt.roughness = 0.48;
+      mt.metalness = 0.08;
+    }
     const m = this.r.model;
     jacked(m);
     this.chest = bone(m, 'chest');
@@ -286,6 +333,7 @@ export class AuthoredHero {
     this.acts.idle.play();
     this.mode = 'idle';
     this.gear();
+    inkOutline(this.group, HERO_INK());
   }
 
   /** Helmet, visor, rig pack and pulse pistol, coloured by the skin. */
@@ -298,7 +346,7 @@ export class AuthoredHero {
       // open-face shell: everything but a window over the face (+Z)
       const shell = new THREE.Mesh(
         new THREE.SphereGeometry(0.575, 28, 16, Math.PI / 2 + 0.85, Math.PI * 2 - 1.7, 0, 2.05),
-        new THREE.MeshStandardMaterial({ color: s.helmet[0], roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide }),
+        new THREE.MeshStandardMaterial({ color: s.helmet[0], roughness: 0.32, metalness: 0.15, side: THREE.DoubleSide }),
       );
       shell.position.set(0.01, 0.44, 0);
       shell.scale.set(1, 0.95, 1);
@@ -410,6 +458,7 @@ export class AuthoredHero {
       this.hand.add(this.muzzle);
     }
     this.muzzle.position.set(0, muzzle, 0);
+    inkOutline(this.gunMesh, HERO_INK());
   }
 
   /** World position of the gun muzzle. */

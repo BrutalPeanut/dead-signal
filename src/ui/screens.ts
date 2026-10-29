@@ -199,7 +199,7 @@ export function settingsModal(
       toggle('Music', 'music'),
       toggle('Vibration', 'haptics'),
       graphics
-        ? h('button.toggle', { onclick: graphics.toggle }, '3D graphics', h('span.sw' + (graphics.on3d ? '.on' : '')))
+        ? h('button.toggle', { onclick: graphics.toggle }, h('span', { style: { textAlign: 'left' } }, '3D graphics', h('small', { style: { display: 'block', fontSize: '11px', opacity: 0.65, fontWeight: 400 } }, graphics.on3d ? 'On · turn off for the classic 2D art' : 'Off · classic 2D art')), h('span.sw' + (graphics.on3d ? '.on' : '')))
         : null,
       controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),

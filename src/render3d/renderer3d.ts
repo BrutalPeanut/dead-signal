@@ -12,7 +12,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GLOW, GlowBatch, TriBatch } from './batches';
-import { Part, RIM, SIGNAL, detailed, outlineMat, rgbC, toonMat } from './kit3d';
+import { OUTLINE_RES, Part, RIM, SIGNAL, detailed, outlineMat, rgbC, toonMat } from './kit3d';
 import { BOSS_BUILDERS, buildHero, type BossModel, type HeroModel } from './models';
 import { CROWD, CrowdKind, setCrowdPalette, variantScale } from './crowd2';
 import { AuthoredBoss, AuthoredHero, BOSS_ANIMS, BOSS_MESH, COURIER, loadGlb, preloadAuthored, type Gltf } from './authored';
@@ -380,6 +380,7 @@ export class Renderer3D {
     this.gl.setSize(w, h, false);
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
+    OUTLINE_RES.value.set(w, h); // CSS pixels: outline widths are given in CSS px
     this.zoom = Math.max(Math.min(w, h) / TARGET_VIEW, 0.75);
     if (h > w) this.zoom = w / TARGET_VIEW;
     this.zoom = Math.min(this.zoom, 2.4);
