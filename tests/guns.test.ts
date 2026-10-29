@@ -93,11 +93,18 @@ describe('primary guns', () => {
     expect(p.gun()).toBe('flamer');
   });
 
-  it('weapon gear other than the sidearm keeps its own starting weapon', () => {
+  it('weapon gear never replaces the gun: its own weapon comes along as a second one', () => {
     const p = mk();
-    p.data.unlocked = 9;
-    p.data.gear.push({ uid: 'z', def: 'gauntlet', rarity: 0, level: 1 });
+    p.data.unlocked = 12; // e.g. a player who reached Sector 13 wearing crate gear
+    p.data.gear.push({ uid: 'z', def: 'tube', rarity: 2, level: 9 });
     p.data.equipped.weapon = 'z';
-    expect(p.baseStats().startWeapon).toBe('arc');
+    const b = p.baseStats();
+    expect(b.startWeapon).toBe('bazooka');
+    expect(b.gearWeapon).toBe('frag');
+    const g = new Game(getChapter(12), b, 1);
+    expect(g.weapons.map((w) => w.id)).toEqual(['bazooka', 'frag']);
+    // the plain sidearm adds nothing extra
+    p.data.equipped.weapon = 'g1';
+    expect(p.baseStats().gearWeapon).toBeUndefined();
   });
 });

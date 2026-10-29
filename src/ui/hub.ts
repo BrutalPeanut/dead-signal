@@ -820,7 +820,7 @@ export class Hub {
     const gunNow = p.gun();
     this.heroGun = isGun(b.startWeapon) ? b.startWeapon : 'pistol';
     const wgear = p.data.equipped.weapon ? GEAR[p.item(p.data.equipped.weapon)!.def] : undefined;
-    const gunLive = !wgear?.startWeapon || wgear.startWeapon === 'pistol';
+    const extra = wgear?.startWeapon && wgear.startWeapon !== 'pistol' ? WEAPONS[wgear.startWeapon].name : null;
     const guns = h(
       'div.roster.guns',
       GUN_IDS.map((id) => {
@@ -860,7 +860,7 @@ export class Hub {
       h(
         'div.ch-perk',
         h('b', `${gd.name} · evolves into ${gd.evoName}`),
-        h('span', gunLive ? gd.gun!.blurb : `Your ${wgear!.name} replaces the gun. Equip the Pulse Sidearm to fire the ${gd.name}.`),
+        h('span', extra ? `${gd.gun!.blurb} Your ${wgear!.name} adds the ${extra} as a second weapon.` : gd.gun!.blurb),
       ),
       h('div.section-h', 'Couriers', h('span.reset', `${CHARACTERS.filter((c) => p.charUnlocked(c.id)).length}/${CHARACTERS.length} unlocked`)),
       roster,
@@ -995,7 +995,7 @@ export class Hub {
         { style: { marginTop: '12px' } },
         h('div.kv', h('span', 'Level'), h('b', `${it.level} / ${MAX_LEVEL[it.rarity]}`)),
         h('div.kv', h('span', def.stat === 'atk' ? 'Attack' : 'Health'), h('b', `+${fmtNum(gearStat(it))}`)),
-        def.startWeapon ? h('div.kv', h('span', 'Starting weapon'), h('b', WEAPONS[def.startWeapon === 'pistol' ? this.p.gun() : def.startWeapon].name)) : null,
+        def.startWeapon && def.startWeapon !== 'pistol' ? h('div.kv', h('span', 'Bonus weapon'), h('b', WEAPONS[def.startWeapon].name)) : null,
       ),
       h(
         'div.perks',

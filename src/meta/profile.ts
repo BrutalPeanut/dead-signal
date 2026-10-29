@@ -238,8 +238,10 @@ export class Profile {
       goldMul: 1 + this.milestone('gold'),
       rerolls: 1 + this.milestone('reroll'),
       revives: this.milestone('revive') + p.revive,
-      // the Pulse Sidearm (or no weapon gear) fires whichever primary gun is picked in the Armory
-      startWeapon: weapon && GEAR[weapon.def].startWeapon && GEAR[weapon.def].startWeapon !== 'pistol' ? GEAR[weapon.def].startWeapon! : this.gun(),
+      // your primary gun always starts the run; weapon gear with its own weapon (Arc Gauntlet,
+      // Frag Tube...) brings it along as a second weapon instead of replacing the gun
+      startWeapon: this.gun(),
+      gearWeapon: weapon && GEAR[weapon.def].startWeapon !== 'pistol' ? GEAR[weapon.def].startWeapon : undefined,
       startLevels: this.milestone('startLevel') + p.startLevel,
       regen: p.regen + (ch.regen ?? 0),
       bonusWeapon: ch.bonusWeapon,
