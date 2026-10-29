@@ -178,8 +178,6 @@ export interface BaseStats {
   regen: number; // fraction of max hp per second
   /** Character perk: a second weapon at run start. */
   bonusWeapon?: WeaponId;
-  /** Signature weapon of the equipped weapon gear, carried alongside the primary gun. */
-  gearWeapon?: WeaponId;
 }
 
 export type RunState = 'play' | 'levelup' | 'chest' | 'revive' | 'dead' | 'won';
