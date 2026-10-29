@@ -141,11 +141,12 @@ function shambler(): CrowdRig {
     .ball(5, 3.4, 5, '$shirt', [-1, 19, 8.5]);
   return {
     joints: biped({
-      hipY: 16, pelvis: new Part().ball(7, 5.5, 8, '$pants', [0, 0, 0]), torso: tor, headAt: [5, 26, 0], head: head(9.5),
+      hipY: 16, pelvis: new Part().ball(7, 5.5, 8, '$pants', [0, 0, 0]), torso: tor, headAt: [4.5, 25, 0], head: head(8.3),
       shoulder: [1, 18, -10], upper: seg(9, 3, '$shirt'), fore: claw(seg(9, 2.7, '$skin'), [0, -10, 0], 2.8), upperLen: 9,
+      // (head radius 8.5: about a fifth of the body, so it reads as a zombie, not a bobblehead)
       hipZ: 4.5, thigh: seg(7.5, 3.4, '$pants'), shin: shoe(seg(7.5, 3, '$pants'), 7.5), thighLen: 7.5,
     }),
-    glows: eyes(3, 9.5),
+    glows: eyes(3, 8.3),
     height: 46,
     variants: true,
     pose(ph, t, hit, o) {
@@ -166,11 +167,11 @@ function runner(): CrowdRig {
     joints: biped({
       hipY: 17, pelvis: new Part().ball(6.5, 5, 7.5, '$pants', [0, 0, 0]),
       torso: new Part().ball(8, 10, 9, '$shirt', [0, 9, 0]).box(4, 4, 9, '$skinD', [6.5, 5, 0]).ball(3.5, 4.5, 3, BLOOD, [6.5, 12, 3]).ball(5.5, 3.6, 5.5, '$shirt', [-1, 17, -8]).ball(5.5, 3.6, 5.5, '$shirt', [-1, 17, 8]),
-      headAt: [5, 24, 0], head: head(9, { hood: '#c4384f' }),
+      headAt: [4.5, 23, 0], head: head(7.9, { hood: '#c4384f' }),
       shoulder: [0, 16, -9.5], upper: seg(8, 3, '$shirt'), fore: claw(seg(8, 2.7, '$skin'), [0, -9, 0], 2.6), upperLen: 8,
       hipZ: 4, thigh: seg(8, 3.1, '$pants'), shin: shoe(seg(8, 2.8, '$pants'), 8, '#e8e8ec', 4.6), thighLen: 8,
     }),
-    glows: eyes(3, 9),
+    glows: eyes(3, 7.9),
     height: 44,
     variants: true,
     pose(ph, t, hit, o) {
@@ -254,11 +255,11 @@ function spitter(): CrowdRig {
     joints: biped({
       hipY: 15, pelvis: new Part().ball(5, 4, 6, '$pants', [0, 0, 0]),
       torso: new Part().cyl(5.5, 7.5, 18, COAT, [0, 8, 0], [0, 0, -0.1]).box(1, 10, 1.2, '#9aa3ad', [6, 9, 0], [0, 0, -0.1]).ball(4.5, 4.5, 5, '#9dff4a', [5.5, 17, 0]),
-      headAt: [3, 22, 0], head: head(6.5),
+      headAt: [3, 21.5, 0], head: head(6),
       shoulder: [1, 16, -6.5], upper: seg(8, 1.9, COAT), fore: seg(8, 1.6, '$skin').ball(1.8, 1.6, 1.8, '$skin', [0, -8.5, 0]), upperLen: 8,
       hipZ: 3.2, thigh: seg(7, 2.4, '$pants'), shin: shoe(seg(7, 2.2, '$pants'), 7), thighLen: 7,
     }),
-    glows: [...eyes(3, 6.5), { j: 2, at: [7, 17, 0], size: 14, color: '#9dff4a' }],
+    glows: [...eyes(3, 6), { j: 2, at: [7, 17, 0], size: 14, color: '#9dff4a' }],
     height: 46,
     variants: true,
     pose(ph, t, hit, o) {
@@ -338,6 +339,35 @@ const SHIRTS: Record<string, string[]> = {
   bloater: ['#e6c63a'],
 };
 const PANTS = ['#3c3756', '#2f3a4a', '#4a3a30', '#2c2c3a', '#2f4058'];
+
+/**
+ * Dark floors (downtown, spaceport, reactor): the default palette's dark olive skin and navy
+ * clothes sit at the floor's own brightness. These keep the rot but lift the value: mid-tone
+ * sickly skin (not pale) and clothing in clearly separated, brighter hues.
+ */
+const SKINS_DARK: [string, string][] = [
+  ['#9aae7c', '#5e6e48'],
+  ['#a8a47a', '#6a6644'],
+  ['#8fa496', '#56685c'],
+  ['#b09a72', '#6e5c40'],
+  ['#9890ac', '#5c5670'],
+  ['#a3b07a', '#62703e'],
+];
+const SHIRTS_DARK: Record<string, string[]> = {
+  shambler: ['#4f9ab0', '#a8506a', '#c08a3c', '#7d88a8', '#5aa078'],
+  runner: ['#e04a62', '#4a86e8', '#d0a040', '#40b08a'],
+  crawler: ['#8a6aa8', '#a07a5a', '#6a8aa8'],
+  brute: ['#8a92a0', '#9a6a4a', '#5a7aa0'],
+  spitter: ['#4f9ab0', '#a0b050'],
+  bloater: ['#e6c63a'],
+};
+const PANTS_DARK = ['#5e5a8a', '#4a6488', '#7a5a44', '#56566a', '#4a6a8a'];
+
+let dark = false;
+/** Pick the horde palette for the current floor. */
+export function setCrowdPalette(darkFloor: boolean) {
+  dark = darkFloor;
+}
 
 function hash(n: number, k: number) {
   const x = Math.sin(n * 12.9898 + k * 78.233) * 43758.5453;
@@ -433,12 +463,15 @@ export class CrowdKind {
       }
     }
     if (rig.variants) {
-      const sk = SKINS[Math.floor(hash(seed, 1) * SKINS.length)];
-      const shirts = SHIRTS[kindOf(rig)] ?? SHIRTS.shambler;
+      const skins = dark ? SKINS_DARK : SKINS;
+      const sk = skins[Math.floor(hash(seed, 1) * skins.length)];
+      const table = dark ? SHIRTS_DARK : SHIRTS;
+      const shirts = table[kindOf(rig)] ?? table.shambler;
+      const pants = dark ? PANTS_DARK : PANTS;
       this.setC('iSkin', i, sk[0]);
       this.setC('iSkinD', i, sk[1]);
       this.setC('iShirt', i, shirts[Math.floor(hash(seed, 2) * shirts.length)]);
-      this.setC('iPants', i, PANTS[Math.floor(hash(seed, 3) * PANTS.length)]);
+      this.setC('iPants', i, pants[Math.floor(hash(seed, 3) * pants.length)]);
     } else {
       this.setC('iSkin', i, '#b4c27a');
       this.setC('iSkinD', i, '#5a6a2a');

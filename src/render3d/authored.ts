@@ -145,6 +145,8 @@ function filterClip(clip: THREE.AnimationClip, bones: string[], keep: boolean) {
 // ------------------------------------------------------------------ the courier
 
 const AIM_ARM = ['upperarmr', 'lowerarmr', 'wristr', 'handr', 'handslotr'];
+/** Courier head size relative to the KayKit original (which is about half the body height). */
+const HEAD_SCALE = 0.7;
 
 export interface HeroState {
   moving: boolean;
@@ -163,13 +165,14 @@ export class AuthoredHero {
   private r: Rigged;
   private chest: THREE.Object3D;
   private spine: THREE.Object3D;
+  private head: THREE.Object3D;
   private muzzle!: THREE.Object3D;
   private acts: Record<string, THREE.AnimationAction> = {};
   private mode = '';
   private hitT = 0;
 
   constructor(src: Gltf, readonly skin: HeroSkin) {
-    this.r = instantiate(src, 50, {
+    this.r = instantiate(src, 54, {
       r1c0: skin.jacket[0],
       r2c5: skin.jacketBack[0],
       r1c1: skin.collar[0],
@@ -184,6 +187,7 @@ export class AuthoredHero {
     const m = this.r.model;
     this.chest = bone(m, 'chest');
     this.spine = bone(m, 'spine');
+    this.head = bone(m, 'head');
     const clip = (n: string) => src.animations.find((c) => c.name === n)!;
     const mixer = this.r.mixer;
     // legs and torso play the body clip; the gun arm holds an aim on top of it
@@ -288,6 +292,9 @@ export class AuthoredHero {
     const aiming = !s.dead && !s.won;
     this.acts.aim.weight = aiming ? 1 : 0;
     this.r.mixer.update(dt);
+    // KayKit heads are chibi-sized; shrink the head (and the helmet on it) to adult proportions.
+    // Applied after the mixer so clips can't undo it.
+    this.head.scale.setScalar(HEAD_SCALE);
     // upper body turns toward the target while the legs keep running
     if (aiming) {
       const tw = Math.max(-1.3, Math.min(1.3, s.twist));

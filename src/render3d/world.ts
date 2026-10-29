@@ -15,16 +15,18 @@ export interface Atmos {
   fogNear: number;
   /** Character rim-light colour. */
   rim: string;
+  /** Dark floors use the brighter infected palette so the horde doesn't melt into them. */
+  darkFloor: boolean;
   /** Ambient weather drifting through the frame. */
   weather: 'rain' | 'spores' | 'dust' | 'embers';
   weatherCol: string;
 }
 
 export const ATMOS: Record<Biome, Atmos> = {
-  downtown: { bg: '#121419', sky: '#b8c4dc', floor: '#2a2230', hemi: 1.45, sun: '#ffd2a0', sunI: 2.1, fogNear: 0.9, rim: '#8fd4ff', weather: 'rain', weatherCol: '#9fb4d8' },
-  biolab: { bg: '#3a4249', sky: '#e8f2f6', floor: '#5a646c', hemi: 1.25, sun: '#ffffff', sunI: 1.6, fogNear: 0.95, rim: '#bff6e6', weather: 'spores', weatherCol: '#9dff4a' },
-  spaceport: { bg: '#0d1016', sky: '#a8c0e0', floor: '#1c2230', hemi: 1.45, sun: '#cfe4ff', sunI: 2.0, fogNear: 0.9, rim: '#7fc8ff', weather: 'dust', weatherCol: '#cfd8e8' },
-  reactor: { bg: '#090d0c', sky: '#a8d8c8', floor: '#14201c', hemi: 1.45, sun: '#d8ffe8', sunI: 1.9, fogNear: 0.9, rim: '#7dffcf', weather: 'embers', weatherCol: '#43ffa4' },
+  downtown: { bg: '#121419', sky: '#b8c4dc', floor: '#2a2230', hemi: 1.45, sun: '#ffd2a0', sunI: 2.1, fogNear: 0.9, rim: '#8fd4ff', darkFloor: true, weather: 'rain', weatherCol: '#9fb4d8' },
+  biolab: { bg: '#3a4249', sky: '#e8f2f6', floor: '#5a646c', hemi: 1.25, sun: '#ffffff', sunI: 1.6, fogNear: 0.95, rim: '#bff6e6', darkFloor: false, weather: 'spores', weatherCol: '#9dff4a' },
+  spaceport: { bg: '#0d1016', sky: '#a8c0e0', floor: '#1c2230', hemi: 1.45, sun: '#cfe4ff', sunI: 2.0, fogNear: 0.9, rim: '#7fc8ff', darkFloor: true, weather: 'dust', weatherCol: '#cfd8e8' },
+  reactor: { bg: '#090d0c', sky: '#a8d8c8', floor: '#14201c', hemi: 1.45, sun: '#d8ffe8', sunI: 1.9, fogNear: 0.9, rim: '#7dffcf', darkFloor: true, weather: 'embers', weatherCol: '#43ffa4' },
 };
 
 export interface StaticGlow {

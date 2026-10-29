@@ -13,7 +13,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { GLOW, GlowBatch, TriBatch } from './batches';
 import { Part, RIM, SIGNAL, detailed, outlineMat, rgbC, toonMat } from './kit3d';
 import { BOSS_BUILDERS, buildHero, type BossModel, type HeroModel } from './models';
-import { CROWD, CrowdKind, variantScale } from './crowd2';
+import { CROWD, CrowdKind, setCrowdPalette, variantScale } from './crowd2';
 import { AuthoredBoss, AuthoredHero, BOSS_ANIMS, BOSS_MESH, COURIER, loadGlb, preloadAuthored, type Gltf } from './authored';
 import type { Enemy } from '../sim/types';
 import { drawOverlay } from './overlay';
@@ -321,6 +321,7 @@ export class Renderer3D {
     this.sun.color.set(at.sun);
     this.sun.intensity = at.sunI;
     RIM.uRimColor.value.set(at.rim);
+    setCrowdPalette(at.darkFloor);
     this.motes.length = 0;
     this.corpses.length = 0;
     this.lights.length = 0;
