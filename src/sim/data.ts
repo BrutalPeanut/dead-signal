@@ -9,7 +9,12 @@ export type WeaponId =
   | 'disc'
   | 'napalm'
   | 'drill'
-  | 'cleaver';
+  | 'cleaver'
+  // primary guns: start-of-run only (replace the Pulse Pistol), never offered as new level-up picks
+  | 'smg'
+  | 'flamer'
+  | 'mg'
+  | 'bazooka';
 
 export type PassiveId =
   | 'chip'
@@ -44,6 +49,8 @@ export interface WeaponDef {
   levels: WeaponLevel[]; // index 0..4 → Lv1..Lv5
   evo: WeaponLevel;
   levelText: string[]; // what each level-up adds (index 1..4 used)
+  /** Primary gun: chosen in the Armory, unlocked by campaign progress, never offered mid-run. */
+  gun?: { unlock: number; blurb: string };
 }
 
 const L = (
@@ -75,6 +82,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     ],
     evo: L(3.2, 0.32, 5, 7, 900, 1.0, 999),
     levelText: ['', '+1 bolt, +dmg', 'Bolts pierce 1, faster', '+1 bolt, +dmg', '+1 bolt, pierce 2'],
+    gun: { unlock: 0, blurb: 'Reliable pulse bolts. Multi-shot as it levels.' },
   },
   blades: {
     id: 'blades',
@@ -221,9 +229,96 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     evo: L(6.21, 0.6, 2, 96, 0, 0, 0, Math.PI),
     levelText: ['', 'Longer reach, +dmg', 'Swings twice', 'Wider sweep, +dmg', 'Faster, +dmg'],
   },
+
+  // ------------------------------------------------------------ primary guns
+  // All four pair with the Targeting Chip, like the Pulse Pistol they replace.
+  smg: {
+    id: 'smg',
+    name: 'Vector SMG',
+    evoName: 'Bullet Hose',
+    partner: 'chip',
+    desc: 'A rattling stream of rounds at the nearest infected.',
+    evoDesc: 'A relentless hose of piercing rounds.',
+    color: '#ffd34d',
+    // count = rounds per trigger pull, extra = spread (radians)
+    levels: [
+      L(0.62, 0.2, 1, 4, 640, 0.62, 0, 0.1),
+      L(0.7, 0.18, 1, 4, 660, 0.62, 0, 0.1),
+      L(0.76, 0.17, 2, 4, 680, 0.64, 0, 0.12),
+      L(0.83, 0.16, 2, 4, 700, 0.66, 1, 0.12),
+      L(0.92, 0.14, 3, 5, 720, 0.68, 1, 0.14),
+    ],
+    evo: L(1.04, 0.075, 3, 5, 820, 0.7, 2, 0.16),
+    levelText: ['', 'Faster fire, +dmg', '+1 round per burst', 'Rounds pierce 1', '+1 round, faster'],
+    gun: { unlock: 2, blurb: 'Fast, light rounds. Shreds runners and crawlers.' },
+  },
+  flamer: {
+    id: 'flamer',
+    name: 'Flamethrower',
+    evoName: "Dragon's Breath",
+    partner: 'chip',
+    desc: 'Hoses a cone of fire through everything in front of you.',
+    evoDesc: 'A roaring, longer jet that torches whole crowds.',
+    color: '#ff7a1f',
+    // area = flame size, speed = jet speed (range), count = flames per puff, extra = cone half-angle
+    levels: [
+      L(0.49, 0.09, 1, 20, 300, 0.42, 999, 0.22),
+      L(0.54, 0.085, 1, 22, 310, 0.44, 999, 0.24),
+      L(0.59, 0.08, 2, 23, 320, 0.46, 999, 0.26),
+      L(0.67, 0.075, 2, 25, 330, 0.48, 999, 0.28),
+      L(0.76, 0.07, 2, 28, 340, 0.5, 999, 0.3),
+    ],
+    evo: L(0.9, 0.05, 3, 32, 420, 0.55, 999, 0.34),
+    levelText: ['', 'Hotter, longer jet', '+1 flame per puff', 'Wider cone, +dmg', 'Bigger flames, +dmg'],
+    gun: { unlock: 4, blurb: 'Short range, burns through every infected in the cone.' },
+  },
+  mg: {
+    id: 'mg',
+    name: 'Heavy Machine Gun',
+    evoName: 'Minigun',
+    partner: 'chip',
+    desc: 'Heavy rounds that punch through the front rank.',
+    evoDesc: 'A spinning wall of lead that pierces the whole line.',
+    color: '#ffb02e',
+    levels: [
+      L(0.95, 0.3, 1, 5, 700, 0.9, 1, 0.08),
+      L(1.06, 0.27, 1, 5, 720, 0.9, 1, 0.08),
+      L(1.14, 0.24, 1, 6, 740, 0.95, 2, 0.1),
+      L(1.25, 0.21, 2, 6, 760, 0.95, 2, 0.1),
+      L(1.41, 0.18, 2, 6, 780, 1.0, 3, 0.12),
+    ],
+    evo: L(1.5, 0.065, 2, 7, 900, 1.0, 5, 0.14),
+    levelText: ['', 'Faster fire, +dmg', 'Rounds pierce 2', '+1 round per burst', 'Pierce 3, faster'],
+    gun: { unlock: 6, blurb: 'Hard-hitting rounds that pierce, with real knockback.' },
+  },
+  bazooka: {
+    id: 'bazooka',
+    name: 'Bazooka',
+    evoName: 'Warhead Swarm',
+    partner: 'chip',
+    desc: 'Fires rockets that explode on impact.',
+    evoDesc: 'Rocket salvos whose blasts scatter bomblets.',
+    color: '#ff4d3d',
+    // area = blast radius
+    levels: [
+      L(5.23, 1.25, 1, 42, 330, 1.6, 0),
+      L(5.82, 1.2, 1, 46, 340, 1.6, 0),
+      L(6.42, 1.15, 2, 48, 350, 1.6, 0),
+      L(7.13, 1.05, 2, 52, 360, 1.6, 0),
+      L(8.08, 0.95, 3, 56, 380, 1.6, 0),
+    ],
+    evo: L(8.79, 0.8, 3, 64, 420, 1.6, 0, 1),
+    levelText: ['', 'Bigger blast, +dmg', '+1 rocket', 'Bigger blast, +dmg', '+1 rocket, faster'],
+    gun: { unlock: 8, blurb: 'Slow, devastating rockets. Best against packs and bosses.' },
+  },
 };
 
 export const WEAPON_IDS = Object.keys(WEAPONS) as WeaponId[];
+
+/** Primary guns in unlock order (the Pulse Pistol first). `unlock` is the campaign sector index that must be unlocked. */
+export const GUN_IDS: WeaponId[] = ['pistol', 'smg', 'flamer', 'mg', 'bazooka'];
+export const gunUnlock = (id: WeaponId) => WEAPONS[id].gun?.unlock ?? 0;
+export const isGun = (id: WeaponId) => GUN_IDS.includes(id);
 
 export interface PassiveDef {
   id: PassiveId;

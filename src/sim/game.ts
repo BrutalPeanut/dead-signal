@@ -798,10 +798,40 @@ export class Game {
         p.vy *= 0.94;
         if (p.life <= 0) {
           p.alive = false;
-          this.src = 'frag';
+          this.src = p.extra ? 'bazooka' : 'frag';
           this.explode(p.x, p.y, p.area, p.dmg, '#ffb03d', false);
         }
         continue;
+      }
+      if (p.kind === 'rocket') {
+        // accelerates to full speed, bursts on the first infected it touches (or at end of flight)
+        const sp = Math.hypot(p.vx, p.vy) || 1;
+        const ns = Math.min(p.extra, sp + p.extra * 2.2 * dt);
+        p.vx *= ns / sp;
+        p.vy *= ns / sp;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        let hit = p.life <= 0;
+        if (!hit) {
+          this.grid.query(p.x, p.y, p.r + 40, (j) => {
+            const e = es[j];
+            if (hit || !e.alive) return;
+            if (dist2(p.x, p.y, e.x, e.y) < (p.r + e.r) ** 2) hit = true;
+          });
+        }
+        if (hit) {
+          p.alive = false;
+          this.src = 'bazooka';
+          this.explode(p.x, p.y, p.area, p.dmg, '#ff4d3d', p.evo);
+        }
+        continue;
+      }
+      if (p.kind === 'flame') {
+        // puffs slow down and swell as they burn out
+        const drag = Math.exp(-dt * 2.6);
+        p.vx *= drag;
+        p.vy *= drag;
+        p.r = 6 + (p.area - 6) * Math.min(1, 1 - p.life / p.maxLife + 0.15);
       }
       if (p.kind === 'disc') {
         // out then home back to player
@@ -845,7 +875,8 @@ export class Game {
         if (last !== undefined && (p.hitCd === 0 || this.time - last < p.hitCd)) return;
         e.hits.set(p.id, this.time);
         const sp = Math.hypot(p.vx, p.vy) || 1;
-        this.damage(e, p.dmg, p.vx / sp, p.vy / sp, p.kind === 'rail' ? 40 : 120, WEAPON_COLOR[p.kind]);
+        this.damage(e, p.dmg, p.vx / sp, p.vy / sp, KNOCK[p.kind] ?? 120, WEAPON_COLOR[p.kind]);
+        if (p.kind === 'flame') e.burn = 0.5;
         if (p.kind === 'disc' && p.evo) {
           // gravity disc drags enemies along
           e.kx += p.vx * 0.5;
@@ -876,7 +907,7 @@ export class Game {
         const s = this.rng.range(140, 220);
         this.addProjectile({
           kind: 'bomblet', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: 4, dmg: dmg * 0.45,
-          life: 0.45, maxLife: 0.45, pierce: 0, hitCd: 0, tx: 0, ty: 0, sx: x, sy: y, area: r * 0.55, evo: false, spin: 0, extra: 0,
+          life: 0.45, maxLife: 0.45, pierce: 0, hitCd: 0, tx: 0, ty: 0, sx: x, sy: y, area: r * 0.55, evo: false, spin: 0, extra: this.src === 'bazooka' ? 1 : 0,
         });
       }
     }
@@ -1280,7 +1311,14 @@ export class Game {
   }
 }
 
+/** Knockback per projectile kind (default 120). */
+const KNOCK: Record<string, number> = { rail: 40, bullet: 60, slug: 190, flame: 12 };
+
 const PROJ_SRC: Record<string, string> = {
+  bullet: 'smg',
+  slug: 'mg',
+  flame: 'flamer',
+  rocket: 'bazooka',
   bolt: 'pistol',
   rail: 'pistol',
   disc: 'disc',
@@ -1291,6 +1329,9 @@ const PROJ_SRC: Record<string, string> = {
 };
 
 const WEAPON_COLOR: Record<string, string> = {
+  bullet: '#ffd34d',
+  slug: '#ffb02e',
+  flame: '#ff7a1f',
   bolt: '#5ef2ff',
   rail: '#9ffcff',
   disc: '#ff4fd8',

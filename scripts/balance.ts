@@ -15,7 +15,7 @@ const chapters = (process.argv[5] ?? '0').split(',').map(Number);
 function base(): BaseStats {
   return {
     atk, hp, def: 0, crit: 0.05, critMul: 1.5, moveSpeed: 92, pickup: 46, healMul: 1, goldMul: 1,
-    rerolls: 2, revives: 0, startWeapon: 'pistol', startLevels: 0, regen: 0,
+    rerolls: 2, revives: 0, startWeapon: (process.env.START ?? 'pistol') as BaseStats['startWeapon'], startLevels: 0, regen: 0,
   };
 }
 

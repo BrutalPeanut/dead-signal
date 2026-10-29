@@ -32,6 +32,80 @@ function glyph(x: C, fill: string) {
 }
 
 const SKILL_GLYPHS: Record<string, (x: C, col: string) => void> = {
+  smg(x, col) {
+    x.beginPath();
+    x.roundRect(10, 22, 34, 11, 3); // receiver
+    x.roundRect(22, 31, 8, 17, 2); // magazine
+    x.roundRect(36, 31, 7, 10, 2); // grip
+    glyph(x, '#5a6478');
+    x.beginPath();
+    x.rect(44, 25, 12, 5); // barrel
+    x.roundRect(4, 24, 8, 7, 2); // stock
+    glyph(x, col);
+    x.fillStyle = col;
+    x.fillRect(14, 25, 24, 2.5);
+  },
+  flamer(x, col) {
+    x.beginPath();
+    x.arc(18, 40, 9, 0, Math.PI * 2); // fuel tank
+    x.roundRect(14, 26, 26, 9, 3);
+    glyph(x, '#5a6478');
+    x.beginPath();
+    x.rect(39, 27.5, 8, 6);
+    glyph(x, '#8d97ab');
+    x.beginPath(); // flame
+    x.moveTo(47, 30);
+    x.quadraticCurveTo(54, 16, 60, 22);
+    x.quadraticCurveTo(57, 26, 61, 30);
+    x.quadraticCurveTo(57, 34, 60, 39);
+    x.quadraticCurveTo(53, 44, 47, 31);
+    glyph(x, col);
+    x.fillStyle = '#ffe9a8';
+    x.beginPath();
+    x.ellipse(52, 30.5, 4, 2.4, 0, 0, Math.PI * 2);
+    x.fill();
+  },
+  mg(x, col) {
+    x.beginPath();
+    x.roundRect(8, 23, 30, 12, 3);
+    x.roundRect(30, 34, 6, 9, 2);
+    glyph(x, '#5a6478');
+    x.beginPath();
+    x.rect(38, 25.5, 20, 6); // long barrel
+    x.rect(50, 24, 3, 9);
+    glyph(x, col);
+    // bipod + ammo belt
+    x.strokeStyle = '#8d97ab';
+    x.lineWidth = 2.5;
+    x.beginPath();
+    x.moveTo(46, 31); x.lineTo(42, 46);
+    x.moveTo(46, 31); x.lineTo(52, 46);
+    x.stroke();
+    x.fillStyle = col;
+    for (let i = 0; i < 4; i++) x.fillRect(12 + i * 5, 36 + i * 2.2, 3.5, 6);
+  },
+  bazooka(x, col) {
+    x.save();
+    x.translate(32, 32);
+    x.rotate(-0.12);
+    x.beginPath();
+    x.roundRect(-26, -6, 46, 12, 4); // tube
+    glyph(x, '#5a6478');
+    x.beginPath();
+    x.roundRect(-8, 5, 7, 10, 2);
+    x.roundRect(-30, -8, 7, 16, 2); // flared back end
+    glyph(x, '#8d97ab');
+    x.beginPath(); // warhead poking out
+    x.moveTo(20, -5);
+    x.lineTo(28, -3);
+    x.quadraticCurveTo(33, 0, 28, 3);
+    x.lineTo(20, 5);
+    x.closePath();
+    glyph(x, col);
+    x.fillStyle = col;
+    x.fillRect(-18, -2, 26, 3);
+    x.restore();
+  },
   pistol(x, col) {
     x.beginPath();
     x.roundRect(14, 22, 30, 12, 3);

@@ -44,7 +44,7 @@ describe('modes', () => {
     expect(g.time).toBeGreaterThan(400);
     expect(bossesSeen).toBeGreaterThanOrEqual(2);
     expect(g.result().time).toBeGreaterThan(300);
-  });
+  }, 30000); // simulates 6+ minutes: slow on shared CI runners
 });
 
 describe('act II', () => {

@@ -1,3 +1,4 @@
+import { isGun } from '../sim/data';
 import * as THREE from 'three';
 import type { Game } from '../sim/game';
 import type { Pickup } from '../sim/types';
@@ -18,6 +19,9 @@ import { AuthoredBoss, AuthoredHero, BOSS_ANIMS, BOSS_MESH, COURIER, loadGlb, pr
 import type { Enemy } from '../sim/types';
 import { drawOverlay } from './overlay';
 import { ATMOS, World } from './world';
+
+/** Muzzle flash colour per gun. */
+const MUZZLE: Record<string, string> = { pistol: '#5ef2ff', smg: '#ffd34d', mg: '#ffb02e', flamer: '#ff7a1f', bazooka: '#ff4d3d' };
 
 /** Same framing rule as the 2D renderer: this many world units across a portrait phone. */
 const TARGET_VIEW = 360;
@@ -161,6 +165,7 @@ export class Renderer3D {
   private lights: Light[] = [];
   private motes: Mote[] = [];
   private muzzle = 0;
+  private muzzleCol = '#5ef2ff';
   private corpseSeed = 1;
   private m4 = new THREE.Matrix4();
   private q = new THREE.Quaternion();
@@ -538,7 +543,10 @@ export class Renderer3D {
           }
           break;
         case 'shoot':
-          if (e.weapon === 'pistol') this.muzzle = 0.07;
+          if (MUZZLE[e.weapon]) {
+            this.muzzle = 0.07;
+            this.muzzleCol = MUZZLE[e.weapon];
+          }
           break;
         case 'explode':
           this.flashLight(e.x, e.y, e.r * 2.4, e.color, 0.5, 0.3);
@@ -1162,6 +1170,7 @@ export class Renderer3D {
     }
     if (!this.authHero) return this.drawHeroFallback(skin);
     const h = this.authHero;
+    h.setGun(g.weapons.find((w) => isGun(w.id))?.id ?? 'pistol');
     // the courier faces where it runs; its upper body twists toward the auto-aim target
     const dx = g.px - this.lastPx, dy = g.py - this.lastPy;
     this.lastPx = g.px;
@@ -1192,8 +1201,9 @@ export class Renderer3D {
     if (this.muzzle > 0) {
       h.muzzleWorld(this.v3);
       const k = this.muzzle / 0.07;
-      this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, 34 * k, rgbC('#bffbff'), 1);
-      this.light(this.v3.x, this.v3.z, 70, rgbC('#5ef2ff'), 0.35 * k);
+      const big = this.muzzleCol === MUZZLE.bazooka ? 1.7 : 1;
+      this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, 34 * k * big, rgbC(this.muzzleCol === MUZZLE.pistol ? '#bffbff' : '#fff1c4'), 1);
+      this.light(this.v3.x, this.v3.z, 70 * big, rgbC(this.muzzleCol), 0.35 * k);
     }
   }
 
@@ -1292,6 +1302,39 @@ export class Renderer3D {
         case 'bomblet':
           this.glowAdd.add(p.x, 10, p.y, 18, rgbC('#ffb03d'), 1);
           break;
+        case 'bullet':
+        case 'slug': {
+          const sp = Math.hypot(p.vx, p.vy) || 1;
+          const slug = p.kind === 'slug';
+          const l = slug ? 26 : 18;
+          const col = slug ? '#ffb02e' : '#ffd34d';
+          this.ribbons.seg(p.x, 32, p.y, p.x - (p.vx / sp) * l, 32, p.y - (p.vy / sp) * l, p.r * (slug ? 1.3 : 0.9), rgbC(col), 0.9, 0.1);
+          this.glowAdd.add(p.x, 32, p.y, slug ? 16 : 11, rgbC('#fff1c4'), 0.8);
+          break;
+        }
+        case 'flame': {
+          const k = 1 - Math.max(0, p.life) / p.maxLife; // 0 fresh → 1 burnt out
+          const col = k < 0.3 ? '#ffe08a' : k < 0.65 ? '#ff7a1f' : '#c2341a';
+          const a = (1 - k * k) * 0.75;
+          this.glowAdd.add(p.x, 22 + k * 14, p.y, p.r * (p.evo ? 3.2 : 2.8), rgbC(col), a);
+          if ((p.id & 7) === 0) this.light(p.x, p.y, 60, rgbC('#ff7a1f'), 0.12 * (1 - k));
+          break;
+        }
+        case 'rocket': {
+          const sp = Math.hypot(p.vx, p.vy) || 1;
+          const ux = p.vx / sp, uz = p.vy / sp;
+          if (shells < 120) {
+            this.q.setFromEuler(this.e3.set(0, -Math.atan2(p.vy, p.vx), 0));
+            this.m4.compose(this.v3.set(p.x, 30, p.y), this.q, this.s3.set(2.1, 1.25, 1.25));
+            this.shellMesh.setMatrixAt(shells, this.m4);
+            this.shellMesh.setColorAt(shells++, this.tmpCol.set('#9aa874'));
+          }
+          // exhaust flame + smoke trail
+          this.glowAdd.add(p.x - ux * 12, 30, p.y - uz * 12, 22, rgbC('#ffcf6a'), 1);
+          this.ribbons.seg(p.x - ux * 10, 30, p.y - uz * 10, p.x - ux * 46, 30, p.y - uz * 46, 5, rgbC('#ff4d3d'), 0.55, 0);
+          this.light(p.x, p.y, 50, rgbC('#ff7a3d'), 0.22);
+          break;
+        }
         case 'disc': {
           const col = p.evo ? '#ff8ff0' : '#ff4fd8';
           this.glowAdd.add(p.x, 18, p.y, p.r * 5, rgbC(col), 0.9);

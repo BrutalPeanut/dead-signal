@@ -336,19 +336,10 @@ export class AuthoredHero {
       this.chest.add(tip);
       this.glows.push({ obj: this.chest, at: tip.position.clone(), size: 5, color: s.glow });
 
-      const hand = bone(m, 'handslot.r');
-      hand.add(
-        solid(
-          new Part()
-            .box(0.12, 0.42, 0.16, '#5a6478', [0, 0.18, 0])
-            .box(0.09, 0.14, 0.11, '#2c323f', [0, 0.44, 0])
-            .box(0.08, 0.12, 0.14, '#2c323f', [0, 0.02, 0.1])
-            .box(0.02, 0.2, 0.05, s.glow, [0.065, 0.2, 0]),
-        ),
-      );
+      this.hand = bone(m, 'handslot.r');
       this.muzzle = new THREE.Object3D();
-      this.muzzle.position.set(0, 0.55, 0);
-      hand.add(this.muzzle);
+      this.hand.add(this.muzzle);
+      this.setGun('pistol');
     });
   }
 
@@ -394,13 +385,77 @@ export class AuthoredHero {
     for (const b of this.hands) b.scale.setScalar(1 / ARM_SCALE);
   }
 
-  /** World position of the pistol muzzle. */
+  private hand!: THREE.Object3D;
+  private gunMesh: THREE.Object3D | null = null;
+  gunId = '';
+  /** Swap the gun in the courier's hand (Pulse Pistol or one of the primary guns). */
+  setGun(id: string) {
+    if (id === this.gunId) return;
+    this.gunId = id;
+    if (this.gunMesh) this.hand.remove(this.gunMesh);
+    const [part, muzzle] = detailed(2.2, () => gunModel(id, this.skin.glow));
+    this.gunMesh = solid(part);
+    this.hand.add(this.gunMesh);
+    this.muzzle.position.set(0, muzzle, 0);
+  }
+
+  /** World position of the gun muzzle. */
   muzzleWorld(out: THREE.Vector3) {
     return this.muzzle.getWorldPosition(out);
   }
 
   setHurt(k: number) {
     for (const m of this.r.mats) m.emissive.setRGB(0.6 * k, 0.05 * k, 0.1 * k);
+  }
+}
+
+/**
+ * Hand-held guns in the courier's right-hand slot space: the barrel runs along +Y, the grip
+ * sits at the origin and +Z is the grip side. Returns the model and the muzzle height.
+ */
+function gunModel(id: string, glow: string): [Part, number] {
+  const p = new Part();
+  const steel = '#5a6478', dark = '#2c323f', black = '#1b2029';
+  switch (id) {
+    case 'smg':
+      p.box(0.13, 0.5, 0.17, steel, [0, 0.2, 0])
+        .box(0.08, 0.14, 0.12, dark, [0, -0.02, 0.1]) // grip
+        .box(0.07, 0.08, 0.26, black, [0, 0.3, 0.2]) // magazine
+        .cyl(0.035, 0.035, 0.22, dark, [0, 0.56, 0])
+        .box(0.06, 0.26, 0.06, dark, [0, -0.14, -0.05]) // folded stock
+        .box(0.02, 0.32, 0.05, glow, [0.07, 0.22, 0]);
+      return [p, 0.7];
+    case 'mg':
+      p.box(0.15, 0.62, 0.2, steel, [0, 0.16, 0])
+        .box(0.09, 0.15, 0.12, dark, [0, -0.04, 0.11])
+        .box(0.16, 0.16, 0.18, '#3d4a2e', [0.13, 0.12, 0.05]) // ammo can
+        .cyl(0.045, 0.045, 0.66, dark, [0, 0.78, 0])
+        .cyl(0.065, 0.065, 0.2, black, [0, 0.62, 0]) // barrel shroud
+        .box(0.08, 0.3, 0.1, dark, [0, -0.28, 0]) // stock
+        .box(0.02, 0.4, 0.05, glow, [0.08, 0.18, -0.02]);
+      return [p, 1.13];
+    case 'flamer':
+      p.cyl(0.07, 0.08, 0.62, steel, [0, 0.26, 0])
+        .box(0.08, 0.14, 0.12, dark, [0, -0.02, 0.1])
+        .cyl(0.11, 0.11, 0.34, '#9a3b14', [0, 0.14, -0.16]) // fuel tank
+        .cyl(0.05, 0.09, 0.14, black, [0, 0.62, 0]) // nozzle
+        .box(0.02, 0.3, 0.05, '#ff7a1f', [0.075, 0.28, 0]);
+      return [p, 0.72];
+    case 'bazooka':
+      p.cyl(0.13, 0.13, 1.25, '#4b5a3a', [0, 0.25, -0.03])
+        .cyl(0.17, 0.13, 0.16, black, [0, -0.4, -0.03]) // flared back end
+        .cyl(0.15, 0.13, 0.08, black, [0, 0.87, -0.03])
+        .box(0.08, 0.14, 0.12, dark, [0, 0.0, 0.14])
+        .box(0.08, 0.13, 0.11, dark, [0, 0.32, 0.15]) // front grip
+        .box(0.05, 0.12, 0.08, steel, [0.12, 0.45, -0.03]) // sight
+        .box(0.02, 0.5, 0.04, '#ff4d3d', [0.135, 0.15, -0.03]);
+      return [p, 0.95];
+    default:
+      p.box(0.12, 0.42, 0.16, steel, [0, 0.18, 0])
+        .box(0.09, 0.14, 0.11, dark, [0, 0.44, 0])
+        .box(0.08, 0.12, 0.14, dark, [0, 0.02, 0.1])
+        .box(0.02, 0.2, 0.05, glow, [0.065, 0.2, 0]);
+      return [p, 0.55];
   }
 }
 

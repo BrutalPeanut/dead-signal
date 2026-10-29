@@ -39,6 +39,9 @@ export function buildOffers(
     if (st) {
       if (!st.evolved && st.level < MAX_SKILL_LEVEL)
         cands.push({ o: { type: 'weapon', id, level: st.level + 1, isNew: false }, w: 3.2 });
+    } else if (WEAPONS[id].gun && id !== 'pistol') {
+      // primary guns are picked in the Armory, never found mid-run
+      continue;
     } else if (weapons.length < rules.maxW && (!allowW || allowW.has(id))) {
       const early = weapons.length < 3 ? 1.6 : 1;
       cands.push({ o: { type: 'weapon', id, level: 1, isNew: true }, w: 1.4 * early });

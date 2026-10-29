@@ -107,6 +107,21 @@ export class Audio {
       case 'pistol':
         this.tone(980, 0.07, 'square', 0.05, 420);
         break;
+      case 'smg':
+        this.noiseHit(0.045, 0.07, 'highpass', 2400, 0, this.sfxBus, 0.8);
+        this.tone(620, 0.04, 'square', 0.03, 300);
+        break;
+      case 'mg':
+        this.noiseHit(0.08, 0.11, 'bandpass', 900, 0, this.sfxBus, 0.9);
+        this.tone(170, 0.07, 'square', 0.05, 80);
+        break;
+      case 'flamer':
+        if (this.gate('flamer-roar', 0.16)) this.noiseHit(0.2, 0.06, 'lowpass', 700, 0, this.sfxBus, 0.6);
+        break;
+      case 'bazooka':
+        this.noiseHit(0.3, 0.12, 'lowpass', 1200, 0, this.sfxBus, 0.7);
+        this.tone(260, 0.22, 'sawtooth', 0.05, 70);
+        break;
       case 'arc':
         this.noiseHit(0.12, 0.12, 'bandpass', 3200, 0, this.sfxBus, 4);
         this.tone(1800, 0.08, 'sawtooth', 0.03, 300);

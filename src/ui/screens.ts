@@ -1,8 +1,8 @@
 import { GEAR, RARITIES, RARITY_COLORS } from '../meta/gear';
 import type { RunRewards } from '../meta/profile';
 import type { RunResult } from '../sim/game';
-import { gearIcon } from '../render/icons';
-import { BOSSES, RUN_LENGTH, starTimes, type BossKind } from '../sim/data';
+import { gearIcon, skillIcon } from '../render/icons';
+import { BOSSES, RUN_LENGTH, WEAPONS, starTimes, type BossKind } from '../sim/data';
 import { DAILY_TIERS } from '../sim/modes';
 
 /** "What got me, and what do I do about it" — one line, shown on a loss. */
@@ -107,6 +107,14 @@ export function resultsModal(
       rw.newBest ? h('span.best-badge', rw.prevBest ? 'NEW BEST!' : 'FIRST SCORE!') : h('span.prev', `Best ${rw.prevBest.toLocaleString()}`),
     ),
     stars,
+    rw.newGun
+      ? h(
+          'div.new-gun',
+          { style: { borderColor: WEAPONS[rw.newGun].color } },
+          h('img', { src: skillIcon(rw.newGun), alt: '' }),
+          h('div', h('small', 'NEW GUN UNLOCKED'), h('b', { style: { color: WEAPONS[rw.newGun].color } }, WEAPONS[rw.newGun].name), h('span', 'Equipped for your next run · swap any time in the Armory')),
+        )
+      : null,
     h(
       'div.stats',
       h('div', h('b', fmtTime(r.time)), h('span', 'Survived')),

@@ -124,6 +124,117 @@ export function updateWeapons(g: Game, dt: number) {
         break;
       }
 
+      case 'smg':
+      case 'mg': {
+        // automatic fire: a burst of `count` rounds at the nearest, with random spread
+        w.timer -= dt;
+        if (w.timer > 0) break;
+        const vis = visibleEnemies(g, 30);
+        if (!vis.length) {
+          w.timer = 0.1;
+          break;
+        }
+        w.timer = s.cd * g.cdMul;
+        const t = nearest(g, vis, 1)[0];
+        const base = Math.atan2(t.y - g.py, t.x - g.px);
+        g.aim = base;
+        const sp = s.speed * g.projSpeedMul;
+        for (let k = 0; k < s.count; k++) {
+          const a = base + g.rng.range(-s.extra, s.extra);
+          fire(g, {
+            kind: w.id === 'mg' ? 'slug' : 'bullet',
+            x: g.px + Math.cos(a) * 16,
+            y: g.py + Math.sin(a) * 16,
+            vx: Math.cos(a) * sp * (1 - k * 0.04),
+            vy: Math.sin(a) * sp * (1 - k * 0.04),
+            r: s.area,
+            dmg,
+            life: s.dur,
+            maxLife: s.dur,
+            pierce: s.pierce,
+            evo: w.evolved,
+          });
+        }
+        g.fx.push({ t: 'shoot', weapon: w.id });
+        break;
+      }
+
+      case 'flamer': {
+        // a jet of short-lived flames into a cone toward the nearest infected in reach
+        w.timer -= dt;
+        if (w.timer > 0) break;
+        const reach = s.speed * s.dur * 0.75 * g.projSpeedMul + 30;
+        const vis = visibleEnemies(g, 0);
+        const t = vis.length ? nearest(g, vis, 1)[0] : null;
+        if (!t || dist2(t.x, t.y, g.px, g.py) > (reach + t.r) ** 2) {
+          w.timer = 0.08;
+          w.active = 0;
+          break;
+        }
+        w.timer = s.cd * g.cdMul;
+        // the nozzle swings toward the target rather than snapping, so the cone sweeps
+        const want = Math.atan2(t.y - g.py, t.x - g.px);
+        if (w.active <= 0) w.angle = want;
+        else w.angle += Math.atan2(Math.sin(want - w.angle), Math.cos(want - w.angle)) * 0.5;
+        w.active = 0.3;
+        g.aim = w.angle;
+        const sp = s.speed * g.projSpeedMul;
+        for (let k = 0; k < s.count; k++) {
+          const a = w.angle + g.rng.range(-s.extra, s.extra);
+          const v = sp * g.rng.range(0.85, 1.1);
+          fire(g, {
+            kind: 'flame',
+            x: g.px + Math.cos(a) * 18,
+            y: g.py + Math.sin(a) * 18,
+            vx: Math.cos(a) * v,
+            vy: Math.sin(a) * v,
+            r: 6,
+            area: s.area * g.areaMul,
+            dmg,
+            life: s.dur * g.durMul,
+            maxLife: s.dur * g.durMul,
+            pierce: 999,
+            evo: w.evolved,
+          });
+        }
+        g.fx.push({ t: 'shoot', weapon: 'flamer' });
+        break;
+      }
+
+      case 'bazooka': {
+        w.timer -= dt;
+        if (w.timer > 0) break;
+        const vis = visibleEnemies(g, 0);
+        if (!vis.length) {
+          w.timer = 0.15;
+          break;
+        }
+        w.timer = s.cd * g.cdMul;
+        const targets = nearest(g, vis, s.count);
+        const sp = s.speed * g.projSpeedMul;
+        for (let k = 0; k < s.count; k++) {
+          const t = targets[k % targets.length];
+          const a = Math.atan2(t.y - g.py, t.x - g.px) + (k >= targets.length ? (k % 2 ? 0.18 : -0.18) : 0);
+          if (k === 0) g.aim = a;
+          fire(g, {
+            kind: 'rocket',
+            x: g.px + Math.cos(a) * 18,
+            y: g.py + Math.sin(a) * 18,
+            vx: Math.cos(a) * sp * 0.55,
+            vy: Math.sin(a) * sp * 0.55,
+            r: 6,
+            area: s.area * g.areaMul,
+            dmg,
+            life: s.dur,
+            maxLife: s.dur,
+            extra: sp,
+            evo: w.evolved,
+          });
+        }
+        g.fx.push({ t: 'shoot', weapon: 'bazooka' });
+        break;
+      }
+
       case 'blades': {
         // Blades are always on: downtime is what made melee builds collapse under swarms.
         w.angle += s.speed * dt;

@@ -4,6 +4,8 @@ export interface HeroPose {
   t: number;
   moving: boolean;
   aim: number; // world angle the blaster points at
+  /** Which gun is in hand (default: the Pulse Pistol). */
+  gun?: string;
 }
 
 /** On-screen height of the courier in world units, and where the feet sit relative to the sim position. */
@@ -14,6 +16,8 @@ const BOOT = mat('#24262c', '#0c0d10', '#4a4e58', null);
 const GLOVE = mat('#30343d', '#14161b', '#5a606c', null);
 const GUN = mat('#5a6478', '#1f2430', '#8e9ab0', null);
 const GUN_DARK = mat('#2c323f', '#12151c', '#4a5263', null);
+const OLIVE = mat('#4b5a3a', '#262e1c', '#748558', null);
+const FUEL = mat('#9a3b14', '#4a1a08', '#d0602a', null);
 
 /** A playable character's look: the courier rig recoloured, plus a chest emblem and helmet trim. */
 export interface HeroSkin {
@@ -300,18 +304,58 @@ export function drawHero(ctx: C, pose: HeroPose) {
   paint(ctx, taper(0, 0, 5.8, 13, 1, 4.8), JACKET, -6, -6, 22, 12);
   ball(ctx, 13, 1, 4.4, 4.2, mat(SKIN.collar[0], SKIN.collar[1], SKIN.collar[2], null, 2));
   paint(ctx, taper(13, 1, 4.4, 22, 1.5, 4.2), GLOVE, 9, -4, 16, 10);
-  // blaster
-  paint(ctx, (c) => c.roundRect(17, -5.5, 24, 9, [3, 4, 4, 3]), GUN, 17, -5.5, 24, 9);
-  paint(ctx, (c) => c.roundRect(39, -3.5, 9, 5, 1.5), GUN_DARK, 39, -3.5, 9, 5);
-  paint(ctx, (c) => c.roundRect(21, 3, 6, 8, 2), GUN_DARK, 21, 3, 6, 8);
-  ctx.save();
-  ctx.shadowColor = '#5ef2ff';
-  ctx.shadowBlur = 6;
-  ctx.fillStyle = '#5ef2ff';
-  ctx.fillRect(24, -2.6, 12, 2.6);
+  gun2d(ctx, pose.gun ?? 'pistol');
   ctx.restore();
-  glow(ctx, 48.5, -1, 1.6, '#5ef2ff');
-  ctx.restore();
+}
+
+/** The gun in the courier's hand, in arm space (+x along the barrel, grip at x≈20). */
+function gun2d(ctx: C, id: string) {
+  const strip = (x: number, y: number, w: number, hgt: number, col: string) => {
+    ctx.save();
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = col;
+    ctx.fillRect(x, y, w, hgt);
+    ctx.restore();
+  };
+  switch (id) {
+    case 'smg':
+      paint(ctx, (c) => c.roundRect(15, -5.5, 26, 9, 3), GUN, 15, -5.5, 26, 9);
+      paint(ctx, (c) => c.roundRect(40, -3, 9, 4, 1.5), GUN_DARK, 40, -3, 9, 4);
+      paint(ctx, (c) => c.roundRect(27, 3, 5, 11, 1.5), GUN_DARK, 27, 3, 5, 11);
+      paint(ctx, (c) => c.roundRect(19, 3, 5, 7, 2), GUN_DARK, 19, 3, 5, 7);
+      strip(18, -2.6, 18, 2.4, '#ffd34d');
+      glow(ctx, 49.5, -1, 1.6, '#ffd34d');
+      break;
+    case 'mg':
+      paint(ctx, (c) => c.roundRect(12, -6, 30, 10, 3), GUN, 12, -6, 30, 10);
+      paint(ctx, (c) => c.roundRect(41, -3, 18, 4, 1.5), GUN_DARK, 41, -3, 18, 4);
+      paint(ctx, (c) => c.roundRect(24, 3, 10, 8, 2), OLIVE, 24, 3, 10, 8);
+      paint(ctx, (c) => c.roundRect(17, 3, 5, 8, 2), GUN_DARK, 17, 3, 5, 8);
+      strip(15, -3, 22, 2.6, '#ffb02e');
+      glow(ctx, 59.5, -1, 1.7, '#ffb02e');
+      break;
+    case 'flamer':
+      paint(ctx, (c) => c.roundRect(14, -4.5, 30, 8, 4), GUN, 14, -4.5, 30, 8);
+      paint(ctx, (c) => c.roundRect(14, 3, 14, 8, 4), FUEL, 14, 3, 14, 8);
+      paint(ctx, (c) => (c.moveTo(43, -4), c.lineTo(50, -6), c.lineTo(50, 4), c.lineTo(43, 2.5), c.closePath()), GUN_DARK, 43, -6, 7, 10);
+      strip(18, -2, 20, 2.2, '#ff7a1f');
+      glow(ctx, 51, -1, 2.2, '#ff9a3d');
+      break;
+    case 'bazooka':
+      paint(ctx, (c) => c.roundRect(2, -7.5, 50, 12, 4), OLIVE, 2, -7.5, 50, 12);
+      paint(ctx, (c) => c.roundRect(-1, -9, 6, 15, 2), GUN_DARK, -1, -9, 6, 15);
+      paint(ctx, (c) => c.roundRect(50, -8.5, 5, 14, 2), GUN_DARK, 50, -8.5, 5, 14);
+      paint(ctx, (c) => c.roundRect(19, 4, 6, 8, 2), GUN_DARK, 19, 4, 6, 8);
+      strip(10, -3, 30, 2.4, '#ff4d3d');
+      break;
+    default:
+      paint(ctx, (c) => c.roundRect(17, -5.5, 24, 9, [3, 4, 4, 3]), GUN, 17, -5.5, 24, 9);
+      paint(ctx, (c) => c.roundRect(39, -3.5, 9, 5, 1.5), GUN_DARK, 39, -3.5, 9, 5);
+      paint(ctx, (c) => c.roundRect(21, 3, 6, 8, 2), GUN_DARK, 21, 3, 6, 8);
+      strip(24, -2.6, 12, 2.6, '#5ef2ff');
+      glow(ctx, 48.5, -1, 1.6, '#5ef2ff');
+  }
 }
 
 /** Chest emblem: the quickest read of which character you are at phone size. */
