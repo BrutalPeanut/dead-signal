@@ -4182,3 +4182,23 @@ button {
   color: #ffd34d;
   font-weight: 800;
 }
+
+/* new primary gun unlocked (results screen) */
+.new-gun {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border: 2px solid;
+  border-radius: 14px;
+  background: rgba(255, 180, 60, 0.08);
+  text-align: left;
+  animation: newgun 0.6s ease-out;
+}
+.new-gun img { width: 52px; height: 52px; flex: none; }
+.new-gun small { display: block; font-size: 10px; letter-spacing: 0.14em; opacity: 0.75; }
+.new-gun b { display: block; font-size: 18px; }
+.new-gun span { display: block; font-size: 11px; opacity: 0.8; }
+@keyframes newgun { from { transform: scale(0.85); opacity: 0; } to { transform: none; opacity: 1; } }
+.roster.guns .ch-card img { background: none; }

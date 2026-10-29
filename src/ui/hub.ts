@@ -23,8 +23,8 @@ import { setHeroSkin } from '../render/hero';
 import { CHARACTERS, charById } from '../meta/characters';
 import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../meta/pass';
 import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
-import { gearIcon } from '../render/icons';
-import { BOSSES, WEAPONS, runLengthFor, starTimes } from '../sim/data';
+import { gearIcon, skillIcon } from '../render/icons';
+import { BOSSES, GUN_IDS, WEAPONS, gunUnlock, isGun, runLengthFor, starTimes } from '../sim/data';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
 import { coin, fmtNum, fmtTime, h, haptic, toast } from './dom';
 import { HomeScene } from './homeScene';
@@ -79,6 +79,7 @@ export class Hub {
   private top: HTMLElement;
   private nav: HTMLElement;
   tab: Tab = 'deploy';
+  private heroGun = 'pistol';
   sector: number;
   private heroCanvas: HTMLCanvasElement | null = null;
   private t = 0;
@@ -140,7 +141,7 @@ export class Hub {
       x.beginPath();
       x.ellipse(0, 13, 12, 4, 0, 0, Math.PI * 2);
       x.fill();
-      drawHero(x, { t: this.t, moving: false, aim: Math.sin(this.t * 0.6) * 0.5 });
+      drawHero(x, { t: this.t, moving: false, aim: Math.sin(this.t * 0.6) * 0.5, gun: this.heroGun });
       x.restore();
     }
   }
@@ -816,8 +817,51 @@ export class Hub {
         );
       }),
     );
+    const gunNow = p.gun();
+    this.heroGun = isGun(b.startWeapon) ? b.startWeapon : 'pistol';
+    const wgear = p.data.equipped.weapon ? GEAR[p.item(p.data.equipped.weapon)!.def] : undefined;
+    const gunLive = !wgear?.startWeapon || wgear.startWeapon === 'pistol';
+    const guns = h(
+      'div.roster.guns',
+      GUN_IDS.map((id) => {
+        const wd = WEAPONS[id];
+        const open = p.gunsUnlocked().includes(id);
+        const on = id === gunNow;
+        return h(
+          'button.ch-card.gun' + (on ? '.on' : '') + (open ? '' : '.lock'),
+          {
+            style: on ? { borderColor: wd.color, boxShadow: `0 0 14px ${wd.color}55` } : undefined,
+            onclick: () => {
+              if (!open) {
+                audio.click();
+                toast(`Clear Sector ${gunUnlock(id)} to unlock the ${wd.name}`, '#8d97ab');
+                return;
+              }
+              if (on) return;
+              p.setGun(id);
+              audio.levelUp();
+              haptic(15);
+              toast(`${wd.name} equipped`, wd.color);
+              this.renderBody();
+            },
+          },
+          h('img', { src: skillIcon(id), alt: wd.name }),
+          h('b', wd.name),
+          h('small', open ? (on ? 'Equipped' : 'Tap to equip') : `Sector ${gunUnlock(id)}`),
+          open ? null : h('i.lk', { html: icon('lock', 14) }),
+        );
+      }),
+    );
+    const gd = WEAPONS[gunNow];
     return h(
       'div',
+      h('div.section-h', 'Primary Gun', h('span.reset', `${p.gunsUnlocked().length}/${GUN_IDS.length} unlocked`)),
+      guns,
+      h(
+        'div.ch-perk',
+        h('b', `${gd.name} · evolves into ${gd.evoName}`),
+        h('span', gunLive ? gd.gun!.blurb : `Your ${wgear!.name} replaces the gun. Equip the Pulse Sidearm to fire the ${gd.name}.`),
+      ),
       h('div.section-h', 'Couriers', h('span.reset', `${CHARACTERS.filter((c) => p.charUnlocked(c.id)).length}/${CHARACTERS.length} unlocked`)),
       roster,
       h('div.ch-perk', h('b', `${sel.name} · ${sel.role}`), h('span', sel.perk)),
@@ -951,7 +995,7 @@ export class Hub {
         { style: { marginTop: '12px' } },
         h('div.kv', h('span', 'Level'), h('b', `${it.level} / ${MAX_LEVEL[it.rarity]}`)),
         h('div.kv', h('span', def.stat === 'atk' ? 'Attack' : 'Health'), h('b', `+${fmtNum(gearStat(it))}`)),
-        def.startWeapon ? h('div.kv', h('span', 'Starting weapon'), h('b', WEAPONS[def.startWeapon].name)) : null,
+        def.startWeapon ? h('div.kv', h('span', 'Starting weapon'), h('b', WEAPONS[def.startWeapon === 'pistol' ? this.p.gun() : def.startWeapon].name)) : null,
       ),
       h(
         'div.perks',

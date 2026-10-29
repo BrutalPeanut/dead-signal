@@ -4,7 +4,7 @@ import { dailyBoard, ENDLESS_BOARD, submitScore, uuid, type Submission } from '.
 import { DAILY_TIERS, dailySeed, type RunMode } from '../sim/modes';
 import { LOGIN_DAYS, freshLogin, loginReward, type LoginReward, type LoginState } from './login';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
-import { STAR2_TIME, TIME_SCALE, runLengthFor, starTimes } from '../sim/data';
+import { GUN_IDS, STAR2_TIME, TIME_SCALE, gunUnlock, runLengthFor, starTimes, type WeaponId } from '../sim/data';
 import { Rng } from '../sim/math';
 import type { RunResult } from '../sim/game';
 import type { BaseStats } from '../sim/types';
@@ -80,6 +80,8 @@ export interface SaveData {
   online: { id: string; name: string; crew: string; pending: Submission[] };
   pass: PassState;
   adKeys?: { date: string; n: number };
+  /** Chosen primary gun (replaces the Pulse Pistol). Unset = the newest one unlocked. */
+  gun?: WeaponId;
 }
 
 export interface RunRewards {
@@ -100,6 +102,8 @@ export interface RunRewards {
   /** Daily Challenge tiers reached for the first time today. */
   tiersNew?: string[];
   mode?: RunMode;
+  /** Primary gun unlocked (and equipped) by this clear, if any. */
+  newGun?: WeaponId;
   /** Character unlocked by this clear, if any. */
   newCharacter?: string;
   /** Loadout grew with this clear (starter kit opens up over Sectors 1-3). */
@@ -232,11 +236,27 @@ export class Profile {
       goldMul: 1 + this.milestone('gold'),
       rerolls: 1 + this.milestone('reroll'),
       revives: this.milestone('revive') + p.revive,
-      startWeapon: weapon ? GEAR[weapon.def].startWeapon ?? 'pistol' : 'pistol',
+      // the Pulse Sidearm (or no weapon gear) fires whichever primary gun is picked in the Armory
+      startWeapon: weapon && GEAR[weapon.def].startWeapon && GEAR[weapon.def].startWeapon !== 'pistol' ? GEAR[weapon.def].startWeapon! : this.gun(),
       startLevels: this.milestone('startLevel') + p.startLevel,
       regen: p.regen + (ch.regen ?? 0),
       bonusWeapon: ch.bonusWeapon,
     };
+  }
+
+  /** Primary guns unlocked so far, in unlock order. */
+  gunsUnlocked(): WeaponId[] {
+    return GUN_IDS.filter((id) => gunUnlock(id) <= this.data.unlocked);
+  }
+  /** The equipped primary gun: the picked one if it is unlocked, else the newest unlocked. */
+  gun(): WeaponId {
+    const have = this.gunsUnlocked();
+    return this.data.gun && have.includes(this.data.gun) ? this.data.gun : have[have.length - 1];
+  }
+  setGun(id: WeaponId) {
+    if (!this.gunsUnlocked().includes(id)) return;
+    this.data.gun = id;
+    this.save();
   }
 
   /**
@@ -793,9 +813,11 @@ export class Profile {
       levelsGained++;
     }
     this.save();
+    const newGun = unlockedSector ? GUN_IDS.find((id) => id !== 'pistol' && gunUnlock(id) === d.unlocked) : undefined;
+    if (newGun) d.gun = newGun; // the new gun replaces the old one; the Armory swaps back
     const newCharacter = unlockedSector ? CHARACTERS.find((c) => c.unlock === d.unlocked)?.name : undefined;
     const newLoadout = !unlockedSector ? undefined : d.unlocked === 2 ? 'More slots! You can now carry 4 attack + 4 support upgrades, and every weapon type can appear.' : d.unlocked === 3 ? 'Full loadout unlocked: 6 attack + 6 support slots.' : undefined;
-    return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector, score, newBest, prevBest, starsBefore: prevStars, starsAfter: stars, newCharacter, newLoadout };
+    return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector, score, newBest, prevBest, starsBefore: prevStars, starsAfter: stars, newCharacter, newLoadout, newGun };
   }
 
   // ------------------------------------------------------------------ idle relay + daily

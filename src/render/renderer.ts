@@ -1,3 +1,4 @@
+import { isGun } from '../sim/data';
 import type { Game } from '../sim/game';
 import type { Enemy, Pickup } from '../sim/types';
 import { bladePositions, bladesActive, weaponStats } from '../sim/weapons';
@@ -666,7 +667,7 @@ export class Renderer {
     ctx.ellipse(g.px, g.py + 13, 15, 5.5, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    const pose = { t: this.time, moving: g.moving, aim: g.aim };
+    const pose = { t: this.time, moving: g.moving, aim: g.aim, gun: g.weapons.find((w) => isGun(w.id))?.id };
     if (hurt) {
       this.drawTinted(ctx, g.px, g.py, 100, 96, 1, 'rgba(255,50,70,0.5)', (c) => drawHero(c, pose));
     } else {
@@ -827,6 +828,53 @@ export class Renderer {
         case 'bomblet':
           ctx.drawImage(this.sprites.glow('#ffb03d'), p.x - 8, p.y - 8, 16, 16);
           break;
+        case 'bullet':
+        case 'slug': {
+          const sp = Math.hypot(p.vx, p.vy) || 1;
+          const slug = p.kind === 'slug';
+          const l = slug ? 20 : 12;
+          ctx.strokeStyle = slug ? '#ffc76a' : '#ffe58a';
+          ctx.lineWidth = p.r * (slug ? 0.9 : 0.6);
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - (p.vx / sp) * l, p.y - (p.vy / sp) * l);
+          ctx.stroke();
+          ctx.drawImage(this.sprites.glow(slug ? '#ffb02e' : '#ffd34d'), p.x - 6, p.y - 6, 12, 12);
+          break;
+        }
+        case 'flame': {
+          const k = 1 - Math.max(0, p.life) / p.maxLife;
+          const col = k < 0.3 ? '#ffe08a' : k < 0.65 ? '#ff7a1f' : '#c2341a';
+          const r = p.r * 1.5;
+          ctx.globalAlpha = 1 - k * k;
+          ctx.drawImage(this.sprites.glow(col), p.x - r, p.y - r - k * 6, r * 2, r * 2);
+          ctx.globalAlpha = 1;
+          break;
+        }
+        case 'rocket': {
+          const a = Math.atan2(p.vy, p.vx);
+          ctx.drawImage(this.sprites.glow('#ff7a3d'), p.x - Math.cos(a) * 10 - 10, p.y - Math.sin(a) * 10 - 10, 20, 20);
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(a);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = '#6d7a4e';
+          ctx.strokeStyle = '#120d14';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(8, 0);
+          ctx.lineTo(3, -3);
+          ctx.lineTo(-7, -3);
+          ctx.lineTo(-7, 3);
+          ctx.lineTo(3, 3);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+          ctx.globalCompositeOperation = 'lighter';
+          break;
+        }
         case 'disc': {
           const r = p.r;
           const col = p.evo ? '#ff8ff0' : '#ff4fd8';

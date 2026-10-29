@@ -237,8 +237,8 @@ export function offerCard(g: Game, o: Offer, onPick: (() => void) | null) {
   let badge: HTMLElement | null = null;
   if (o.type === 'weapon' && o.isNew) badge = h('span.badge', 'NEW');
   if (o.type === 'passive') {
-    const partner = PASSIVES[o.id].partnerOf;
-    const w = g.weapons.find((x) => x.id === partner);
+    const w = g.weapons.find((x) => WEAPONS[x.id].partner === o.id && !x.evolved) ?? g.weapons.find((x) => x.id === PASSIVES[o.id].partnerOf);
+    const partner = w?.id ?? PASSIVES[o.id].partnerOf;
     if (w && !w.evolved && o.isNew) badge = h('span.badge.evo', w.level >= MAX_SKILL_LEVEL ? 'EVOLVES ' + WEAPONS[partner].name.toUpperCase() : '🔗 PAIRS WITH YOUR ' + WEAPONS[partner].name.toUpperCase());
     else if (o.isNew) badge = h('span.badge', 'NEW');
   }
@@ -263,7 +263,9 @@ export function offerCard(g: Game, o: Offer, onPick: (() => void) | null) {
  */
 function combo(g: Game, o: Offer) {
   if (o.type === 'passive') {
-    const wid = PASSIVES[o.id].partnerOf;
+    // the Targeting Chip pairs with every primary gun: name the one you actually carry
+    const owned = g.weapons.find((x) => WEAPONS[x.id].partner === o.id && !x.evolved);
+    const wid = owned?.id ?? PASSIVES[o.id].partnerOf;
     const wd = WEAPONS[wid];
     const w = g.weapons.find((x) => x.id === wid);
     let txt: string;

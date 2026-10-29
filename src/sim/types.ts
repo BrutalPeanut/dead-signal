@@ -32,7 +32,7 @@ export interface Enemy {
   phase2: boolean;
 }
 
-export type ProjKind = 'bolt' | 'rail' | 'shell' | 'bomblet' | 'disc' | 'drill' | 'canister';
+export type ProjKind = 'bolt' | 'rail' | 'shell' | 'bomblet' | 'disc' | 'drill' | 'canister' | 'bullet' | 'slug' | 'flame' | 'rocket';
 
 export interface Projectile {
   id: number;
