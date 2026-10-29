@@ -12,7 +12,10 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { GLOW, GlowBatch, TriBatch } from './batches';
 import { Part, RIM, SIGNAL, detailed, outlineMat, rgbC, toonMat } from './kit3d';
-import { BOSS_BUILDERS, RIG_BUILDERS, buildHero, type BossModel, type HeroModel, type RigDef } from './models';
+import { BOSS_BUILDERS, buildHero, type BossModel, type HeroModel } from './models';
+import { CROWD, CrowdKind, variantScale } from './crowd2';
+import { AuthoredBoss, AuthoredHero, BOSS_ANIMS, BOSS_MESH, COURIER, loadGlb, preloadAuthored, type Gltf } from './authored';
+import type { Enemy } from '../sim/types';
 import { drawOverlay } from './overlay';
 import { ATMOS, World } from './world';
 
@@ -39,6 +42,7 @@ const PK_SPARK = 0, PK_GOO = 1, PK_RING = 2, PK_SMOKE = 3, PK_FLASH = 4, PK_CHUN
 export type Tier = 0 | 1 | 2;
 
 interface Corpse {
+  seed: number;
   kind: string;
   x: number;
   y: number;
@@ -71,13 +75,6 @@ const CORPSE = new THREE.Color(0.5, 0.46, 0.5);
 const FLASH = new THREE.Color(2.6, 2.6, 2.6);
 const FLASH_ELITE = new THREE.Color(1.7, 1.7, 1.7);
 
-interface KindMesh {
-  rig: RigDef;
-  main: THREE.InstancedMesh[];
-  ink: THREE.InstancedMesh[];
-  rot: Float32Array;
-  count: number;
-}
 
 /**
  * Three.js renderer for Dead Signal. Drop-in replacement for the 2D Renderer: same public surface
@@ -116,11 +113,21 @@ export class Renderer3D {
   private flatAlpha = new TriBatch(60000, 'alpha');
   private ribbons = new TriBatch(30000, 'add');
 
-  private kinds = new Map<string, KindMesh>();
+  private crowd = new Map<string, CrowdKind>();
   private hero: HeroModel | null = null;
+  private authHero: AuthoredHero | null = null;
   private heroSkin: HeroSkin | null = null;
   private heroYaw = 0;
-  private bosses = new Map<string, BossModel>();
+  private moveAng = 0;
+  private lastPx = 0;
+  private lastPy = 0;
+  private lastHurt = 0;
+  /** Loaded authored models (Option D), by URL. Until loaded, procedural stand-ins draw. */
+  private assets = new Map<string, Gltf>();
+  private bossLive = new Map<number, { m: AuthoredBoss; prev: { state: number; stateT: number; shootCd: number }; x: number; y: number; phase2: boolean; dying: number }>();
+  private bossDownAt = false;
+  private oldBosses = new Map<string, BossModel>();
+  private oldSeen = new Set<string>();
   private yaw = new Map<number, number>();
   private yawNext = new Map<number, number>();
 
@@ -154,8 +161,8 @@ export class Renderer3D {
   private lights: Light[] = [];
   private motes: Mote[] = [];
   private muzzle = 0;
+  private corpseSeed = 1;
   private m4 = new THREE.Matrix4();
-  private m4b = new THREE.Matrix4();
   private q = new THREE.Quaternion();
   private v3 = new THREE.Vector3();
   private s3 = new THREE.Vector3();
@@ -242,6 +249,9 @@ export class Renderer3D {
 
     this.scene.add(this.decals.group);
 
+    // authored models stream in; procedural stand-ins draw until each one is ready
+    preloadAuthored().catch(() => {});
+    for (const url of [COURIER, BOSS_ANIMS, ...new Set(Object.values(BOSS_MESH))]) loadGlb(url).then((m) => this.assets.set(url, m)).catch((err) => console.warn('model load failed', url, err));
     const touch = matchMedia('(pointer:coarse)').matches;
     this.maxTier = touch ? 1 : 2;
     this.setGame(game);
@@ -261,12 +271,12 @@ export class Renderer3D {
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
     }
-    for (const km of this.kinds.values()) for (const m of km.main) m.castShadow = t === 2;
+    for (const k of this.crowd.values()) k.setShadows(t === 2);
     if (t >= 1) {
       if (!this.composer) {
         this.composer = new EffectComposer(this.gl);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
-        this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.42, 0.45, 0.92);
+        this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.45, 1.02);
         this.composer.addPass(this.bloom);
         this.composer.addPass(new OutputPass());
       }
@@ -317,8 +327,12 @@ export class Renderer3D {
     this.camX = g.px;
     this.camY = g.py;
     this.yaw.clear();
-    for (const b of this.bosses.values()) this.scene.remove(b.group);
-    this.bosses.clear();
+    for (const s of this.bossLive.values()) this.scene.remove(s.m.group);
+    this.bossLive.clear();
+    for (const b of this.oldBosses.values()) this.scene.remove(b.group);
+    this.oldBosses.clear();
+    this.lastPx = g.px;
+    this.lastPy = g.py;
     this.applyView();
   }
 
@@ -472,8 +486,8 @@ export class Renderer3D {
     this.drawShadows();
     this.drawPickups();
     this.drawEnemies();
-    this.drawBosses();
-    this.drawHero();
+    this.drawBosses(dt);
+    this.drawHero(dt);
     this.drawBlades();
     this.drawProjectiles();
     this.drawShots();
@@ -517,8 +531,9 @@ export class Renderer3D {
     for (const e of g.fx) {
       switch (e.t) {
         case 'death':
-          if (RIG_BUILDERS[e.kind] && this.corpses.length < [40, 80, 140][this.tier] && this.seen(e.x, e.y, 60)) {
-            this.corpses.push({ kind: e.kind, x: e.x, y: e.y, yaw: -Math.atan2(g.py - e.y, g.px - e.x), ph: Math.random() * 6, sc: (e.elite ? 1.3 : 1) * ACTOR_SCALE, t: 0 });
+          if (CROWD[e.kind] && this.corpses.length < [40, 80, 140][this.tier] && this.seen(e.x, e.y, 60)) {
+            const id = this.corpseSeed++;
+            this.corpses.push({ kind: e.kind, x: e.x, y: e.y, yaw: -Math.atan2(g.py - e.y, g.px - e.x), ph: Math.random() * 6, sc: (e.elite ? 1.3 : 1) * ACTOR_SCALE, t: 0, seed: id });
           }
           break;
         case 'shoot':
@@ -528,6 +543,7 @@ export class Renderer3D {
           this.flashLight(e.x, e.y, e.r * 2.4, e.color, 0.5, 0.3);
           break;
         case 'bossDown':
+          this.bossDownAt = true;
           this.flashLight(e.x, e.y, 420, '#ff3bd4', 1, 0.9);
           break;
         case 'emp':
@@ -928,32 +944,14 @@ export class Renderer3D {
 
   // ------------------------------------------------------------------ characters
 
-  private kindMesh(kind: string): KindMesh {
-    let km = this.kinds.get(kind);
-    if (km) return km;
-    const rig = RIG_BUILDERS[kind]();
-    const mat = toonMat();
-    const main: THREE.InstancedMesh[] = [];
-    const ink: THREE.InstancedMesh[] = [];
-    for (const part of rig.parts) {
-      const m = new THREE.InstancedMesh(part.geo, mat, MAX_PER_KIND);
-      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      m.frustumCulled = false;
-      m.setColorAt(0, WHITE);
-      m.instanceColor!.setUsage(THREE.DynamicDrawUsage);
-      m.count = 0;
-      m.castShadow = this.tier === 2;
-      const o = new THREE.InstancedMesh(part.geo, this.ink, MAX_PER_KIND);
-      o.instanceMatrix = m.instanceMatrix;
-      o.frustumCulled = false;
-      o.count = 0;
-      this.scene.add(o, m);
-      main.push(m);
-      ink.push(o);
+  private crowdKind(kind: string): CrowdKind {
+    let k = this.crowd.get(kind);
+    if (!k) {
+      k = new CrowdKind(kind, MAX_PER_KIND, this.scene);
+      k.setShadows(this.tier === 2);
+      this.crowd.set(kind, k);
     }
-    km = { rig, main, ink, rot: new Float32Array(rig.parts.length * 2), count: 0 };
-    this.kinds.set(kind, km);
-    return km;
+    return k;
   }
 
   private smoothYaw(id: number, target: number, rate: number) {
@@ -971,7 +969,7 @@ export class Renderer3D {
 
   private drawEnemies() {
     const g = this.game;
-    for (const km of this.kinds.values()) km.count = 0;
+    for (const k of this.crowd.values()) k.begin();
     const yawRate = 0.25;
     for (const e of g.enemies) {
       if (e.kind === 'boss') continue;
@@ -980,147 +978,248 @@ export class Renderer3D {
         if (y !== undefined) this.yawNext.set(e.id, y);
         continue;
       }
-      const km = this.kindMesh(e.kind);
-      if (km.count >= MAX_PER_KIND) continue;
-      const i = km.count++;
+      const ck = this.crowdKind(e.kind);
       const ang = Math.atan2(g.py - e.y, g.px - e.x);
       const yaw = this.smoothYaw(e.id, -ang, yawRate);
-      const bob = km.rig.pose(e.anim, km.rot);
-      const sc = (e.elite ? 1.3 : 1) * ACTOR_SCALE;
+      const sc = (e.elite ? 1.3 : 1) * ACTOR_SCALE * variantScale(e.id);
       this.q.setFromEuler(this.e3.set(0, yaw, 0));
-      this.m4.compose(this.v3.set(e.x, bob * sc, e.y), this.q, this.s3.set(sc, sc, sc));
+      this.m4.compose(this.v3.set(e.x, 0, e.y), this.q, this.s3.set(sc, sc, sc));
+      // hit stagger: a quick recoil while the sim's hit-flash timer runs
+      const hit = e.flash > 0 ? Math.min(1, e.flash / 0.08) : 0;
       const col = e.flash > 0 ? (e.elite ? FLASH_ELITE : FLASH) : WHITE;
-      for (let p = 0; p < km.main.length; p++) {
-        const pv = km.rig.parts[p].pivot;
-        const rz = km.rot[p * 2], rx = km.rot[p * 2 + 1];
-        if (p === 0 || (rz === 0 && rx === 0)) km.main[p].setMatrixAt(i, this.m4);
-        else {
-          this.m4b.makeTranslation(pv[0], pv[1], pv[2]);
-          this.q.setFromEuler(this.e3.set(rx, 0, rz));
-          this.m4b.multiply(this.tmpR.makeRotationFromQuaternion(this.q));
-          this.m4b.multiply(this.tmpM.makeTranslation(-pv[0], -pv[1], -pv[2]));
-          this.m4b.premultiply(this.m4);
-          km.main[p].setMatrixAt(i, this.m4b);
+      const W = ck.add(this.m4, e.anim, this.time + e.id * 0.37, hit, e.id, col);
+      if (W) {
+        for (const gl of ck.rig.glows) {
+          this.v3.set(gl.at[0], gl.at[1], gl.at[2]).applyMatrix4(W[gl.j]);
+          this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, gl.size * sc * 1.5, rgbC(gl.color), 0.9);
         }
-        km.main[p].setColorAt(i, col);
-      }
-      for (const gl of km.rig.glows) {
-        this.v3.set(gl.at[0], gl.at[1], gl.at[2]).applyMatrix4(this.m4);
-        this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, gl.size * sc * 1.6, rgbC(gl.color), 0.9);
       }
       if (e.elite) {
         const pulse = (Math.sin(this.time * 5 + e.id) + 1) / 2;
-        this.glowAdd.add(e.x, km.rig.height * 0.5 * sc, e.y, e.r * 6.4, rgbC('#ffc94d'), 0.35 + pulse * 0.25);
+        this.glowAdd.add(e.x, ck.rig.height * 0.5 * sc, e.y, e.r * 6.4, rgbC('#ffc94d'), 0.35 + pulse * 0.25);
         this.flatAdd.band(e.x, e.y, e.r * 1.6, e.r * 1.6 + 2.5, 1, rgbC('#ffc94d'), 0.6 + pulse * 0.3);
       }
       if (e.burn > 0) this.glowAdd.add(e.x, 14, e.y, 26, rgbC('#ff8a1f'), 0.6);
     }
     // the fallen: tip over backwards, then sink into the floor
     for (const c of this.corpses) {
-      const km = this.kindMesh(c.kind);
-      if (km.count >= MAX_PER_KIND) continue;
-      const i = km.count++;
-      km.rig.pose(c.ph, km.rot);
+      const ck = this.crowdKind(c.kind);
       const tip = Math.min(1, c.t / 0.28);
       const ease = 1 - (1 - tip) * (1 - tip);
       const sink = Math.max(0, c.t - 0.45) * 40;
       this.q.setFromEuler(this.e3.set(0, c.yaw, ease * 1.45, 'YXZ'));
       this.m4.compose(this.v3.set(c.x, -sink, c.y), this.q, this.s3.set(c.sc, c.sc, c.sc));
-      for (let p = 0; p < km.main.length; p++) {
-        km.main[p].setMatrixAt(i, this.m4);
-        km.main[p].setColorAt(i, CORPSE);
-      }
+      ck.add(this.m4, c.ph, c.ph, 0, c.seed, CORPSE);
     }
-    for (const km of this.kinds.values()) {
-      for (let p = 0; p < km.main.length; p++) {
-        km.main[p].count = km.count;
-        km.ink[p].count = km.count;
-        km.main[p].instanceMatrix.needsUpdate = true;
-        km.main[p].instanceColor!.needsUpdate = true;
-      }
+    for (const k of this.crowd.values()) k.end();
+  }
+
+  /** Pick a boss clip from what its sim state machine is doing right now. */
+  private bossAnim(b: Enemy, m: AuthoredBoss, prev: { state: number; stateT: number; shootCd: number }) {
+    const g = this.game;
+    const reset = b.stateT > prev.stateT + 0.05; // a move just started
+    const lines = g.telegraphs.filter((t) => t.kind === 'line');
+    const charging = lines.some((t) => t.t > 0);
+    const beaming = lines.some((t) => t.t <= 0 && t.active > 0);
+    const walk = () => m.play(b.phase2 ? 'run' : 'walk', b.phase2 ? 0.9 : 1);
+    switch (b.boss) {
+      case 'warden':
+        if (b.state === 1) m.play('block');
+        else if (b.state === 2) m.play('run', 1.3);
+        else if (b.state === 3 && prev.state !== 3) m.play('attack', 1.4);
+        else if (b.state === 0) walk();
+        break;
+      case 'hive':
+        if (reset) m.play('cast');
+        else if (b.shootCd > prev.shootCd + 0.05) m.play('taunt');
+        else walk();
+        break;
+      case 'colossus':
+        if (charging) m.play('block');
+        else if (beaming) m.play('cast');
+        else if (reset) m.play('attack');
+        else walk();
+        break;
+      case 'broadcaster':
+        if (b.state === 9) m.play('taunt');
+        else if (prev.state === 9) m.play('rise', 1.6);
+        else if (charging || beaming) m.play('cast');
+        else if (reset) m.play('shoot');
+        else walk();
+        break;
     }
   }
 
-  private tmpM = new THREE.Matrix4();
-  private tmpR = new THREE.Matrix4();
-
-  private drawBosses() {
+  private drawBosses(dt: number) {
     const g = this.game;
-    const seen = new Set<string>();
+    const seen = new Set<number>();
     for (const b of g.enemies) {
       if (b.kind !== 'boss' || !b.boss) continue;
-      seen.add(b.boss);
-      let m = this.bosses.get(b.boss);
-      if (!m) {
-        const kind = b.boss;
-        m = detailed(1.8, () => BOSS_BUILDERS[kind]());
-        this.shadowCaster(m.group);
-        this.bosses.set(b.boss, m);
-        this.scene.add(m.group);
+      seen.add(b.id);
+      let s = this.bossLive.get(b.id);
+      if (!s) {
+        const mesh = this.assets.get(BOSS_MESH[b.boss]);
+        const anims = this.assets.get(BOSS_ANIMS);
+        if (mesh && anims) {
+          const m = new AuthoredBoss(b.boss, mesh, anims);
+          m.group.position.set(b.x, 0, b.y);
+          this.scene.add(m.group);
+          m.play('rise', 1.4);
+          s = { m, prev: { state: b.state, stateT: b.stateT, shootCd: b.shootCd }, x: b.x, y: b.y, phase2: b.phase2, dying: -1 };
+          this.bossLive.set(b.id, s);
+        }
       }
-      m.group.visible = true;
-      m.animate(b.anim, b.state, b.phase2);
+      const pulse = 0.75 + 0.25 * Math.sin(this.time * (b.phase2 ? 9 : 5));
       const ang = Math.atan2(g.py - b.y, g.px - b.x);
       const yaw = this.smoothYaw(b.id, -ang, 0.08);
-      m.group.position.set(b.x, 0, b.y);
-      m.group.rotation.y = yaw;
-      m.group.scale.setScalar(1.15);
-      if (b.flash > 0) m.mat.emissive.setRGB(0.2, 0.2, 0.2);
-      m.group.updateMatrixWorld();
-      const pulse = 0.75 + 0.25 * Math.sin(this.time * (b.phase2 ? 9 : 5));
-      for (const gl of m.glows) {
-        this.v3.copy(gl.at).applyMatrix4(gl.obj.matrixWorld);
-        const s = gl.size * 1.6 * (b.phase2 ? 1.25 : 1) * (gl.pulse ? pulse : 1);
-        this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, s, rgbC(gl.color), 0.95);
-      }
-      if (b.state === 1 || b.phase2) this.glowAdd.add(b.x, m.height * 0.5, b.y, m.height * 1.3, rgbC(SIGNAL), 0.12 + 0.08 * pulse);
-      this.light(b.x, b.y, m.height * 1.4, rgbC(SIGNAL), (b.phase2 ? 0.26 : 0.16) * pulse);
+      let height = 110;
+      if (s) {
+        const m = s.m;
+        this.bossAnim(b, m, s.prev);
+        s.prev.state = b.state;
+        s.prev.stateT = b.stateT;
+        s.prev.shootCd = b.shootCd;
+        s.x = b.x;
+        s.y = b.y;
+        s.phase2 = b.phase2;
+        m.group.position.set(b.x, 0, b.y);
+        m.group.rotation.y = yaw;
+        m.update(dt, b.flash > 0, b.phase2);
+        m.group.updateMatrixWorld();
+        height = m.height;
+        for (const gl of m.glows) {
+          this.v3.copy(gl.at).applyMatrix4(gl.obj.matrixWorld);
+          const sz = gl.size * 1.6 * (b.phase2 ? 1.25 : 1) * (gl.pulse ? pulse : 1);
+          this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, sz, rgbC(gl.color), 0.95);
+        }
+      } else this.drawBossFallback(b, yaw, pulse);
+      if (b.state === 1 || b.phase2) this.glowAdd.add(b.x, height * 0.5, b.y, height * 1.3, rgbC(SIGNAL), 0.12 + 0.08 * pulse);
+      this.light(b.x, b.y, height * 1.4, rgbC(SIGNAL), (b.phase2 ? 0.26 : 0.16) * pulse);
     }
-    for (const [k, m] of this.bosses) if (!seen.has(k)) m.group.visible = false;
+    // bosses gone from the sim: the one that was just killed plays its death, then sinks
+    for (const [id, s] of this.bossLive) {
+      if (seen.has(id)) continue;
+      if (s.dying < 0) {
+        if (!this.bossDownAt) {
+          this.scene.remove(s.m.group);
+          this.bossLive.delete(id);
+          continue;
+        }
+        s.dying = 0;
+        s.m.play('death', 0.9);
+      }
+      s.dying += dt;
+      s.m.update(dt, false, false);
+      if (s.dying > 1.8) s.m.group.position.y = -(s.dying - 1.8) * 60;
+      if (s.dying > 3.2) {
+        this.scene.remove(s.m.group);
+        this.bossLive.delete(id);
+      }
+    }
+    this.bossDownAt = false;
+    for (const [k, m] of this.oldBosses) if (!this.oldSeen.has(k)) m.group.visible = false;
+    this.oldSeen.clear();
   }
 
-  private drawHero() {
+  /** Procedural boss, only used for the moment before the authored models finish loading. */
+  private drawBossFallback(b: Enemy, yaw: number, pulse: number) {
+    let m = this.oldBosses.get(b.boss!);
+    if (!m) {
+      const kind = b.boss!;
+      m = detailed(1.8, () => BOSS_BUILDERS[kind]());
+      this.shadowCaster(m.group);
+      this.oldBosses.set(kind, m);
+      this.scene.add(m.group);
+    }
+    this.oldSeen.add(b.boss!);
+    m.group.visible = true;
+    m.animate(b.anim, b.state, b.phase2);
+    m.group.position.set(b.x, 0, b.y);
+    m.group.rotation.y = yaw;
+    m.group.scale.setScalar(1.15);
+    if (b.flash > 0) m.mat.emissive.setRGB(0.2, 0.2, 0.2);
+    m.group.updateMatrixWorld();
+    for (const gl of m.glows) {
+      this.v3.copy(gl.at).applyMatrix4(gl.obj.matrixWorld);
+      this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, gl.size * 1.6 * (gl.pulse ? pulse : 1), rgbC(gl.color), 0.95);
+    }
+  }
+
+  private drawHero(dt: number) {
     const g = this.game;
     const skin = currentHeroSkin();
-    if (skin !== this.heroSkin) {
+    const src = this.assets.get(COURIER);
+    if (src && (skin !== this.heroSkin || !this.authHero)) {
+      if (this.authHero) this.scene.remove(this.authHero.group);
+      if (this.hero) {
+        this.scene.remove(this.hero.group);
+        this.hero = null;
+      }
+      this.authHero = new AuthoredHero(src, skin);
+      this.heroSkin = skin;
+      this.scene.add(this.authHero.group);
+    }
+    if (!this.authHero) return this.drawHeroFallback(skin);
+    const h = this.authHero;
+    // the courier faces where it runs; its upper body twists toward the auto-aim target
+    const dx = g.px - this.lastPx, dy = g.py - this.lastPy;
+    this.lastPx = g.px;
+    this.lastPy = g.py;
+    const moving = g.moving && dx * dx + dy * dy > 1e-4;
+    if (moving) this.moveAng = Math.atan2(dy, dx);
+    const want = moving ? -this.moveAng : -g.aim;
+    let d = (want - this.heroYaw) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    this.heroYaw += d * Math.min(1, dt * 14);
+    let tw = (-g.aim - this.heroYaw) % (Math.PI * 2);
+    if (tw > Math.PI) tw -= Math.PI * 2;
+    if (tw < -Math.PI) tw += Math.PI * 2;
+    const hitNow = g.hurtT > 0 && this.lastHurt <= 0;
+    this.lastHurt = g.hurtT;
+    h.group.position.set(g.px, 0, g.py);
+    h.group.rotation.y = this.heroYaw;
+    h.group.scale.setScalar(ACTOR_SCALE);
+    h.update(dt, { moving: g.moving, dead: g.state === 'dead' || g.state === 'revive', won: g.state === 'won', hit: hitNow, twist: tw });
+    h.setHurt(g.hurtT > 0 ? 1 : 0);
+    h.group.updateMatrixWorld();
+    for (const gl of h.glows) {
+      this.v3.copy(gl.at).applyMatrix4(gl.obj.matrixWorld);
+      this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, gl.size * 1.6, rgbC(gl.color), 0.9);
+    }
+    this.light(g.px, g.py, 48, rgbC(skin.glow), 0.12);
+    if (this.muzzle > 0) {
+      h.muzzleWorld(this.v3);
+      const k = this.muzzle / 0.07;
+      this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, 34 * k, rgbC('#bffbff'), 1);
+      this.light(this.v3.x, this.v3.z, 70, rgbC('#5ef2ff'), 0.35 * k);
+    }
+  }
+
+  /** Procedural courier, shown only until the authored model has loaded. */
+  private drawHeroFallback(skin: HeroSkin) {
+    const g = this.game;
+    if (skin !== this.heroSkin || !this.hero) {
       if (this.hero) this.scene.remove(this.hero.group);
       this.hero = detailed(2, () => buildHero(skin));
       this.shadowCaster(this.hero.group);
       this.heroSkin = skin;
       this.scene.add(this.hero.group);
     }
-    const h = this.hero!;
+    const h = this.hero;
     let d = (-g.aim - this.heroYaw) % (Math.PI * 2);
     if (d > Math.PI) d -= Math.PI * 2;
     if (d < -Math.PI) d += Math.PI * 2;
     this.heroYaw += d * 0.35;
     const ph = g.moving ? this.time * 11 : 0;
-    const bob = g.moving ? Math.abs(Math.cos(ph)) * 2.2 : Math.sin(this.time * 2.4) * 0.6;
     h.group.position.set(g.px, 0, g.py);
     h.group.rotation.y = this.heroYaw;
     h.group.scale.setScalar(ACTOR_SCALE);
-    h.torso.position.y = bob;
-    // recoil: the torso kicks back a touch on every pulse bolt
-    h.torso.position.x = -this.muzzle * 22;
-    h.torso.rotation.z = g.moving ? -0.08 : 0;
+    h.torso.position.y = g.moving ? Math.abs(Math.cos(ph)) * 2.2 : Math.sin(this.time * 2.4) * 0.6;
     const sw = g.moving ? Math.sin(ph) * 0.6 : 0;
     h.legL.rotation.z = sw;
     h.legR.rotation.z = -sw;
-    const hurt = g.hurtT > 0;
-    h.mat.emissive.setRGB(hurt ? 0.6 : 0, hurt ? 0.05 : 0, hurt ? 0.1 : 0);
-    h.group.updateMatrixWorld();
-    for (const gl of h.glows) {
-      this.v3.copy(gl.at).applyMatrix4(gl.obj.matrixWorld);
-      this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, gl.size * 1.6, rgbC(gl.color), 0.9);
-    }
-    this.light(g.px, g.py, 48, rgbC(this.heroSkin!.glow), 0.12);
-    if (this.muzzle > 0) {
-      const tip = h.glows[h.glows.length - 1];
-      this.v3.copy(tip.at).applyMatrix4(tip.obj.matrixWorld);
-      const k = this.muzzle / 0.07;
-      this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, 34 * k, rgbC('#bffbff'), 1);
-      this.light(this.v3.x, this.v3.z, 70, rgbC('#5ef2ff'), 0.35 * k);
-    }
+    h.mat.emissive.setRGB(g.hurtT > 0 ? 0.6 : 0, 0, 0);
   }
 
   private drawBlades() {

@@ -7,8 +7,8 @@ A one-thumb sci-fi zombie survivor-like ("bullet heaven") for mobile web, in the
 - **Run:** 10 minutes per sector. Auto-firing weapons, hordes, elites with chests, a mid-boss at 5:00 and a final boss at 10:00 in a caged arena.
 - **Build:** 8 weapons × 8 passives. Max a weapon, own its partner passive, and the next chest evolves it.
 - **Progression:** 10 sectors, 6-slot gear with 6 rarities and 3→1 merging, talents with account-level milestones, supply crates, an idle Signal Relay and a daily ration.
-- **3D by default:** a Three.js renderer draws the same sim with low-poly, cel-shaded models of every infected, boss and courier skin. The original 2D art is one tap away (Settings → 3D graphics, or `?r=2d`).
-- **No assets:** every character, icon, floor and sound is generated in code.
+- **3D by default:** a Three.js renderer draws the same sim. The courier and the four bosses are rigged, hand-animated models (KayKit by Kay Lousberg, CC0) restyled in code with helmets, gear and glowing signal parts; the horde is procedural, with knees, elbows and per-zombie colour variants. The original 2D art is one tap away (Settings → 3D graphics, or `?r=2d`).
+- **Almost no assets:** apart from those five character rigs (~0.7 MB gzipped, `src/assets/models/CREDITS.md`), every icon, floor, effect and sound is generated in code.
 
 The design rationale (with sources) is in [`docs/DESIGN.md`](docs/DESIGN.md).
 
