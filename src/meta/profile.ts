@@ -147,6 +147,8 @@ function fresh(): SaveData {
 
 export class Profile {
   data: SaveData;
+  /** Playtest links only (never saved): floor for ATK/HP so a test save can hold its own deep in the campaign. */
+  boost: { atk: number; hp: number } | null = null;
   private listeners: (() => void)[] = [];
 
   constructor(private storage: Storage | null = typeof localStorage !== 'undefined' ? localStorage : null, private key = KEY) {
@@ -225,8 +227,8 @@ export class Profile {
     hp *= 1 + p.hpPct + (ch.hpPct ?? 0);
     const weapon = this.data.equipped.weapon ? this.item(this.data.equipped.weapon) : undefined;
     return {
-      atk: Math.round(atk),
-      hp: Math.round(hp),
+      atk: Math.round(Math.max(atk, this.boost?.atk ?? 0)),
+      hp: Math.round(Math.max(hp, this.boost?.hp ?? 0)),
       def: Math.min(0.6, d.tracks.def * 0.005 + p.def),
       crit: 0.05 + p.crit + this.milestone('crit') + (ch.crit ?? 0),
       critMul: 1.5 + p.critMul,

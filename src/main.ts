@@ -12,7 +12,8 @@ import { KEY, Profile } from './meta/profile';
 import { Renderer } from './render/renderer';
 import { Renderer3D } from './render3d/renderer3d';
 import { botChoose, botMove } from './sim/bot';
-import { getChapter } from './sim/chapters';
+import { CHAPTER_COUNT, getChapter } from './sim/chapters';
+import { GUN_IDS, type WeaponId } from './sim/data';
 import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes';
 import { DT, Game } from './sim/game';
 import type { BaseStats, FxEvent } from './sim/types';
@@ -38,6 +39,14 @@ function want3d(graphics: '3d' | '2d' | undefined) {
   }
 }
 
+/** ?playtest=N (1-based sector), or null. */
+function playtestSector(): number | null {
+  const v = new URLSearchParams(location.search).get('playtest');
+  if (v === null) return null;
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.max(0, Math.min(CHAPTER_COUNT - 1, n - 1)) : 0;
+}
+
 /**
  * ?fresh plays as a brand-new player every load (great for trying the first-time experience)
  * without touching your real save; ?profile=name keeps a separate named save.
@@ -45,6 +54,25 @@ function want3d(graphics: '3d' | '2d' | undefined) {
 function makeProfile() {
   const q = new URLSearchParams(location.search);
   const store = typeof localStorage !== 'undefined' ? localStorage : null;
+  const pt = playtestSector();
+  if (pt !== null) {
+    // ?playtest=8 drops straight into Sector 8 on a separate test save (your real save is untouched):
+    // everything up to that sector unlocked, every primary gun, and gear power to match.
+    // Optional: &gun=smg|flamer|mg|bazooka|pistol, &atk=, &hp=
+    const p = new Profile(store, KEY + ':playtest');
+    p.data.unlocked = Math.max(p.data.unlocked, pt, 8);
+    p.data.seenIntro = true;
+    for (let i = 0; i < pt; i++) p.data.stars[i] = (p.data.stars[i] ?? 0) | 7;
+    const gun = q.get('gun') as WeaponId | null;
+    if (gun && GUN_IDS.includes(gun)) p.data.gun = gun;
+    const num = (k: string, d: number) => {
+      const v = Number(q.get(k));
+      return Number.isFinite(v) && v > 0 ? v : d;
+    };
+    p.boost = { atk: num('atk', 70 + pt * 11), hp: num('hp', 560 + pt * 100) };
+    p.save();
+    return p;
+  }
   if (q.has('fresh')) {
     try {
       store?.removeItem(KEY + ':fresh');
@@ -122,6 +150,8 @@ class App {
         'intro',
       );
     } else setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
+    const pt = playtestSector();
+    if (pt !== null) setTimeout(() => this.startRun(pt, 'campaign'), 400);
     requestAnimationFrame(this.frame);
   }
 
