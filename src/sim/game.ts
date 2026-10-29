@@ -383,7 +383,9 @@ export class Game {
         this.spawnBoss(kinds[this.endlessBossIdx++ % kinds.length], true);
         this.endlessBossT += ENDLESS_BOSS_EVERY;
       }
-    } else if (!this.finalBossSpawned && this.time >= this.runLength) {
+    } else if (!this.finalBossSpawned && this.time >= this.runLength && !bossActive) {
+      // If the mid-boss is still up at the final whistle, the final boss waits for it to fall:
+      // two bosses at once shared one cage and one health bar, and killing either cleared both.
       this.finalBossSpawned = true;
       this.spawnBoss(this.chapter.finalBoss, false);
     }
@@ -722,8 +724,10 @@ export class Game {
 
     if (e.kind === 'boss') {
       this.bossKills++;
-      this.boss = null;
-      this.cage = null;
+      // another boss still standing keeps the arena and the health bar
+      const other = this.enemies.find((o) => o.alive && o.kind === 'boss' && o !== e) ?? null;
+      this.boss = other;
+      if (!other) this.cage = null;
       this.telegraphs.length = 0;
       this.shots.length = 0;
       this.fx.push({ t: 'bossDown', x: e.x, y: e.y });
