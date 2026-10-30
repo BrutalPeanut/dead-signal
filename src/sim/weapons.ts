@@ -83,10 +83,47 @@ function nearest(g: Game, list: Enemy[], n: number): Enemy[] {
   return res;
 }
 
+/**
+ * Gun synergies: each primary gun's partner upgrade tunes that gun (on top of a small damage
+ * bonus to everything, applied in Game.recalc). Per partner level:
+ *  - Extended Mag → SMG fires 6% faster with 4% faster rounds
+ *  - Fuel Injector → Flamethrower reaches ~9% further and burns 7% hotter
+ *  - Belt Feed → Machine Gun rounds hit 7% harder, +1 pierce at Lv2 and again at Lv4
+ *  - Warhead Core → Bazooka blasts ~1% wider and 4% harder
+ */
+export function withPartner(g: Game, w: WeaponState, s: WeaponLevel): WeaponLevel {
+  const d = WEAPONS[w.id];
+  if (!d.gun || w.id === 'pistol') return s;
+  const lv = g.passiveLevel(d.partner);
+  if (!lv) return s;
+  const t = { ...s };
+  switch (w.id) {
+    case 'smg':
+      t.cd *= 1 - 0.06 * lv;
+      t.speed *= 1 + 0.04 * lv;
+      break;
+    case 'flamer':
+      t.speed *= 1 + 0.06 * lv;
+      t.dur *= 1 + 0.03 * lv;
+      t.dmg *= 1 + 0.07 * lv;
+      break;
+    case 'mg':
+      t.dmg *= 1 + 0.07 * lv;
+      t.pierce += lv >= 4 ? 2 : lv >= 2 ? 1 : 0;
+      break;
+    case 'bazooka':
+      // radius grows the hit area quadratically, so keep it gentle
+      t.area *= 1 + 0.012 * lv;
+      t.dmg *= 1 + 0.04 * lv;
+      break;
+  }
+  return t;
+}
+
 export function updateWeapons(g: Game, dt: number) {
   const atk = g.base.atk;
   for (const w of g.weapons) {
-    const s = weaponStats(w);
+    const s = withPartner(g, w, weaponStats(w));
     const dmg = s.dmg * atk;
     g.src = w.id;
     switch (w.id) {

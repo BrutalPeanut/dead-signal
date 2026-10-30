@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Game } from '../src/sim/game';
 import { getChapter } from '../src/sim/chapters';
 import { buildOffers } from '../src/sim/offers';
+import { weaponStats, withPartner } from '../src/sim/weapons';
 import { GUN_IDS, PASSIVES, WEAPONS, type WeaponId } from '../src/sim/data';
 import { Rng } from '../src/sim/math';
 import { Profile } from '../src/meta/profile';
@@ -75,6 +76,41 @@ describe('primary guns', () => {
       expect(seen.has(WEAPONS[gun].partner)).toBe(true);
       for (const other of GUN_IDS) if (other !== gun) expect(seen.has(WEAPONS[other].partner)).toBe(false);
     }
+  });
+
+  it('each partner tunes its own gun, and only that gun', () => {
+    const tuned = (gun: WeaponId, partner: string, lv: number) => {
+      const g = new Game(getChapter(0), base(gun), 1);
+      g.weapons[0].level = 5;
+      if (lv) g.passives.push({ id: partner as never, level: lv });
+      g.recalc();
+      return { s: withPartner(g, g.weapons[0], weaponStats(g.weapons[0])), dmgMul: g.dmgMul };
+    };
+    const smg0 = tuned('smg', 'extmag', 0).s, smg5 = tuned('smg', 'extmag', 5);
+    expect(smg5.s.cd).toBeCloseTo(smg0.cd * 0.7);
+    expect(smg5.dmgMul).toBeCloseTo(1.4);
+    const fl0 = tuned('flamer', 'injector', 0).s, fl5 = tuned('flamer', 'injector', 5).s;
+    expect(fl5.speed * fl5.dur).toBeCloseTo(fl0.speed * fl0.dur * 1.3 * 1.15);
+    expect(fl5.dmg).toBeCloseTo(fl0.dmg * 1.35);
+    const mg0 = tuned('mg', 'beltfeed', 0).s;
+    expect(tuned('mg', 'beltfeed', 2).s.pierce).toBe(mg0.pierce + 1);
+    expect(tuned('mg', 'beltfeed', 4).s.pierce).toBe(mg0.pierce + 2);
+    const bz0 = tuned('bazooka', 'warhead', 0).s, bz5 = tuned('bazooka', 'warhead', 5).s;
+    expect(bz5.area).toBeCloseTo(bz0.area * 1.06);
+    expect(bz5.dmg).toBeCloseTo(bz0.dmg * 1.2);
+    // a partner never changes another weapon
+    const g = new Game(getChapter(0), base('bazooka'), 1);
+    g.addWeapon('frag');
+    g.passives.push({ id: 'warhead', level: 5 });
+    g.recalc();
+    const frag = g.weapons[1];
+    expect(withPartner(g, frag, weaponStats(frag))).toEqual(weaponStats(frag));
+    // the pistol's Targeting Chip is unchanged: +12% damage per level to everything
+    const p = new Game(getChapter(0), base('pistol'), 1);
+    p.passives.push({ id: 'chip', level: 5 });
+    p.recalc();
+    expect(p.dmgMul).toBeCloseTo(1.6);
+    expect(withPartner(p, p.weapons[0], weaponStats(p.weapons[0]))).toEqual(weaponStats(p.weapons[0]));
   });
 
   it('a maxed gun evolves with its own partner', () => {
