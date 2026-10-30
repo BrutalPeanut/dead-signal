@@ -51,6 +51,9 @@ export function buildOffers(
   }
   for (const id of PASSIVE_IDS) {
     const st = ownedP.get(id);
+    // a gun's partner (Targeting Chip, Extended Mag...) only shows up while you carry that gun
+    const of = PASSIVES[id].partnerOf;
+    if (!st && WEAPONS[of].gun && !ownedW.has(of)) continue;
     let w = 0;
     let lvl = 1;
     let isNew = true;

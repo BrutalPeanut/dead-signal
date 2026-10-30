@@ -252,6 +252,82 @@ const SKILL_GLYPHS: Record<string, (x: C, col: string) => void> = {
     x.lineTo(48, 30);
     x.stroke();
   },
+  extmag(x, col) {
+    // a tall curved magazine with rounds peeking out
+    x.beginPath();
+    x.moveTo(22, 10);
+    x.lineTo(40, 10);
+    x.quadraticCurveTo(46, 34, 42, 56);
+    x.lineTo(26, 56);
+    x.quadraticCurveTo(28, 34, 22, 10);
+    glyph(x, '#5a6478');
+    x.fillStyle = col;
+    for (let i = 0; i < 3; i++) x.fillRect(26 + i * 0.6, 16 + i * 6, 12, 3.5);
+    x.beginPath();
+    x.roundRect(24, 44, 18, 6, 2);
+    glyph(x, col);
+  },
+  injector(x, col) {
+    // fuel canister with a nozzle and a flame
+    x.beginPath();
+    x.roundRect(14, 22, 26, 32, 6);
+    glyph(x, '#9a3b14');
+    x.beginPath();
+    x.rect(40, 34, 8, 6);
+    glyph(x, '#5a6478');
+    x.beginPath();
+    x.moveTo(48, 37);
+    x.quadraticCurveTo(56, 24, 60, 30);
+    x.quadraticCurveTo(56, 36, 60, 44);
+    x.quadraticCurveTo(54, 48, 48, 37);
+    glyph(x, col);
+    x.fillStyle = col;
+    x.fillRect(19, 30, 16, 3);
+    x.fillRect(19, 38, 16, 3);
+  },
+  beltfeed(x, col) {
+    // an ammo belt draped in a curve
+    for (let i = 0; i < 5; i++) {
+      const a = -0.9 + i * 0.45;
+      const cx = 32 + Math.sin(a) * 20, cy = 18 + Math.cos(a) * 22;
+      x.save();
+      x.translate(cx, cy);
+      x.rotate(-a);
+      x.beginPath();
+      x.roundRect(-3.5, -9, 7, 16, [3.5, 3.5, 1, 1]);
+      glyph(x, col);
+      x.restore();
+    }
+    x.beginPath();
+    x.arc(32, 18, 22, 0.7, Math.PI - 0.7);
+    x.lineWidth = 4;
+    x.strokeStyle = '#5a6478';
+    x.stroke();
+  },
+  warhead(x, col) {
+    // a rocket warhead pointing up-right
+    x.save();
+    x.translate(32, 34);
+    x.rotate(-Math.PI / 4);
+    x.beginPath();
+    x.moveTo(-18, -7);
+    x.lineTo(6, -7);
+    x.quadraticCurveTo(22, -5, 24, 0);
+    x.quadraticCurveTo(22, 5, 6, 7);
+    x.lineTo(-18, 7);
+    x.closePath();
+    glyph(x, col);
+    x.beginPath();
+    x.moveTo(-18, -7);
+    x.lineTo(-26, -13);
+    x.lineTo(-22, 0);
+    x.lineTo(-26, 13);
+    x.lineTo(-18, 7);
+    glyph(x, '#5a6478');
+    x.fillStyle = '#1b2029';
+    x.fillRect(-4, -7, 4, 14);
+    x.restore();
+  },
   chip(x, col) {
     x.beginPath();
     x.arc(32, 32, 18, 0, Math.PI * 2);

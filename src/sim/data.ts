@@ -25,7 +25,12 @@ export type PassiveId =
   | 'magnet'
   | 'gel'
   | 'boots'
-  | 'adrenal';
+  | 'adrenal'
+  // partners of the primary guns (one each, like the Targeting Chip for the Pulse Pistol)
+  | 'extmag'
+  | 'injector'
+  | 'beltfeed'
+  | 'warhead';
 
 export interface WeaponLevel {
   dmg: number; // multiplier on player ATK
@@ -236,7 +241,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     id: 'smg',
     name: 'Vector SMG',
     evoName: 'Bullet Hose',
-    partner: 'chip',
+    partner: 'extmag',
     desc: 'A rattling stream of rounds at the nearest infected.',
     evoDesc: 'A relentless hose of piercing rounds.',
     color: '#ffd34d',
@@ -256,7 +261,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     id: 'flamer',
     name: 'Flamethrower',
     evoName: "Dragon's Breath",
-    partner: 'chip',
+    partner: 'injector',
     desc: 'Hoses a cone of fire through everything in front of you.',
     evoDesc: 'A roaring, longer jet that torches whole crowds.',
     color: '#ff7a1f',
@@ -276,7 +281,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     id: 'mg',
     name: 'Heavy Machine Gun',
     evoName: 'Minigun',
-    partner: 'chip',
+    partner: 'beltfeed',
     desc: 'Heavy rounds that punch through the front rank.',
     evoDesc: 'A spinning wall of lead that pierces the whole line.',
     color: '#ffb02e',
@@ -295,7 +300,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     id: 'bazooka',
     name: 'Bazooka',
     evoName: 'Warhead Swarm',
-    partner: 'chip',
+    partner: 'warhead',
     desc: 'Fires rockets that explode on impact.',
     evoDesc: 'Rocket salvos whose blasts scatter bomblets.',
     color: '#ff4d3d',
@@ -338,6 +343,11 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   gel: { id: 'gel', name: 'Thermal Gel', desc: '+12% duration, +8% projectile speed', color: '#ff9a1f', partnerOf: 'napalm' },
   boots: { id: 'boots', name: 'Thruster Boots', desc: '+8% move speed', color: '#ffe14d', partnerOf: 'drill' },
   adrenal: { id: 'adrenal', name: 'Adrenal Pump', desc: 'Kills heal 0.06% max HP', color: '#ff5470', partnerOf: 'cleaver' },
+  // gun partners: same +12% damage as the Targeting Chip, only offered while you carry that gun
+  extmag: { id: 'extmag', name: 'Extended Mag', desc: '+12% damage', color: '#ffd34d', partnerOf: 'smg' },
+  injector: { id: 'injector', name: 'Fuel Injector', desc: '+12% damage', color: '#ff7a1f', partnerOf: 'flamer' },
+  beltfeed: { id: 'beltfeed', name: 'Belt Feed', desc: '+12% damage', color: '#ffb02e', partnerOf: 'mg' },
+  warhead: { id: 'warhead', name: 'Warhead Core', desc: '+12% damage', color: '#ff4d3d', partnerOf: 'bazooka' },
 };
 
 export const PASSIVE_IDS = Object.keys(PASSIVES) as PassiveId[];
