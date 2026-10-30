@@ -82,8 +82,8 @@ export interface SaveData {
   adKeys?: { date: string; n: number };
   /** Chosen primary gun (replaces the Pulse Pistol). Unset = the newest one unlocked. */
   gun?: WeaponId;
-  /** Cloud save sync code (see meta/sync.ts). */
-  sync?: { code: string };
+  /** Cloud save sync code (see meta/sync.ts); `saved` = the player confirmed they kept a copy. */
+  sync?: { code: string; saved?: boolean; nagAt?: number };
 }
 
 export interface RunRewards {
@@ -175,17 +175,71 @@ export class Profile {
     this.listeners.push(fn);
   }
 
-  private load(): SaveData {
+  /** How this launch's save was loaded: 'ok', 'backup' (main save was unreadable), or 'new'. */
+  loadedFrom: 'ok' | 'backup' | 'new' = 'new';
+
+  private get(k: string) {
     try {
-      const raw = this.storage?.getItem(this.key);
-      if (raw) {
-        const d = normalizeSave(JSON.parse(raw));
-        if (d) return d;
-      }
+      return this.storage?.getItem(k) ?? null;
     } catch {
-      /* corrupted save → start fresh */
+      return null;
     }
-    return fresh();
+  }
+  private put(k: string, v: string) {
+    try {
+      this.storage?.setItem(k, v);
+    } catch {
+      /* storage full / private mode */
+    }
+  }
+
+  /**
+   * Load with fallbacks so a bad write never silently wipes a player:
+   *  1. the main save;
+   *  2. if that's unreadable (crash mid-write, bad update, unknown version), the copy taken at the
+   *     last good launch (`:bak`); the unreadable text is kept in `:broken` for support;
+   *  3. the sync code is also stored on its own (`:code`), so even a fresh start can find its cloud
+   *     save again and adopt it on launch.
+   */
+  private load(): SaveData {
+    let d: SaveData | null = null;
+    const raw = this.get(this.key);
+    if (raw) {
+      try {
+        d = normalizeSave(JSON.parse(raw));
+      } catch {
+        d = null;
+      }
+      if (d) {
+        this.loadedFrom = 'ok';
+        this.put(this.key + ':bak', raw); // known-good copy for next time
+      } else if (!this.get(this.key + ':broken')) this.put(this.key + ':broken', raw.slice(0, 500_000));
+    }
+    if (!d) {
+      const bak = this.get(this.key + ':bak');
+      if (bak) {
+        try {
+          d = normalizeSave(JSON.parse(bak));
+        } catch {
+          d = null;
+        }
+        if (d) this.loadedFrom = 'backup';
+      }
+    }
+    d ??= fresh();
+    const code = this.get(this.key + ':code');
+    if (!d.sync?.code && code && /^[A-HJ-NP-Z2-9]{10}$/.test(code)) d.sync = { ...d.sync, code };
+    return d;
+  }
+
+  /** Sync codes this device used before a Reset (newest first), so a reset can be undone. */
+  previousCodes(): string[] {
+    try {
+      const v = JSON.parse(this.get(this.key + ':codes') ?? '[]');
+      return Array.isArray(v) ? v.filter((c) => typeof c === 'string') : [];
+    } catch {
+      return [];
+    }
   }
 
   /**
@@ -204,18 +258,24 @@ export class Profile {
   }
 
   save() {
-    try {
-      this.storage?.setItem(this.key, JSON.stringify(this.data));
-    } catch {
-      /* storage full / private mode: keep playing in memory */
+    this.put(this.key, JSON.stringify(this.data));
+    const code = this.data.sync?.code;
+    if (code && code !== this.savedCode) {
+      this.put(this.key + ':code', code);
+      this.savedCode = code;
     }
     for (const l of this.listeners) l();
   }
+  private savedCode = '';
 
   /** Erase this device's progress. The old cloud backups are left alone under the old code; this
    *  device starts a fresh code so the reset can't be undone by a sync. */
   reset() {
+    const old = this.data.sync?.code;
+    if (old) this.put(this.key + ':codes', JSON.stringify([old, ...this.previousCodes().filter((c) => c !== old)].slice(0, 5)));
     this.data = fresh();
+    this.put(this.key + ':code', '');
+    this.savedCode = '';
     this.save();
   }
 

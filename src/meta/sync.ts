@@ -145,6 +145,26 @@ export class CloudSync {
     return true;
   }
 
+  /** Codes this device used before a Reset (to undo it). */
+  previousCodes() {
+    return this.p.previousCodes();
+  }
+
+  /** Should we remind the player to keep a copy of their code? After Sector 2, every 2 days until they confirm. */
+  needsReminder(now = Date.now()) {
+    const s = this.p.data.sync;
+    if (!this.enabled || !s || s.saved) return false;
+    if (this.p.data.unlocked < 2) return false;
+    return now - (s.nagAt ?? 0) > 2 * 86_400_000;
+  }
+  markReminded(saved: boolean, now = Date.now()) {
+    const s = this.p.data.sync;
+    if (!s) return;
+    if (saved) s.saved = true;
+    s.nagAt = now;
+    this.p.save();
+  }
+
   backups() {
     return cloudList(this.code());
   }

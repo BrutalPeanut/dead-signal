@@ -18,7 +18,7 @@ import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes'
 import { DT, Game } from './sim/game';
 import { Interp } from './render/interp';
 import { CloudSync } from './meta/sync';
-import { cloudModal, statusText } from './ui/cloud';
+import { cloudModal, protectModal, statusText } from './ui/cloud';
 import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics, toast } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
@@ -169,6 +169,13 @@ class App {
     this.trackSession();
     // cloud save: take a further-along save from another device (only between runs), else back up
     this.sync.onAdopted = () => this.reloadSynced();
+    // ask the browser not to evict our storage under pressure (Chrome/Android honor this)
+    try {
+      void navigator.storage?.persist?.();
+    } catch {
+      /* ignore */
+    }
+    if (this.profile.loadedFrom === 'backup') setTimeout(() => toast('Your save was damaged, so it was restored from a backup', '#ffd34d'), 800);
     void this.sync.startup(() => this.mode === 'hub');
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
@@ -257,6 +264,7 @@ class App {
   private backToHub(goNext = false) {
     // the cloud was ahead when we launched mid-run: take it now that the run is over
     if (this.sync.behind) void this.sync.startup(() => this.mode === 'hub');
+    if (this.sync.needsReminder()) this.queueProtect();
     this.closeModal();
     this.hud.el.remove();
     this.mode = 'hub';
@@ -326,7 +334,7 @@ class App {
           setHaptics(s.haptics);
         },
         () => {
-          this.profile.reset();
+          this.profile.reset(); // remembers the old code: Settings → Cloud save → Undo a reset
           this.sync.fresh(); // new code: old cloud backups stay safe and can't sync this back
           location.reload();
         },
@@ -372,6 +380,15 @@ class App {
     adListeners.push((placement, ok) => this.stats.track('ad', { d: { placement, stage: 'result', ok } }));
     window.addEventListener('error', (e) => this.stats.error(e.message, `${(e.filename || '').split('/').pop()}:${e.lineno}`));
     window.addEventListener('unhandledrejection', (e) => this.stats.error(String((e as PromiseRejectionEvent).reason?.message ?? (e as PromiseRejectionEvent).reason), 'promise'));
+  }
+
+  /** Show "Protect your progress" once nothing else is open (it waits behind the calendar etc.). */
+  private queueProtect(tries = 0) {
+    setTimeout(() => {
+      if (this.mode !== 'hub' || !this.sync.needsReminder()) return;
+      if (this.modal || this.hub.busy) return tries < 60 && this.queueProtect(tries + 1);
+      this.showModal(protectModal(this.sync, () => this.closeModal()), 'protect');
+    }, tries ? 1000 : 1200);
   }
 
   /** A rewarded-ad button was shown (for offer → watch rates). */

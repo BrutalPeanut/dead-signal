@@ -184,7 +184,7 @@ export function settingsModal(
   reset.onclick = () => {
     if (!armed) {
       armed = true;
-      reset.textContent = 'Tap again to erase everything';
+      reset.textContent = cloud ? 'Tap again to erase (undo later in Cloud save)' : 'Tap again to erase everything';
       return;
     }
     onReset();
