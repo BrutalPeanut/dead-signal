@@ -74,17 +74,21 @@ export function getChapter(index: number): ChapterDef {
   // On-ramp: Sector 2 is the first full 5-minute run, so it's cut roughly in half (playtesters
   // needed 3 tries); Sector 3 is eased too so the step up to it isn't a cliff.
   const onramp = [1, 0.55, 0.8][index] ?? 1;
+  // Act II walls: the primary guns made the back half ~30% quicker to clear. Sectors 1-10 keep
+  // the faster pace (new players need constant progress); from Sector 11, where players are
+  // invested, the infected hit a little harder so losses are close calls worth a revive.
+  const wall = index >= 11 ? 1.1 : index === 10 ? 1.05 : 1;
   return {
     index,
     name,
     biome,
-    hpMul: hpMul * onramp,
+    hpMul: hpMul * onramp * wall,
     // Sector 1 is the training ground: softer hits so a first run can end in a win.
-    dmgMul: index === 0 ? dmgMul * 0.8 : dmgMul * onramp,
+    dmgMul: index === 0 ? dmgMul * 0.8 : dmgMul * onramp * Math.sqrt(wall),
     midBoss,
     finalBoss,
     goldMul: 1 + index * 0.45,
     // Calibrated to the power a player following Power Up actually clears each sector at (+~10%).
-    power: Math.round((450 * Math.pow(1.28, Math.min(index, 9)) * Math.pow(1.07, act2) * ([1, 0.75, 0.9][index] ?? 1)) / 10) * 10,
+    power: Math.round((450 * Math.pow(1.28, Math.min(index, 9)) * Math.pow(1.07, act2) * ([1, 0.75, 0.9][index] ?? 1) * Math.sqrt(wall)) / 10) * 10,
   };
 }
