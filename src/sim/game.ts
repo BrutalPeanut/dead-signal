@@ -231,8 +231,9 @@ export class Game {
 
   recalc() {
     const lv = (id: PassiveId) => this.passiveLevel(id);
-    // the Targeting Chip and the four gun partners all give +12% damage per level
-    this.dmgMul = 1 + 0.12 * (lv('chip') + lv('extmag') + lv('injector') + lv('beltfeed') + lv('warhead'));
+    // Targeting Chip: +12% damage per level. The four gun partners give +8% to everything and
+    // tune their own gun on top (see withPartner in weapons.ts).
+    this.dmgMul = 1 + 0.12 * lv('chip') + 0.08 * (lv('extmag') + lv('injector') + lv('beltfeed') + lv('warhead'));
     this.takenMul = (1 - this.base.def) * (1 - 0.07 * lv('plating'));
     this.cdMul = 1 - 0.07 * lv('capacitor');
     this.areaMul = 1 + 0.1 * lv('fuel');
