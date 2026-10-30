@@ -123,5 +123,16 @@ function pick(): AdProvider {
   return new NoAds();
 }
 
-export const ads: AdProvider = pick();
+/** Listeners told about every rewarded ad (the stats module counts starts and completions). */
+export const adListeners: ((p: Placement, ok: boolean) => void)[] = [];
+const provider = pick();
+export const ads: AdProvider = {
+  name: provider.name,
+  isReady: (p) => provider.isReady(p),
+  showRewarded: async (p) => {
+    const ok = await provider.showRewarded(p);
+    for (const l of adListeners) l(p, ok);
+    return ok;
+  },
+};
 export const adsOn = () => ads.name !== 'none';

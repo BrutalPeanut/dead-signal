@@ -24,7 +24,7 @@ export function setFetcher(f: FetchLike) {
   fetcher = f;
 }
 
-export async function rpc<T>(fn: string, body: Record<string, unknown>, timeoutMs = 7000): Promise<T | null> {
+export async function rpc<T>(fn: string, body: Record<string, unknown>, timeoutMs = 7000, keepalive = false): Promise<T | null> {
   const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
   try {
@@ -33,6 +33,8 @@ export async function rpc<T>(fn: string, body: Record<string, unknown>, timeoutM
       headers: { apikey: KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: ctrl?.signal,
+      // small requests sent as the tab closes (stats) must outlive the page
+      keepalive,
     });
     if (!res.ok) return null;
     return (await res.json()) as T;
