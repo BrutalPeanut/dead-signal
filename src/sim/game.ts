@@ -823,7 +823,7 @@ export class Game {
         if (hit) {
           p.alive = false;
           this.src = 'bazooka';
-          this.explode(p.x, p.y, p.area, p.dmg, '#ff4d3d', p.evo, 0);
+          this.explode(p.x, p.y, p.area, p.dmg, '#ff4d3d', p.evo, 0, 3, 0.3);
         }
         continue;
       }
@@ -889,7 +889,7 @@ export class Game {
     }
   }
 
-  explode(x: number, y: number, r: number, dmg: number, color: string, cluster: boolean, shake = 2.5) {
+  explode(x: number, y: number, r: number, dmg: number, color: string, cluster: boolean, shake = 2.5, bomblets = 5, bombletMul = 0.45) {
     this.fx.push({ t: 'explode', x, y, r, color });
     // a steady stream of rocket blasts shaking the camera made the courier look jittery
     if (shake) this.fx.push({ t: 'shake', amt: shake });
@@ -904,11 +904,11 @@ export class Game {
       this.damage(e, dmg, (e.x - x) / d, (e.y - y) / d, 160, color);
     });
     if (cluster) {
-      for (let k = 0; k < 5; k++) {
-        const a = (k / 5) * TAU + this.rng.range(-0.3, 0.3);
+      for (let k = 0; k < bomblets; k++) {
+        const a = (k / bomblets) * TAU + this.rng.range(-0.3, 0.3);
         const s = this.rng.range(140, 220);
         this.addProjectile({
-          kind: 'bomblet', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: 4, dmg: dmg * 0.45,
+          kind: 'bomblet', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: 4, dmg: dmg * bombletMul,
           life: 0.45, maxLife: 0.45, pierce: 0, hitCd: 0, tx: 0, ty: 0, sx: x, sy: y, area: r * 0.55, evo: false, spin: 0, extra: this.src === 'bazooka' ? 1 : 0,
         });
       }
@@ -1314,7 +1314,7 @@ export class Game {
 }
 
 /** Knockback per projectile kind (default 120). */
-const KNOCK: Record<string, number> = { rail: 40, bullet: 60, slug: 190, flame: 12 };
+const KNOCK: Record<string, number> = { rail: 40, bullet: 60, slug: 140, flame: 12 };
 
 const PROJ_SRC: Record<string, string> = {
   bullet: 'smg',
