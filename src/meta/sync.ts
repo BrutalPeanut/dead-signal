@@ -1,5 +1,6 @@
 import { cloudGet, cloudList, cloudPull, cloudPush, newSyncCode, normalizeCode, type CloudVersion } from '../net/cloud';
 import { normalizeSave, progressOf, type Profile } from './profile';
+import { driveLoad, driveSave, signIn, signedIn } from '../net/gdrive';
 
 /**
  * Cloud save. Every device gets a sync code; its save is backed up a few seconds after each
@@ -143,6 +144,59 @@ export class CloudSync {
     this.lastPushed = JSON.stringify(this.p.data);
     this.set('ok');
     return true;
+  }
+
+  // ---------------------------------------------------------------- Google Drive
+
+  /** Back up to the player's Google Drive (asks them to sign in if needed). */
+  async driveBackup(): Promise<'ok' | 'denied' | 'error'> {
+    try {
+      if (!(await signIn())) return 'denied';
+      await driveSave(JSON.parse(JSON.stringify(this.p.data)));
+      this.p.data.gdrive = { at: Date.now() };
+      this.p.save();
+      return 'ok';
+    } catch {
+      return 'error';
+    }
+  }
+
+  /** Read the save in Google Drive (for "Restore"); 'none' if there isn't one. */
+  async drivePeek(): Promise<{ v: CloudVersion; save: unknown } | 'none' | 'denied' | 'error'> {
+    try {
+      if (!(await signIn())) return 'denied';
+      const r = await driveLoad();
+      const d = r && normalizeSave(r.save);
+      if (!r || !d) return 'none';
+      return { save: r.save, v: { id: 0, sector: d.unlocked, level: d.accountLevel, progress: progressOf(d), updated_at: r.savedAt } };
+    } catch {
+      return 'error';
+    }
+  }
+
+  /** Take a save from Google Drive (keeps this device's sync code and settings). */
+  driveAdopt(save: unknown): boolean {
+    if (!this.p.adopt(save)) return false;
+    this.behind = false;
+    this.lastPushed = '';
+    this.p.data.gdrive = { at: Date.now() };
+    this.p.save();
+    return true;
+  }
+
+  driveAt() {
+    return this.p.data.gdrive?.at ?? 0;
+  }
+
+  /** After a run: refresh the Drive copy quietly if the player linked Drive this session. */
+  async driveAuto() {
+    if (!this.p.data.gdrive || !signedIn()) return;
+    try {
+      await driveSave(JSON.parse(JSON.stringify(this.p.data)));
+      this.p.data.gdrive = { at: Date.now() };
+    } catch {
+      /* try again after the next run */
+    }
   }
 
   /** Codes this device used before a Reset (to undo it). */
