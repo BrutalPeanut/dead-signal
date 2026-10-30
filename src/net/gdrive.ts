@@ -9,7 +9,10 @@
  */
 
 /** OAuth web client id from Google Cloud Console (public, not a secret). Empty = feature hidden. */
-export const GOOGLE_CLIENT_ID: string = (import.meta as { env?: Record<string, string> }).env?.VITE_GOOGLE_CLIENT_ID || '';
+// Google Cloud project "Dead Signal" (dead-signal-513219), web client "Dead Signal web"
+// (origins https://deadsignal.info and https://www.deadsignal.info; scope drive.appdata only).
+export const GOOGLE_CLIENT_ID: string =
+  (import.meta as { env?: Record<string, string> }).env?.VITE_GOOGLE_CLIENT_ID ?? '957385136433-tlsggrud98gel5rtolm5o1232bgfp75f.apps.googleusercontent.com';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE = 'dead-signal-save.json';
