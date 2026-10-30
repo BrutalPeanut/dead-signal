@@ -22,6 +22,7 @@ import { drawHero } from '../render/art';
 import { setHeroSkin } from '../render/hero';
 import { CHARACTERS, charById } from '../meta/characters';
 import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../meta/pass';
+import { cleanName } from '../net/names';
 import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
 import { gearIcon, skillIcon } from '../render/icons';
 import { BOSSES, GUN_IDS, WEAPONS, gunUnlock, isGun, runLengthFor, starTimes } from '../sim/data';
@@ -614,7 +615,9 @@ export class Hub {
           onclick: () => {
             const c = crew.value.trim().toUpperCase();
             if (!validName(name.value)) return toast('Call sign needs 2–16 characters', '#ff5c7a');
+            if (!cleanName(name.value)) return toast('Pick a different call sign: that one isn’t allowed on the public boards', '#ff5c7a');
             if (!validCrew(c)) return toast('Crew codes are 4–8 letters/numbers', '#ff5c7a');
+            if (c && !cleanName(c)) return toast('Pick a different crew code', '#ff5c7a');
             this.p.setOnline(name.value, c);
             audio.levelUp();
             this.p.flushScores();
