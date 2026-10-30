@@ -147,6 +147,8 @@ export class Game {
   loadout: LoadoutRules = loadoutFor(99, false);
   /** Real seconds until the final boss (2:00 in Sector 1, 5:00 elsewhere). */
   runLength = RUN_LENGTH;
+  /** Revives used this run (stats). */
+  revivesUsed = 0;
   /** Distance moved; in the tutorial nothing starts until the player has tried moving. */
   travel = 0;
   get waitingForMove() {
@@ -1226,6 +1228,7 @@ export class Game {
     }
     if (accept && this.revives > 0) {
       this.revives--;
+      this.revivesUsed++;
       this.hp = this.maxHp;
       this.state = 'play';
       this.emp();

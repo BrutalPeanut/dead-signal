@@ -23,7 +23,8 @@ import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics, toast } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
 import { LEVELUP_TIP, Tutorial } from './ui/tutorial';
-import { ads, adsOn } from './ads/ads';
+import { adListeners, ads, adsOn } from './ads/ads';
+import { Stats } from './net/stats';
 import { Hud, chestModal, levelUpModal, pauseModal, reviveModal } from './ui/hud';
 import { introModal, resultsModal, settingsModal } from './ui/screens';
 
@@ -100,6 +101,8 @@ class App {
   ui = document.getElementById('ui')!;
   profile = makeProfile();
   sync = new CloudSync(this.profile, syncAllowed());
+  /** Anonymous gameplay stats (same rule as cloud save: never from test saves). */
+  stats = new Stats(() => this.profile.playerId(), syncAllowed() && !new URLSearchParams(location.search).has('nostats'));
   input = new Input(this.canvas);
   mode: Mode = 'hub';
   game: Game;
@@ -163,11 +166,15 @@ class App {
     } else setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
     const pt = playtestSector();
     if (pt !== null) setTimeout(() => this.startRun(pt, 'campaign'), 400);
+    this.trackSession();
     // cloud save: take a further-along save from another device (only between runs), else back up
     this.sync.onAdopted = () => this.reloadSynced();
     void this.sync.startup(() => this.mode === 'hub');
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) void this.sync.pushNow();
+      if (document.hidden) {
+        void this.sync.pushNow();
+        void this.stats.flush(true);
+      }
     });
     try {
       if (sessionStorage.getItem('ds.synced')) {
@@ -232,6 +239,7 @@ class App {
       this.hud.startRun(this.profile.data.best[sector] ?? 0, 'campaign', 0, this.game.runLength);
     }
     this.game.adRevive = adsOn();
+    this.stats.track('run_start', { s: sector, m: mode, d: { gun: this.game.weapons[0]?.id, power: this.profile.power(), char: this.profile.data.character } });
     this.renderer.setGame(this.game);
     this.renderer.fx.parts.length = 0;
     this.renderer.fx.decals.length = 0;
@@ -338,6 +346,39 @@ class App {
     );
   }
 
+  private trackSession() {
+    const d = this.profile.data;
+    let ref = '';
+    try {
+      ref = document.referrer ? new URL(document.referrer).hostname : '';
+    } catch {
+      /* ignore */
+    }
+    const ua = navigator.userAgent;
+    this.stats.track('session', {
+      d: {
+        unlocked: d.unlocked,
+        level: d.accountLevel,
+        runs: d.stats.runs,
+        isNew: d.stats.runs === 0,
+        r: this.renderer instanceof Renderer3D ? '3d' : '2d',
+        touch: typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches,
+        w: window.innerWidth,
+        h: window.innerHeight,
+        inApp: /FBAN|FBAV|FB_IAB|Messenger|Instagram/i.test(ua) ? 'facebook' : /; wv\)|WebView/i.test(ua) ? 'webview' : '',
+        ref,
+      },
+    });
+    adListeners.push((placement, ok) => this.stats.track('ad', { d: { placement, stage: 'result', ok } }));
+    window.addEventListener('error', (e) => this.stats.error(e.message, `${(e.filename || '').split('/').pop()}:${e.lineno}`));
+    window.addEventListener('unhandledrejection', (e) => this.stats.error(String((e as PromiseRejectionEvent).reason?.message ?? (e as PromiseRejectionEvent).reason), 'promise'));
+  }
+
+  /** A rewarded-ad button was shown (for offer → watch rates). */
+  private adOffer(placement: string) {
+    this.stats.track('ad', { d: { placement, stage: 'offer' } });
+  }
+
   private openCloud() {
     this.showModal(
       cloudModal(this.sync, () => this.openSettings(), () => this.reloadSynced()),
@@ -374,6 +415,14 @@ class App {
     const r = g.result();
     const mode = this.runMode;
     const rw = mode === 'daily' ? this.profile.applyDaily(r) : mode === 'endless' ? this.profile.applyEndless(this.sector, r) : this.profile.applyRun(this.sector, r);
+    this.stats.track('run_end', {
+      s: this.sector,
+      m: mode,
+      d: { won: r.won, time: Math.round(r.time), level: r.level, kills: r.kills, killedBy: r.killedBy ?? null, gun: g.weapons[0]?.id, evos: r.evolutions ?? 0, score: r.score ?? 0, revives: g.revivesUsed },
+    });
+    if (rw.unlockedSector) this.stats.track('unlock', { s: this.profile.data.unlocked, d: { gun: rw.newGun ?? null, char: rw.newCharacter ?? null } });
+    if (adsOn()) this.adOffer('double');
+    void this.stats.flush();
     this.input.release();
     // After a first clear, land on the newly unlocked sector, ready to go.
     const goNext = rw.unlockedSector;
@@ -447,7 +496,7 @@ class App {
                 this.closeModal();
               },
               g.revives,
-              g.revives <= 0 && g.adRevive
+              g.revives <= 0 && g.adRevive && (this.adOffer('revive'), true)
                 ? () =>
                     ads.showRewarded('revive').then((ok) => {
                       g.revive(ok, ok);
