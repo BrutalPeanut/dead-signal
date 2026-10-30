@@ -4250,3 +4250,5 @@ button {
 .sync-found small { display: block; font-size: 11px; letter-spacing: 0.12em; opacity: 0.7; text-transform: uppercase; }
 .sync-found b { display: block; font-size: 20px; margin: 4px 0; }
 .sync-found span { font-size: 12px; opacity: 0.7; }
+
+.sync-sub { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-weight: 700; font-size: 14px; letter-spacing: 0.04em; }

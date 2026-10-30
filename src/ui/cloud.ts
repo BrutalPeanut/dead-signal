@@ -1,6 +1,7 @@
 import type { CloudSync } from '../meta/sync';
 import type { CloudVersion } from '../net/cloud';
 import { prettyCode } from '../net/cloud';
+import { driveConfigured, inAppBrowser } from '../net/gdrive';
 import { h, toast } from './dom';
 
 const ago = (iso: string | number) => {
@@ -56,6 +57,7 @@ export function cloudModal(sync: CloudSync, onClose: () => void, onReplaced: () 
       h('button.btn', { style: { width: '100%', marginTop: '14px' }, onclick: enter }, 'Use a code from another device'),
       h('button.btn', { style: { width: '100%', marginTop: '8px' }, onclick: backups }, 'Restore a backup'),
       ...(sync.previousCodes().length ? [h('button.btn', { style: { width: '100%', marginTop: '8px' }, onclick: undoReset }, 'Undo a reset')] : []),
+      ...driveSection(),
       h('div.help', { style: { marginTop: '12px' } }, 'Lost your code? Email deadsignalsupportchannel@gmail.com with your call sign and roughly how far you got, and we can find your save.'),
       h('button.btn', { style: { width: '100%', marginTop: '14px' }, onclick: onClose }, 'Done'),
     );
@@ -100,6 +102,40 @@ export function cloudModal(sync: CloudSync, onClose: () => void, onReplaced: () 
       h('button.btn', { style: { width: '100%', marginTop: '8px' }, onclick: main }, 'Back'),
     );
     setTimeout(() => input.focus(), 50);
+  };
+
+  /** Google Drive: an extra backup in the player's own Drive, recoverable with just their Google account. */
+  const driveSection = (): HTMLElement[] => {
+    if (!driveConfigured()) return [];
+    const head = h('div.sync-sub', 'Google Drive backup');
+    if (inAppBrowser())
+      return [
+        head,
+        h('div.help', { style: { marginTop: '4px' } }, 'Google sign-in doesn’t work inside Messenger or Facebook. Open deadsignal.info in Chrome to back up to your Google Drive.'),
+        h('button.btn.small', { style: { width: '100%' }, onclick: () => navigator.clipboard?.writeText('https://deadsignal.info').then(() => toast('Link copied: paste it in Chrome', '#43ffa4')) }, 'Copy game link'),
+      ];
+    const at = sync.driveAt();
+    const note = h('div.help', { style: { marginTop: '4px' } }, at ? `Last backed up to Drive ${ago(at)}. Backs up again after each run while you’re signed in.` : 'Keep a copy in your own Google Drive: restore it on any phone or PC by signing in, no code needed.');
+    const up = h('button.btn', { style: { width: '100%', marginTop: '6px' } }, 'Back up to Google Drive');
+    up.onclick = async () => {
+      up.setAttribute('disabled', '');
+      up.textContent = 'Backing up…';
+      const r = await sync.driveBackup();
+      toast(r === 'ok' ? 'Backed up to your Google Drive' : r === 'denied' ? 'Google sign-in was cancelled' : 'Couldn’t reach Google Drive. Try again', r === 'ok' ? '#43ffa4' : '#ff5470');
+      main();
+    };
+    const down = h('button.btn', { style: { width: '100%', marginTop: '8px' } }, 'Restore from Google Drive');
+    down.onclick = async () => {
+      down.setAttribute('disabled', '');
+      down.textContent = 'Looking…';
+      const r = await sync.drivePeek();
+      if (r === 'none') toast('No Dead Signal save in this Google Drive yet', '#8d97ab');
+      else if (r === 'denied') toast('Google sign-in was cancelled', '#ff5470');
+      else if (r === 'error') toast('Couldn’t reach Google Drive. Try again', '#ff5470');
+      else return confirmReplace('Found in Google Drive', r.v, () => sync.driveAdopt(r.save));
+      main();
+    };
+    return [head, note, up, down];
   };
 
   const undoReset = async () => {

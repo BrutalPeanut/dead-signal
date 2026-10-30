@@ -84,6 +84,8 @@ export interface SaveData {
   gun?: WeaponId;
   /** Cloud save sync code (see meta/sync.ts); `saved` = the player confirmed they kept a copy. */
   sync?: { code: string; saved?: boolean; nagAt?: number };
+  /** Google Drive backup: when this device last backed up there. */
+  gdrive?: { at: number };
 }
 
 export interface RunRewards {

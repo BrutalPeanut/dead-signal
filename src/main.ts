@@ -440,6 +440,7 @@ class App {
     if (rw.unlockedSector) this.stats.track('unlock', { s: this.profile.data.unlocked, d: { gun: rw.newGun ?? null, char: rw.newCharacter ?? null } });
     if (adsOn()) this.adOffer('double');
     void this.stats.flush();
+    void this.sync.driveAuto();
     this.input.release();
     // After a first clear, land on the newly unlocked sector, ready to go.
     const goNext = rw.unlockedSector;
