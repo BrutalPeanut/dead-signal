@@ -55,6 +55,8 @@ export function cloudModal(sync: CloudSync, onClose: () => void, onReplaced: () 
       status,
       h('button.btn', { style: { width: '100%', marginTop: '14px' }, onclick: enter }, 'Use a code from another device'),
       h('button.btn', { style: { width: '100%', marginTop: '8px' }, onclick: backups }, 'Restore a backup'),
+      ...(sync.previousCodes().length ? [h('button.btn', { style: { width: '100%', marginTop: '8px' }, onclick: undoReset }, 'Undo a reset')] : []),
+      h('div.help', { style: { marginTop: '12px' } }, 'Lost your code? Email deadsignalsupportchannel@gmail.com with your call sign and roughly how far you got, and we can find your save.'),
       h('button.btn', { style: { width: '100%', marginTop: '14px' }, onclick: onClose }, 'Done'),
     );
   };
@@ -100,6 +102,20 @@ export function cloudModal(sync: CloudSync, onClose: () => void, onReplaced: () 
     setTimeout(() => input.focus(), 50);
   };
 
+  const undoReset = async () => {
+    body.replaceChildren(h('div.help', 'Looking up your previous saves…'));
+    const rows: HTMLElement[] = [];
+    for (const c of sync.previousCodes()) {
+      const r = await sync.peek(c);
+      if (typeof r !== 'string') rows.push(h('button.sync-row', { onclick: () => confirmReplace('Save from before the reset', r.v, () => sync.useCode(r.code, r.v)) }, h('b', label(r.v)), h('span', prettyCode(c))));
+    }
+    body.replaceChildren(
+      h('div.help', { style: { marginTop: 0 } }, rows.length ? 'Saves this device had before Reset progress. Pick one to bring it back.' : 'No earlier saves found (or the server can’t be reached).'),
+      ...rows,
+      h('button.btn', { style: { width: '100%', marginTop: '10px' }, onclick: main }, 'Back'),
+    );
+  };
+
   const backups = async () => {
     body.replaceChildren(h('div.help', 'Loading backups…'));
     const list = await sync.backups();
@@ -124,4 +140,51 @@ export function cloudModal(sync: CloudSync, onClose: () => void, onReplaced: () 
   sheet.append(h('h2', { style: { fontSize: '22px' } }, 'Cloud save'), body);
   main();
   return el;
+}
+
+/**
+ * "Protect your progress": shown after Sector 2 until the player confirms they kept their code.
+ * iPhones wipe a website's data after ~7 days away, and then only the code brings a save back.
+ */
+export function protectModal(sync: CloudSync, onDone: () => void) {
+  const code = prettyCode(sync.code());
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const standalone = (navigator as Navigator & { standalone?: boolean }).standalone || matchMedia('(display-mode: standalone)').matches;
+  const text = `My Dead Signal sync code: ${code}\nPlay: https://deadsignal.info (Settings → Cloud save → Use a code)`;
+  const done = (saved: boolean) => {
+    sync.markReminded(saved);
+    onDone();
+  };
+  const share = h('button.btn.primary', { style: { width: '100%', marginTop: '14px' } }, 'Send it to myself');
+  share.onclick = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Dead Signal sync code', text });
+        toast('Saved! Keep that message', '#43ffa4');
+        return done(true);
+      }
+    } catch {
+      return; // share sheet closed
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Copied: paste it somewhere safe', '#43ffa4');
+    } catch {
+      toast(code, '#5ef2ff');
+    }
+  };
+  return h(
+    'div.modal',
+    h(
+      'div.sheet.cloud',
+      h('h2', { style: { fontSize: '22px' } }, 'Protect your progress'),
+      h('div.help', { style: { marginTop: 0 } }, 'Your progress backs up to the cloud automatically. If this browser ever clears its data, or you switch phones, this code brings everything back:'),
+      h('div.sync-code', h('b', code)),
+      share,
+      ios && !standalone ? h('div.help', '📱 iPhone tip: tap Share → Add to Home Screen and play from there. iPhones keep home-screen games’ data safe.') : null,
+      h('button.btn', { style: { width: '100%', marginTop: '10px' }, onclick: () => done(true) }, 'I’ve saved it'),
+      h('button.btn.small', { style: { width: '100%', marginTop: '8px', opacity: 0.7 }, onclick: () => done(false) }, 'Remind me later'),
+    ),
+  );
 }

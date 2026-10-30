@@ -85,6 +85,10 @@ export class Hub {
   private heroCanvas: HTMLCanvasElement | null = null;
   private t = 0;
   private modal: HTMLElement | null = null;
+  /** A hub sheet (calendar, item, crate...) is open. */
+  get busy() {
+    return !!this.modal;
+  }
   private scene = new HomeScene();
 
   mode: RunMode = 'campaign';
