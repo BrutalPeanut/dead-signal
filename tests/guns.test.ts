@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Game } from '../src/sim/game';
 import { getChapter } from '../src/sim/chapters';
 import { buildOffers } from '../src/sim/offers';
-import { GUN_IDS, WEAPONS, type WeaponId } from '../src/sim/data';
+import { GUN_IDS, PASSIVES, WEAPONS, type WeaponId } from '../src/sim/data';
 import { Rng } from '../src/sim/math';
 import { Profile } from '../src/meta/profile';
 import type { BaseStats } from '../src/sim/types';
@@ -63,8 +63,25 @@ describe('primary guns', () => {
     expect(seen.has('pistol')).toBe(true);
   });
 
-  it('all pair with the Targeting Chip so they can evolve', () => {
-    for (const id of GUN_IDS) expect(WEAPONS[id].partner).toBe('chip');
+  it('each gun has its own partner, and only the carried gun\'s partner is offered', () => {
+    const partners = GUN_IDS.map((id) => WEAPONS[id].partner);
+    expect(partners).toEqual(['chip', 'extmag', 'injector', 'beltfeed', 'warhead']);
+    for (const id of GUN_IDS) expect(PASSIVES[WEAPONS[id].partner].partnerOf).toBe(id);
+    const rng = new Rng(5);
+    for (const gun of GUN_IDS) {
+      const seen = new Set<string>();
+      for (let i = 0; i < 400; i++)
+        for (const o of buildOffers(rng, [{ id: gun, level: 3, evolved: false, timer: 0, active: 0, angle: 0, sourceId: 1 }], [])) if (o.type === 'passive') seen.add(o.id);
+      expect(seen.has(WEAPONS[gun].partner)).toBe(true);
+      for (const other of GUN_IDS) if (other !== gun) expect(seen.has(WEAPONS[other].partner)).toBe(false);
+    }
+  });
+
+  it('a maxed gun evolves with its own partner', () => {
+    const g = new Game(getChapter(0), base('bazooka'), 4);
+    g.weapons[0].level = 5;
+    g.passives.push({ id: 'warhead', level: 1 });
+    expect(g.evolvable()).toEqual(['bazooka']);
   });
 
   it('unlock with campaign progress, auto-equip on unlock, and can be swapped back', () => {
