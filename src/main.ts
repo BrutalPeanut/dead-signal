@@ -13,6 +13,7 @@ import { Renderer } from './render/renderer';
 import { Renderer3D } from './render3d/renderer3d';
 import { botChoose, botMove } from './sim/bot';
 import { CHAPTER_COUNT, getChapter } from './sim/chapters';
+import { romanRank } from './meta/ascension';
 import { GUN_IDS, type WeaponId } from './sim/data';
 import { dailyChallenge, defaultMods, modsFor, type RunMode } from './sim/modes';
 import { DT, Game } from './sim/game';
@@ -135,6 +136,7 @@ class App {
       (sec, mode) => this.startRun(sec, mode),
       () => this.openSettings(),
     );
+    this.hub.onAscended = (rank, cores) => this.stats.track('unlock', { s: 0, d: { ascend: rank, cores } });
     this.ui.append(this.hub.el);
 
     window.addEventListener('resize', () => this.renderer.resize());
@@ -239,10 +241,11 @@ class App {
       // Sector 1 is the training ground: one free revive so first-timers can bank a win.
       if (sector === 0) base.revives += 1;
       // ...and until it's cleared once, a guided tutorial run
-      this.tutorialOn = sector === 0 && !((this.profile.data.stars[0] ?? 0) & 4);
-      this.game = new Game(getChapter(sector), base, Math.floor(Math.random() * 1e9), { ...defaultMods(), tutorial: this.tutorialOn });
+      this.tutorialOn = sector === 0 && !((this.profile.data.stars[0] ?? 0) & 4) && this.profile.rank() === 0;
+      this.game = new Game(getChapter(sector, this.profile.rank()), base, Math.floor(Math.random() * 1e9), { ...defaultMods(), tutorial: this.tutorialOn });
       sub = `Sector ${sector + 1} · survive ${this.game.runLength >= 120 ? Math.round(this.game.runLength / 60) + ':00' : this.game.runLength + 's'}`;
       if (this.tutorialOn) sub = 'Training run · 2 minutes · follow the tips';
+      if (this.profile.rank()) sub += ` · Ascension ${romanRank(this.profile.rank())}`;
       this.hud.startRun(this.profile.data.best[sector] ?? 0, 'campaign', 0, this.game.runLength);
     }
     this.game.adRevive = adsOn();

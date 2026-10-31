@@ -1,5 +1,7 @@
 /** Hand-drawn 24×24 stroke icons for the lobby chrome (emoji render inconsistently across devices). */
 const P: Record<string, string> = {
+  ascend:
+    '<path d="M12 2l2.6 6.4L21 11l-6.4 2.6L12 20l-2.6-6.4L3 11l6.4-2.6z" fill="currentColor" fill-opacity=".3"/><path d="M19 3v4M17 5h4"/>',
   battle:
     '<path d="M5 19l9-9M14 4l6 0 0 6-6 6-4-4z" fill="currentColor" fill-opacity=".25"/><path d="M4 20l3-3M7 14l3 3"/>',
   armory: '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z" fill="currentColor" fill-opacity=".2"/><path d="M12 8v8M9 11h6"/>',

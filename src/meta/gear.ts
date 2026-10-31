@@ -167,8 +167,9 @@ export function salvageValue(it: GearItem): { scrap: number; gold: number } {
 }
 
 /** Rarity roll weights for drops, improving with sector. */
-export function dropWeights(sector: number, crate: boolean): number[] {
-  const s = Math.min(9, sector);
+export function dropWeights(sector: number, crate: boolean, luck = 0): number[] {
+  // ascension luck reaches past the Sector 10 table (up to 4 steps further)
+  const s = Math.min(9 + Math.min(4, luck), sector + luck);
   if (crate) return [40 - s * 3, 38, 16 + s * 1.5, 5 + s * 1.2, 1 + s * 0.3, 0];
   return [72 - s * 5, 22 + s * 1.5, 5 + s * 2.4, 0.6 + s * 0.9, s * 0.15, 0];
 }
