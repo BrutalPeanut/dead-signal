@@ -31,6 +31,7 @@ import { coin, fmtNum, fmtTime, h, haptic, toast } from './dom';
 import { HomeScene } from './homeScene';
 import { icon } from './svgicons';
 import { MISSION_DEFS, dailyBonus, starReward, type Reward } from '../meta/missions';
+import { ASCEND_AT, LAB, ascendKeys, rankDmgMul, rankHpMul, rankRewardMul, romanRank } from '../meta/ascension';
 
 export type Tab = 'deploy' | 'armory' | 'talents' | 'supply' | 'missions';
 
@@ -92,6 +93,8 @@ export class Hub {
   private scene = new HomeScene();
 
   mode: RunMode = 'campaign';
+  /** Called after the player ascends (for analytics). */
+  onAscended: (rank: number, cores: number) => void = () => {};
 
   constructor(private p: Profile, private onDeploy: (sector: number, mode: RunMode) => void, private onSettings: () => void) {
     this.sector = p.data.unlocked;
@@ -172,6 +175,7 @@ export class Hub {
           'div.ava',
           h('img', { src: avatar(), alt: '' }),
           h('span.lvb', d.accountLevel),
+          this.p.rank() ? h('span.ascb', romanRank(this.p.rank())) : null,
           h('span.ring', { html: `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16.5" pathLength="100" stroke-dasharray="${Math.round((d.accountXp / need) * 100)} 100"/></svg>` }),
         ),
         h('div.who', h('div.nm', charById(d.character).name), h('div.pw', coin('power'), fmtNum(this.p.power()))),
@@ -186,7 +190,7 @@ export class Hub {
     const dots: Partial<Record<Tab, boolean>> = {
       supply: p.data.keys > 0 || p.dailyAvailable() || p.relayPending().hours >= 1,
       armory: p.data.gear.some((g) => p.mergeMates(g.uid).length >= MERGE_COUNT - 1),
-      talents: p.trackInfo().some((t) => p.canBuyTrack(t.id)),
+      talents: p.trackInfo().some((t) => p.canBuyTrack(t.id)) || p.labAffordable(),
       missions: p.missionsClaimable() > 0,
       deploy: p.starChestsReady() > 0,
     };
@@ -249,7 +253,7 @@ export class Hub {
   private deployTab() {
     const p = this.p;
     const d = p.data;
-    const ch = getChapter(this.sector);
+    const ch = getChapter(this.sector, p.rank());
     const locked = this.sector > d.unlocked;
     const stars = d.stars[this.sector] ?? 0;
     const claims = d.starClaims[this.sector] ?? 0;
@@ -330,6 +334,7 @@ export class Hub {
           'div.rails.left',
           rail('relay', 'Relay', () => this.setTab('supply'), relay.hours >= 1 ? '!' : null, relayRing),
           rail('daily', 'Daily', () => this.calendar(), p.dailyAvailable() ? 1 : null),
+          p.canAscend() ? rail('ascend', 'Ascend', () => this.ascendSheet(), '!', null, '.asc-rail') : null,
         ),
         h(
           'div.rails.right',
@@ -385,10 +390,9 @@ export class Hub {
   static readonly MODE_UNLOCK: Record<RunMode, number> = { campaign: 0, daily: 1, endless: 3 };
 
   private modeTabs() {
-    const d = this.p.data;
     const tab = (m: RunMode, label: string) => {
       const need = Hub.MODE_UNLOCK[m];
-      const lock = d.unlocked < need;
+      const lock = this.p.reach() < need;
       const dot = m === 'daily' && !lock && this.p.dailyState().plays === 0;
       return h(
         'button.mt' + (this.mode === m ? '.on' : '') + (lock ? '.lock' : ''),
@@ -481,7 +485,7 @@ export class Hub {
     const se = seasonOf();
     const lvl = passLevel(ps.sp);
     const cell = (i: number, prem: boolean) => {
-      const r = passReward(i, prem, p.data.unlocked);
+      const r = passReward(i, prem, p.reach());
       const done = prem ? !!(ps.prem & (1 << i)) : !!(ps.free & (1 << i));
       const ready = p.canClaimPass(i, prem);
       const locked = prem && !ps.premium;
@@ -715,7 +719,7 @@ export class Hub {
     const left = Math.max(0, midnight.getTime() - Date.now());
     const hrs = Math.floor(left / 3.6e6);
     const mins = Math.floor((left % 3.6e6) / 6e4);
-    const bonus = dailyBonus(p.data.unlocked);
+    const bonus = dailyBonus(p.reach());
     return h(
       'div',
       h('div.section-h', 'Daily missions', h('span.reset', `Resets in ${hrs}h ${mins}m`)),
@@ -1080,6 +1084,123 @@ export class Hub {
 
   // ------------------------------------------------------------------ talents
 
+  // ------------------------------------------------------------------ ascension
+
+  private ascensionPanel() {
+    const p = this.p;
+    const d = p.data;
+    const rank = p.rank();
+    const a = d.asc;
+    if (!rank && !p.canAscend()) {
+      const pct = Math.min(1, d.unlocked / ASCEND_AT);
+      return h(
+        'div.asc-card.locked',
+        h('div.asc-head', h('span.asc-badge', '✦'), h('div', h('b', 'Ascension'), h('small', `Clear Sector ${ASCEND_AT} to unlock`))),
+        h('div.asc-bar', h('i', { style: { width: `${pct * 100}%` } })),
+        h('div.help', { style: { textAlign: 'left', margin: '8px 0 0' } }, 'Restart the campaign stronger: keep all your gear, earn Signal Cores for permanent upgrades and better loot.'),
+      );
+    }
+    return h(
+      'div',
+      h(
+        'div.asc-card',
+        h(
+          'div.asc-head',
+          h('span.asc-badge', rank ? romanRank(rank) : '✦'),
+          h('div', h('b', rank ? `Ascension ${romanRank(rank)}` : 'Ascension'), h('small', rank ? `+${Math.round((rankRewardMul(rank) - 1) * 100)}% campaign rewards · infected +${Math.round((rankHpMul(rank) - 1) * 100)}% HP` : 'Ready: restart the campaign stronger')),
+          h('div.asc-cores', h('b', a?.cores ?? 0), h('small', 'Cores')),
+        ),
+        p.canAscend()
+          ? h('button.btn.primary', { style: { width: '100%', marginTop: '10px' }, onclick: () => this.ascendSheet() }, `Ascend to ${romanRank(rank + 1)} · +${p.coresOnAscend()} cores`)
+          : h('div.help', { style: { textAlign: 'left', margin: '8px 0 0' } }, `Clear Sector ${ASCEND_AT} again to ascend to ${romanRank(rank + 1)}. Every star you earn adds cores.`),
+      ),
+      rank ? h('div.section-h', 'Signal Lab') : null,
+      rank ? h('div.help', { style: { textAlign: 'left', marginBottom: '10px' } }, 'Permanent upgrades bought with Signal Cores. They never reset.') : null,
+      rank
+        ? LAB.map((perk) => {
+            const lv = p.lab(perk.id);
+            const maxed = lv >= perk.max;
+            return h(
+              'div.track',
+              h('div.ti', { style: { color: perk.color } }, perk.icon),
+              h('div', h('div.nm', `${perk.name} `, h('span', { style: { color: 'var(--dim)', fontSize: '12px' } }, `${lv}/${perk.max}`)), h('div.ds', lv ? perk.desc(lv) : `Next: ${perk.desc(1)}`)),
+              h(
+                'button.btn.small.primary',
+                {
+                  disabled: !p.canBuyLab(perk.id),
+                  onclick: () => {
+                    if (p.buyLab(perk.id)) {
+                      audio.levelUp();
+                      haptic(15);
+                      toast(`${perk.name}: ${perk.desc(lv + 1)}`, perk.color);
+                    }
+                  },
+                },
+                maxed ? 'Max' : h('span', '✦ ', String(p.labCost(perk.id))),
+              ),
+            );
+          })
+        : null,
+    );
+  }
+
+  /** Explain exactly what ascending resets, keeps and pays, then confirm. */
+  ascendSheet(confirming = false) {
+    const p = this.p;
+    if (!p.canAscend()) return;
+    const next = p.rank() + 1;
+    const cores = p.coresOnAscend();
+    const keys = ascendKeys(next);
+    const row = (ico: string, text: string, cls = '') => h('div.asc-row' + cls, h('span', ico), h('span', text));
+    const btn = h('button.btn.primary', { style: { width: '100%', marginTop: '14px' } }, confirming ? `Yes, ascend to ${romanRank(next)}` : `Ascend to ${romanRank(next)}`);
+    btn.onclick = () => {
+      if (!confirming) return this.ascendSheet(true);
+      const r = p.ascend();
+      if (!r) return;
+      this.onAscended(r.rank, r.cores);
+      audio.levelUp();
+      haptic(60);
+      this.sector = 0;
+      this.mode = 'campaign';
+      this.ascendedSheet(r.rank, r.cores, r.keys);
+    };
+    const sheet = h(
+      'div.sheet.asc-sheet',
+      { onclick: (e: Event) => e.stopPropagation() },
+      h('div.asc-big', '✦'),
+      h('h2', { style: { fontSize: '22px', textAlign: 'center' } }, `Ascension ${romanRank(next)}`),
+      h('div.help', { style: { marginTop: 0 } }, 'Restart the campaign from Sector 1, stronger.'),
+      h('div.asc-sub', 'You gain'),
+      row('✦', `${cores} Signal Cores for permanent Signal Lab upgrades`, '.gain'),
+      row('🔑', `${keys} crate keys right now`, '.gain'),
+      row('◆', `+${Math.round((rankRewardMul(next) - 1) * 100)}% gold, scrap and XP from campaign runs`, '.gain'),
+      row('★', next <= 2 ? 'Rarer gear from drops and crates' : 'Every sector chest can be claimed again', '.gain'),
+      next <= 2 ? row('★', 'Every sector chest can be claimed again', '.gain') : null,
+      h('div.asc-sub', 'You keep'),
+      row('✓', 'All gear, gold, scrap, keys, talents and account level. Guns and couriers stay unlocked.', '.keep'),
+      h('div.asc-sub', 'Resets'),
+      row('↺', 'Sector progress, stars and best times', '.lose'),
+      row('☠', `Infected get tougher: +${Math.round((rankHpMul(next) - 1) * 100)}% HP, +${Math.round((rankDmgMul(next) - 1) * 100)}% damage`, '.lose'),
+      confirming ? h('div.help', { style: { color: 'var(--gold)' } }, 'This can’t be undone. Tap again to ascend.') : null,
+      btn,
+      h('button.btn', { style: { width: '100%', marginTop: '8px' }, onclick: () => this.closeModal() }, 'Not yet'),
+    );
+    this.present(sheet, 'ascend');
+  }
+
+  private ascendedSheet(rank: number, cores: number, keys: number) {
+    const sheet = h(
+      'div.sheet.asc-sheet',
+      { onclick: (e: Event) => e.stopPropagation() },
+      h('div.asc-big.glow', romanRank(rank)),
+      h('h2', { style: { fontSize: '24px', textAlign: 'center' } }, `Ascension ${romanRank(rank)}`),
+      h('div.help', { style: { marginTop: 0 } }, `+${cores} Signal Cores · +${keys} crate keys`),
+      h('div.help', 'Spend your cores in the Signal Lab, then retake Sector 1. Your gear came with you.'),
+      h('button.btn.primary', { style: { width: '100%', marginTop: '14px' }, onclick: () => { this.closeModal(); this.setTab('talents'); } }, 'Open the Signal Lab'),
+    );
+    this.present(sheet, 'ascended');
+  }
+
   private talentsTab() {
     const p = this.p;
     const d = p.data;
@@ -1087,6 +1208,7 @@ export class Hub {
     const colors: Record<TrackId, string> = { atk: '#ff7a1a', hp: '#ff3b5c', def: '#4da3ff', heal: '#43ffa4' };
     return h(
       'div',
+      this.ascensionPanel(),
       h('div.section-h', `Account level ${d.accountLevel}`),
       h('div.help', { style: { textAlign: 'left', marginBottom: '10px' } }, 'Runs and the Signal Relay earn account XP. Each level raises talent caps and can unlock a milestone.'),
       p.trackInfo().map((t) =>
@@ -1238,7 +1360,7 @@ export class Hub {
     const can = p.dailyAvailable();
     const cycleStart = lg.claimed - today; // claims before this 7-day page
     const tiles = Array.from({ length: LOGIN_DAYS }, (_, i) => {
-      const r = loginReward(i, p.data.unlocked);
+      const r = loginReward(i, p.reach());
       const done = cycleStart + i < lg.claimed;
       const isToday = i === today && can;
       const big = i === LOGIN_DAYS - 1;

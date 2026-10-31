@@ -12,7 +12,8 @@
     "progression": "vite-node scripts/progression.ts",
     "weapons": "vite-node scripts/weapons.ts",
     "builds": "vite-node scripts/melee.ts",
-    "pacing": "vite-node scripts/pacing.ts"
+    "pacing": "vite-node scripts/pacing.ts",
+    "ascension": "vite-node scripts/ascension.ts"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",

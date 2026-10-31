@@ -26,6 +26,7 @@ import {
 } from './gear';
 import { dailyBonus, dateKey, MISSION_DEFS, rollDaily, starReward, type DailyMissions, type MissionKind, type Reward } from './missions';
 import { MILESTONES, TRACKS, accountXpNeed, trackCap, trackCost, type TrackId } from './talents';
+import { ASCEND_AT, LAB, ascendKeys, coresFor, freshAsc, labPerk, rankRewardMul, type AscState, type LabId } from './ascension';
 
 export interface CoachAction {
   kind: 'collect' | 'equip' | 'merge' | 'crate' | 'talent' | 'level';
@@ -86,6 +87,8 @@ export interface SaveData {
   sync?: { code: string; saved?: boolean; nagAt?: number };
   /** Google Drive backup: when this device last backed up there. */
   gdrive?: { at: number };
+  /** Ascension (see meta/ascension.ts). Unset = never ascended. */
+  asc?: AscState;
 }
 
 export interface RunRewards {
@@ -160,7 +163,8 @@ export function normalizeSave(raw: unknown): SaveData | null {
 
 /** How far along a save is, for "keep the furthest" merges: sector, then account level, then XP. */
 export function progressOf(d: SaveData): number {
-  return d.unlocked * 1e9 + Math.min(d.accountLevel, 9999) * 1e5 + Math.min(Math.max(0, d.accountXp | 0), 99999);
+  // an ascension restarts the campaign, so the rank comes first: a pre-ascension backup must never win
+  return Math.min(d.asc?.rank ?? 0, 9000) * 1e11 + d.unlocked * 1e9 + Math.min(d.accountLevel, 9999) * 1e5 + Math.min(Math.max(0, d.accountXp | 0), 99999);
 }
 
 export class Profile {
@@ -318,8 +322,8 @@ export class Profile {
     }
     const p = this.perkSum();
     const ch = charById(d.character);
-    atk *= 1 + p.atkPct + (ch.atkPct ?? 0);
-    hp *= 1 + p.hpPct + (ch.hpPct ?? 0);
+    atk *= 1 + p.atkPct + (ch.atkPct ?? 0) + this.lab('atk') * 0.05;
+    hp *= 1 + p.hpPct + (ch.hpPct ?? 0) + this.lab('hp') * 0.05;
     return {
       atk: Math.round(Math.max(atk, this.boost?.atk ?? 0)),
       hp: Math.round(Math.max(hp, this.boost?.hp ?? 0)),
@@ -331,10 +335,10 @@ export class Profile {
       healMul: 1 + d.tracks.heal * 0.04 + p.heal + (ch.healMul ?? 0),
       goldMul: 1 + this.milestone('gold'),
       rerolls: 1 + this.milestone('reroll'),
-      revives: this.milestone('revive') + p.revive,
+      revives: this.milestone('revive') + p.revive + this.lab('revive'),
       // one primary weapon: always the gun picked in the Armory (weapon gear only adds stats)
       startWeapon: this.gun(),
-      startLevels: this.milestone('startLevel') + p.startLevel,
+      startLevels: this.milestone('startLevel') + p.startLevel + this.lab('start'),
       regen: p.regen + (ch.regen ?? 0),
       bonusWeapon: ch.bonusWeapon,
     };
@@ -342,7 +346,7 @@ export class Profile {
 
   /** Primary guns unlocked so far, in unlock order. */
   gunsUnlocked(): WeaponId[] {
-    return GUN_IDS.filter((id) => gunUnlock(id) <= this.data.unlocked);
+    return GUN_IDS.filter((id) => gunUnlock(id) <= this.reach());
   }
   /** The equipped primary gun: the picked one if it is unlocked, else the newest unlocked. */
   gun(): WeaponId {
@@ -423,8 +427,8 @@ export class Profile {
     const p = this.data.pass;
     if (p.season !== s) {
       for (let i = 0; i < passLevel(p.sp); i++) {
-        if (!(p.free & (1 << i))) this.grantPass(passReward(i, false, this.data.unlocked));
-        if (p.premium && !(p.prem & (1 << i))) this.grantPass(passReward(i, true, this.data.unlocked));
+        if (!(p.free & (1 << i))) this.grantPass(passReward(i, false, this.reach()));
+        if (p.premium && !(p.prem & (1 << i))) this.grantPass(passReward(i, true, this.reach()));
       }
       this.data.pass = freshPass(s);
       this.save();
@@ -439,7 +443,7 @@ export class Profile {
   private grantPass(r: PassReward) {
     this.grant(r);
     if (r.itemRarity !== undefined) {
-      const it = this.rollItem(new Rng(Date.now() ^ (this.data.uidSeq * 7919)), this.data.unlocked, true);
+      const it = this.rollItem(new Rng(Date.now() ^ (this.data.uidSeq * 7919)), this.reach(), true);
       it.rarity = r.itemRarity;
       this.data.gear.push(it);
       this.autoEquip(it);
@@ -460,7 +464,7 @@ export class Profile {
     const p = this.pass();
     if (premium) p.prem |= 1 << tier;
     else p.free |= 1 << tier;
-    const reward = passReward(tier, premium, this.data.unlocked);
+    const reward = passReward(tier, premium, this.reach());
     const item = this.grantPass(reward);
     this.save();
     return { reward, item };
@@ -499,7 +503,7 @@ export class Profile {
   }
 
   charUnlocked(id: string) {
-    return this.data.unlocked >= charById(id).unlock;
+    return this.reach() >= charById(id).unlock;
   }
 
   selectCharacter(id: string) {
@@ -507,6 +511,83 @@ export class Profile {
     this.data.character = id;
     this.save();
     return true;
+  }
+
+  // ------------------------------------------------------------------ ascension
+
+  asc(): AscState {
+    return (this.data.asc ??= freshAsc());
+  }
+  rank() {
+    return this.data.asc?.rank ?? 0;
+  }
+  /** Furthest sector ever unlocked (survives ascending): unlocks and income scale with this. */
+  reach() {
+    return Math.max(this.data.unlocked, this.data.asc?.peak ?? 0);
+  }
+  lab(id: LabId) {
+    return this.data.asc?.lab[id] ?? 0;
+  }
+  /** Better drop/crate rarity: one step per rank (up to 2) plus Lucky Signal. */
+  luck() {
+    return Math.min(2, this.rank()) + this.lab('luck');
+  }
+  canAscend() {
+    return this.data.unlocked >= ASCEND_AT;
+  }
+  /** Signal Cores ascending right now would pay. */
+  coresOnAscend() {
+    return coresFor(this.data.stars);
+  }
+  /**
+   * Restart the campaign one rank higher. Only campaign progress resets; everything else is kept.
+   * Returns what was granted, or null if not allowed yet.
+   */
+  ascend(): { rank: number; cores: number; keys: number } | null {
+    if (!this.canAscend()) return null;
+    const d = this.data;
+    const a = this.asc();
+    const cores = this.coresOnAscend();
+    a.peak = Math.max(a.peak, d.unlocked);
+    a.rank++;
+    a.cores += cores;
+    a.earned += cores;
+    const keys = ascendKeys(a.rank);
+    d.keys += keys;
+    d.gun = this.gun(); // keep the gun in hand (unlocks follow the peak)
+    d.unlocked = 0;
+    d.stars = {};
+    d.starClaims = {};
+    d.best = {};
+    d.bestScore = {};
+    this.save();
+    return { rank: a.rank, cores, keys };
+  }
+  labCost(id: LabId) {
+    const lv = this.lab(id);
+    const perk = labPerk(id);
+    return lv >= perk.max ? Infinity : perk.cost(lv);
+  }
+  canBuyLab(id: LabId) {
+    return (this.data.asc?.cores ?? 0) >= this.labCost(id);
+  }
+  buyLab(id: LabId) {
+    if (!this.canBuyLab(id)) return false;
+    const a = this.asc();
+    a.cores -= this.labCost(id);
+    a.lab[id] = this.lab(id) + 1;
+    this.save();
+    return true;
+  }
+  labAffordable() {
+    return LAB.some((p) => this.canBuyLab(p.id));
+  }
+  /** Gold/scrap multiplier from the Lab (all modes). */
+  private lootMul() {
+    return 1 + this.lab('loot') * 0.1;
+  }
+  private xpMul() {
+    return 1 + this.lab('xp') * 0.15;
   }
 
   power(): number {
@@ -619,7 +700,7 @@ export class Profile {
   }
 
   rollItem(rng: Rng, sector: number, crate: boolean): GearItem {
-    const rarity = rng.weighted(dropWeights(sector, crate));
+    const rarity = rng.weighted(dropWeights(sector, crate, this.luck()));
     // weapons are rarer in drops so slots fill evenly
     const pool = GEAR_IDS.flatMap((id) => (GEAR[id].slot === 'weapon' ? [id] : [id, id]));
     return { uid: this.newUid(), def: rng.pick(pool), rarity, level: 1 };
@@ -628,7 +709,7 @@ export class Profile {
   openCrate(rng = new Rng(Date.now())): GearItem | null {
     if (this.data.keys <= 0) return null;
     this.data.keys--;
-    const it = this.rollItem(rng, this.data.unlocked, true);
+    const it = this.rollItem(rng, this.reach(), true);
     this.data.gear.push(it);
     this.autoEquip(it);
     this.track('crate', 1);
@@ -789,7 +870,7 @@ export class Profile {
   applyDaily(r: RunResult, now = new Date()): RunRewards {
     const d = this.data;
     const ds = this.dailyState(now);
-    const m = 1 + d.unlocked * 0.45;
+    const m = (1 + this.reach() * 0.45) * this.lootMul();
     const score = r.score ?? 0;
     const prevBest = ds.best;
     const newBest = score > prevBest;
@@ -797,7 +878,7 @@ export class Profile {
     ds.bestEver = Math.max(ds.bestEver, score);
     ds.plays++;
     let gold = Math.round((r.gold + 60 + (r.won ? 120 : 0)) * m);
-    let scrap = 3 + Math.floor(r.time / 60);
+    let scrap = Math.round((3 + Math.floor(r.time / 60)) * this.lootMul());
     let keys = 0;
     const tiersNew: string[] = [];
     DAILY_TIERS.forEach((t, i) => {
@@ -813,7 +894,7 @@ export class Profile {
     d.gold += gold;
     d.scrap += scrap;
     d.keys += keys;
-    const xp = Math.round(r.time * 0.8 + r.bossKills * 60);
+    const xp = Math.round((r.time * 0.8 + r.bossKills * 60) * this.xpMul());
     const levelsGained = this.bookRun(r, xp);
     this.save();
     return { gold, xp, keys, scrap, items: [], firstClear: false, newStars: 0, levelsGained, unlockedSector: false, score, newBest, prevBest, starsBefore: 0, starsAfter: 0, tiersNew, mode: 'daily' };
@@ -825,8 +906,8 @@ export class Profile {
     const ch = getChapter(sector);
     const rng = new Rng(seed);
     const mins = r.time / 60;
-    const gold = Math.round((r.gold + mins * 70 * ch.goldMul) * (1 + this.milestone('gold')));
-    const scrap = Math.round(2 + mins * 3 + r.bossKills * 4);
+    const gold = Math.round((r.gold + mins * 70 * ch.goldMul) * (1 + this.milestone('gold')) * this.lootMul());
+    const scrap = Math.round((2 + mins * 3 + r.bossKills * 4) * this.lootMul());
     const keys = Math.floor(r.bossKills / 2);
     const items: GearItem[] = [];
     for (let i = 0; i < Math.min(3, Math.floor(r.bossKills / 2)); i++) items.push(this.rollItem(rng, sector, false));
@@ -841,7 +922,7 @@ export class Profile {
     d.endless.bestScore = Math.max(prevBest, score);
     d.endless.best = Math.max(d.endless.best, r.time);
     d.endless.runs++;
-    const xp = Math.round(r.time + r.bossKills * 60);
+    const xp = Math.round((r.time + r.bossKills * 60) * this.xpMul());
     const levelsGained = this.bookRun(r, xp);
     this.save();
     return { gold, xp, keys, scrap, items, firstClear: false, newStars: 0, levelsGained, unlockedSector: false, score, newBest, prevBest, starsBefore: 0, starsAfter: 0, mode: 'endless' };
@@ -852,8 +933,9 @@ export class Profile {
     const ch = getChapter(sector);
     const rng = new Rng(seed);
     const goldMul = 1 + this.milestone('gold');
-    const gold = Math.round((r.gold + ((r.time * TIME_SCALE) / 6) * ch.goldMul + (r.won ? 120 * ch.goldMul : 0)) * goldMul);
-    const xp = Math.round(r.time * TIME_SCALE * 0.5 + r.kills * 0.02 + r.bossKills * 60 + (r.won ? 100 : 0));
+    const rmul = rankRewardMul(this.rank());
+    const gold = Math.round((r.gold + ((r.time * TIME_SCALE) / 6) * ch.goldMul + (r.won ? 120 * ch.goldMul : 0)) * goldMul * this.lootMul() * rmul);
+    const xp = Math.round((r.time * TIME_SCALE * 0.5 + r.kills * 0.02 + r.bossKills * 60 + (r.won ? 100 : 0)) * this.xpMul() * rmul);
     const prevStars = d.stars[sector] ?? 0;
     const score = r.score ?? 0;
     const prevBest = d.bestScore[sector] ?? 0;
@@ -876,7 +958,7 @@ export class Profile {
     const items: GearItem[] = [];
     const drops = r.bossKills + (r.eliteKills > 0 ? 1 : 0) + (r.won ? 1 : 0);
     for (let i = 0; i < drops; i++) items.push(this.rollItem(rng, sector, false));
-    const scrap = Math.round(2 + (r.time * TIME_SCALE) / 60 + r.eliteKills * 2 + r.bossKills * 4);
+    const scrap = Math.round((2 + (r.time * TIME_SCALE) / 60 + r.eliteKills * 2 + r.bossKills * 4) * this.lootMul() * rmul);
 
     let unlockedSector = false;
     if (r.won && sector === d.unlocked && d.unlocked < CHAPTER_COUNT - 1) {
@@ -909,18 +991,21 @@ export class Profile {
       levelsGained++;
     }
     this.save();
-    const newGun = unlockedSector ? GUN_IDS.find((id) => id !== 'pistol' && gunUnlock(id) === d.unlocked) : undefined;
+    const firstTime = unlockedSector && d.unlocked > (d.asc?.peak ?? 0);
+    if (d.asc && d.unlocked > d.asc.peak) d.asc.peak = d.unlocked;
+    const newGun = firstTime ? GUN_IDS.find((id) => id !== 'pistol' && gunUnlock(id) === d.unlocked) : undefined;
     if (newGun) d.gun = newGun; // the new gun replaces the old one; the Armory swaps back
-    const newCharacter = unlockedSector ? CHARACTERS.find((c) => c.unlock === d.unlocked)?.name : undefined;
-    const newLoadout = !unlockedSector ? undefined : d.unlocked === 2 ? 'More slots! You can now carry 4 attack + 4 support upgrades, and every weapon type can appear.' : d.unlocked === 3 ? 'Full loadout unlocked: 6 attack + 6 support slots.' : undefined;
+    const newCharacter = firstTime ? CHARACTERS.find((c) => c.unlock === d.unlocked)?.name : undefined;
+    const newLoadout = !firstTime ? undefined : d.unlocked === 2 ? 'More slots! You can now carry 4 attack + 4 support upgrades, and every weapon type can appear.' : d.unlocked === 3 ? 'Full loadout unlocked: 6 attack + 6 support slots.' : undefined;
     return { gold, xp, keys, scrap, items, firstClear, newStars, levelsGained, unlockedSector, score, newBest, prevBest, starsBefore: prevStars, starsAfter: stars, newCharacter, newLoadout, newGun };
   }
 
   // ------------------------------------------------------------------ idle relay + daily
 
   relayRates() {
-    const s = this.data.unlocked;
-    return { goldPerH: Math.round(60 * (1 + s * 0.6)), scrapPerH: 3 + s, xpPerH: 40 + s * 10 };
+    const s = this.reach();
+    const k = 1 + this.lab('relay') * 0.2;
+    return { goldPerH: Math.round(60 * (1 + s * 0.6) * k), scrapPerH: Math.round((3 + s) * k), xpPerH: Math.round((40 + s * 10) * k) };
   }
 
   relayPending(now = Date.now()) {
@@ -960,11 +1045,11 @@ export class Profile {
     this.data.lastDaily = now.toDateString();
     const day = lg.claimed % LOGIN_DAYS;
     lg.claimed++;
-    const r = loginReward(day, this.data.unlocked);
+    const r = loginReward(day, this.reach());
     this.grant(r);
     let item: GearItem | undefined;
     if (r.itemRarity !== undefined) {
-      item = this.rollItem(new Rng(now.getTime()), this.data.unlocked, true);
+      item = this.rollItem(new Rng(now.getTime()), this.reach(), true);
       item.rarity = Math.max(item.rarity, r.itemRarity);
       this.data.gear.push(item);
       this.autoEquip(item);
@@ -979,7 +1064,7 @@ export class Profile {
   missions(now = new Date()): DailyMissions {
     const key = dateKey(now);
     if (!this.data.missions || this.data.missions.date !== key) {
-      this.data.missions = rollDaily(key, this.data.unlocked);
+      this.data.missions = rollDaily(key, this.reach());
     }
     // saves from the 10-minute era may hold a survive target longer than a run
     for (const m of this.data.missions.list) if (m.kind === 'survive' && m.target > STAR2_TIME) m.target = STAR2_TIME;
@@ -1019,7 +1104,7 @@ export class Profile {
 
   claimBonus(): Reward | null {
     if (!this.bonusReady()) return null;
-    const r = dailyBonus(this.data.unlocked);
+    const r = dailyBonus(this.reach());
     this.missions().bonusClaimed = true;
     this.grant(r);
     this.save();
