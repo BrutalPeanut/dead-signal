@@ -37,10 +37,11 @@ export class Audio {
     comp.ratio.value = 6;
     this.master.connect(comp).connect(this.ctx.destination);
     this.sfxBus = this.ctx.createGain();
-    this.sfxBus.gain.value = 0.55;
+    this.sfxBus.gain.value = this.sfxOn ? 0.55 : 0;
     this.sfxBus.connect(this.master);
     this.musicBus = this.ctx.createGain();
-    this.musicBus.gain.value = 0.32;
+    // honour the saved settings: the context is created on the first tap, after setSfx/setMusic ran
+    this.musicBus.gain.value = this.musicOn ? 0.32 : 0;
     this.musicBus.connect(this.master);
     const len = this.ctx.sampleRate * 1;
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -50,6 +51,7 @@ export class Audio {
 
   setSfx(on: boolean) {
     this.sfxOn = on;
+    if (this.sfxBus) this.sfxBus.gain.value = on ? 0.55 : 0; // also silences sounds already queued
   }
 
   setMusic(on: boolean) {
