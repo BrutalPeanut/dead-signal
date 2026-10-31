@@ -130,7 +130,7 @@ class App {
 
     this.game = this.demoGame(this.profile.data.unlocked);
     this.renderer = want3d(s.graphics) ? new Renderer3D(this.canvas, this.game) : new Renderer(this.canvas, this.game);
-    this.hud = new Hud(() => this.pause());
+    this.hud = new Hud(() => this.pause(), () => this.toggleSpeed());
     this.hub = new Hub(
       this.profile,
       (sec, mode) => this.startRun(sec, mode),
@@ -248,6 +248,8 @@ class App {
       if (this.profile.rank()) sub += ` · Ascension ${romanRank(this.profile.rank())}`;
       this.hud.startRun(this.profile.data.best[sector] ?? 0, 'campaign', 0, this.game.runLength);
     }
+    this.speedOk = !adsOn() || this.profile.speedActive();
+    this.hud.setSpeed(this.speed, !this.tutorialOn, this.speedOk);
     this.game.adRevive = adsOn();
     this.stats.track('run_start', { s: sector, m: mode, d: { gun: this.game.weapons[0]?.id, power: this.profile.power(), char: this.profile.data.character } });
     this.renderer.setGame(this.game);
@@ -593,6 +595,30 @@ class App {
     }
   }
 
+  /** Sim speed for the current run: the 1×/2× setting (never during the guided tutorial). */
+  private get speed() {
+    return this.mode === 'run' && !this.tutorialOn && this.speedOk && this.profile.data.settings.speed === 2 ? 2 : 1;
+  }
+  /**
+   * 2× is free while ads are off. With ads on it's earned in the lobby (never mid-run), and it's
+   * decided at the start of each run so it can't run out in the middle of one.
+   */
+  private speedOk = true;
+
+  private toggleSpeed() {
+    const s = this.profile.data.settings;
+    if (!this.speedOk) {
+      audio.click();
+      toast('Unlock 2× speed in the lobby: one short ad = 30 minutes', '#ffd34d');
+      return;
+    }
+    s.speed = s.speed === 2 ? 1 : 2;
+    this.profile.save();
+    audio.click();
+    haptic(10);
+    this.hud.setSpeed(this.speed, !this.tutorialOn, this.speedOk);
+  }
+
   private frame = (now: number) => {
     // rAF timestamps can predate a performance.now() stored mid-frame (e.g. on resume): never step backwards
     const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
@@ -620,16 +646,18 @@ class App {
       audio.intensity = 0.15;
     } else if (!this.paused) {
       if (g.state === 'play') {
-        this.acc += dt;
+        // 2× speed just runs the same fixed-step sim twice as often: same rules, same results
+        const sp = this.speed;
+        this.acc += dt * sp;
         let n = 0;
-        while (this.acc >= DT && n < 6 && g.state === 'play') {
+        while (this.acc >= DT && n < 6 * sp && g.state === 'play') {
           this.acc -= DT;
           const [mx, my] = this.input.read();
           this.interp.capture(g);
           g.step(mx, my);
           n++;
         }
-        if (n >= 6) this.acc = 0;
+        if (n >= 6 * sp) this.acc = 0;
       } else this.acc = 0;
       audio.intensity = Math.min(1, g.time / 240);
       audio.bossMode = !!g.boss;
@@ -649,7 +677,8 @@ class App {
     // draw between the last two sim steps so motion is smooth on 120/144 Hz screens
     this.interp.apply(this.game, frozen ? 1 : Math.min(1, this.acc / DT));
     try {
-      this.renderer.render(frozen ? 0 : dt);
+      // effects and animations keep pace with the sim
+      this.renderer.render(frozen ? 0 : dt * (this.mode === 'run' ? this.speed : 1));
     } finally {
       this.interp.restore(this.game);
     }

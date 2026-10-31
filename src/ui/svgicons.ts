@@ -1,5 +1,6 @@
 /** Hand-drawn 24×24 stroke icons for the lobby chrome (emoji render inconsistently across devices). */
 const P: Record<string, string> = {
+  speed: '<path d="M3 6l8 6-8 6zM12 6l8 6-8 6z" fill="currentColor" fill-opacity=".3"/>',
   ascend:
     '<path d="M12 2l2.6 6.4L21 11l-6.4 2.6L12 20l-2.6-6.4L3 11l6.4-2.6z" fill="currentColor" fill-opacity=".3"/><path d="M19 3v4M17 5h4"/>',
   battle:

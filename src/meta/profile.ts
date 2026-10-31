@@ -38,6 +38,9 @@ export interface CoachAction {
 
 export const KEY = 'deadsignal.save.v1';
 export const RELAY_CAP_H = 8;
+/** One ad = 30 minutes of 2× speed, stacking to 2 hours. */
+export const SPEED_AD_MS = 30 * 60_000;
+export const SPEED_CAP_MS = 2 * 3_600_000;
 
 export interface Settings {
   sfx: boolean;
@@ -48,6 +51,8 @@ export interface Settings {
   controls: ControlMode;
   /** Renderer: '3d' (default) or the original '2d' art. */
   graphics?: '3d' | '2d';
+  /** Game speed during runs (the 1×/2× button next to pause). */
+  speed?: 1 | 2;
 }
 
 export type ControlMode = 'drag' | 'left' | 'right';
@@ -93,6 +98,8 @@ export interface SaveData {
   sync?: { code: string; saved?: boolean; nagAt?: number };
   /** Google Drive backup: when this device last backed up there. */
   gdrive?: { at: number };
+  /** 2× game speed is unlocked until this time (ms), earned by watching an ad in the lobby. */
+  speedUntil?: number;
   /** Ascension (see meta/ascension.ts). Unset = never ascended. */
   asc?: AscState;
 }
@@ -523,6 +530,21 @@ export class Profile {
     this.data.keys++;
     this.save();
     return true;
+  }
+
+  /** Is 2× speed unlocked right now? (Only matters when ads are on; otherwise it's free.) */
+  speedActive(now = Date.now()) {
+    return (this.data.speedUntil ?? 0) > now;
+  }
+  speedLeftMin(now = Date.now()) {
+    return Math.max(0, Math.ceil(((this.data.speedUntil ?? 0) - now) / 60_000));
+  }
+  /** After a watched ad: 30 more minutes of 2× speed (stacks up to 2 hours). */
+  grantSpeed(now = Date.now()) {
+    const from = Math.max(now, this.data.speedUntil ?? 0);
+    this.data.speedUntil = Math.min(now + SPEED_CAP_MS, from + SPEED_AD_MS);
+    this.data.settings.speed = 2;
+    this.save();
   }
 
   charUnlocked(id: string) {

@@ -8,7 +8,7 @@
  */
 import { h } from '../ui/dom';
 
-export type Placement = 'revive' | 'double' | 'key';
+export type Placement = 'revive' | 'double' | 'key' | 'speed';
 
 export interface AdProvider {
   readonly name: string;
@@ -36,7 +36,7 @@ class DemoAds implements AdProvider {
         h('div.ad-top', h('span.ad-tag', 'SAMPLE AD'), count, close),
         canvas,
         h('div.ad-cta', h('b', 'Gem Grove'), h('span', 'Fictional game used for this preview'), h('button.ad-install', 'Play free')),
-        h('div.ad-foot', `Reward: ${p === 'revive' ? 'get back up' : p === 'double' ? 'double your gold' : '1 crate key'}`),
+        h('div.ad-foot', `Reward: ${p === 'revive' ? 'get back up' : p === 'double' ? 'double your gold' : p === 'speed' ? '30 minutes of 2× speed' : '1 crate key'}`),
       );
       document.getElementById('ui')!.append(el);
       const ctx = canvas.getContext('2d')!;

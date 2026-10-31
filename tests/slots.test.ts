@@ -82,3 +82,17 @@ describe('better gear indicator', () => {
     expect(p.isUpgrade(p.item('g2')!)).toBe(false); // the old one is worse now
   });
 });
+
+describe('2× speed from ads', () => {
+  it('one ad = 30 minutes, stacking to 2 hours, and it expires', () => {
+    const p = mk();
+    const t = 1_000_000;
+    expect(p.speedActive(t)).toBe(false);
+    p.grantSpeed(t);
+    expect(p.speedLeftMin(t)).toBe(30);
+    expect(p.data.settings.speed).toBe(2);
+    for (let i = 0; i < 6; i++) p.grantSpeed(t);
+    expect(p.speedLeftMin(t)).toBe(120);
+    expect(p.speedActive(t + 2 * 3_600_000 + 1)).toBe(false);
+  });
+});
