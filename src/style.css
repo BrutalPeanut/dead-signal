@@ -243,6 +243,32 @@ button {
   font-weight: 900;
 }
 
+.hud .speed {
+  margin-left: auto;
+  margin-right: 6px;
+  pointer-events: auto;
+  width: 44px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(20, 24, 34, 0.75);
+  border: 1px solid #2d3549;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--dim);
+}
+
+.hud .speed.on {
+  color: #1a1200;
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(255, 211, 77, 0.45);
+}
+
+.hud .speed + .pause {
+  margin-left: 0;
+}
+
 .hud .skills {
   position: absolute;
   top: calc(var(--safe-top) + 70px);
@@ -4499,4 +4525,13 @@ button {
   .item .up {
     animation: none;
   }
+}
+
+.hud .speed.locked {
+  opacity: 0.55;
+}
+
+.rail-btn.speed-on .ri,
+.rail-btn.speed-on .rl {
+  color: var(--gold);
 }

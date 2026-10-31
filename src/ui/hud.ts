@@ -36,7 +36,11 @@ export class Hud {
   private skillKey = '';
   private bannerKey = '';
 
-  constructor(onPause: () => void) {
+  /** The 1×/2× game speed button. */
+  private speedBtn: HTMLButtonElement;
+
+  constructor(onPause: () => void, onSpeed: () => void = () => {}) {
+    this.speedBtn = h('button.speed', { onclick: onSpeed, 'aria-label': 'Game speed' }, '1×') as HTMLButtonElement;
     this.xpFill = h('div.xpfill');
     this.lvl = h('div.lvl', 'LV 1');
     this.timer = h('span', '00:00');
@@ -75,6 +79,7 @@ export class Hud {
           h('div.score-sub', h('span', '☠ ', this.kills), h('span', coin('gold'), this.gold)),
         ),
         h('div.timer', this.timer, this.timerSub),
+        this.speedBtn,
         h('button.pause', { onclick: onPause, 'aria-label': 'Pause' }, 'II'),
       ),
       h(
@@ -113,6 +118,15 @@ export class Hud {
   private mode: 'campaign' | 'daily' | 'endless' = 'campaign';
 
   private len = RUN_LENGTH;
+
+  /** Show the current speed; `allowed` = false hides the button (e.g. the guided tutorial). */
+  setSpeed(speed: number, allowed = true, unlocked = true) {
+    this.speedBtn.textContent = unlocked ? `${speed}×` : '2×';
+    this.speedBtn.classList.toggle('locked', !unlocked);
+    this.speedBtn.classList.toggle('on', speed > 1);
+    this.speedBtn.style.display = allowed ? '' : 'none';
+    this.speedBtn.setAttribute('aria-pressed', String(speed > 1));
+  }
 
   startRun(best: number, mode: 'campaign' | 'daily' | 'endless' = 'campaign', bestScore = 0, len = RUN_LENGTH) {
     this.mode = mode;

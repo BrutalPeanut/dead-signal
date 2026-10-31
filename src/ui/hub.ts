@@ -343,6 +343,7 @@ export class Hub {
             ? rail('missions', 'Missions', () => this.setTab('missions'), null, null, '.locked')
             : rail('pass', 'Pass', () => this.passSheet(), p.passClaimable() || null, passRing),
           rail('crate', 'Crates', () => this.setTab('supply'), d.keys || null),
+          adsOn() && d.stats.runs >= 3 ? rail('speed', p.speedActive() ? `${p.speedLeftMin()}m` : '2× Speed', () => this.speedSheet(), null, null, p.speedActive() ? '.speed-on' : '') : null,
         ),
       ),
       this.modeTabs(),
@@ -1157,6 +1158,34 @@ export class Hub {
           })
         : null,
     );
+  }
+
+  /** 2× speed: one opt-in rewarded ad from the lobby = 30 minutes. Never offered mid-run. */
+  speedSheet() {
+    const p = this.p;
+    const on = p.speedActive();
+    const btn = h('button.btn.primary', { style: { width: '100%', marginTop: '14px' } }, h('span.ad-play', '▶'), on ? 'Watch ad · +30 minutes' : 'Watch ad · 30 minutes of 2×');
+    btn.onclick = () => {
+      btn.setAttribute('disabled', '');
+      ads.showRewarded('speed').then((ok) => {
+        if (ok) {
+          p.grantSpeed();
+          audio.levelUp();
+          toast(`2× speed on · ${p.speedLeftMin()} minutes`, '#ffd34d');
+          this.closeModal();
+        } else btn.removeAttribute('disabled');
+      });
+    };
+    const sheet = h(
+      'div.sheet',
+      { onclick: (e: Event) => e.stopPropagation() },
+      h('h2', { style: { fontSize: '22px', textAlign: 'center' } }, '2× Speed'),
+      h('div.help', { style: { marginTop: 0 } }, on ? `Active: ${p.speedLeftMin()} minutes left. Tap the 2× button during a run to switch.` : 'Play runs at double speed: same rewards, half the time. Toggle it any time with the 2× button next to pause.'),
+      h('div.help', 'One short ad = 30 minutes (stacks up to 2 hours). A run that starts with 2× keeps it to the end.'),
+      p.speedLeftMin() >= 120 ? h('div.help', { style: { color: 'var(--gold)' } }, 'Maxed out: 2 hours banked.') : btn,
+      h('button.btn', { style: { width: '100%', marginTop: '8px' }, onclick: () => this.closeModal() }, 'Close'),
+    );
+    this.present(sheet, 'speed');
   }
 
   /** Explain exactly what ascending resets, keeps and pays, then confirm. */
