@@ -3,10 +3,22 @@
  * (AdMob now, AppLovin MAX later) is one provider class. Rewarded only, always opt-in:
  * the player taps "Watch ad" and gets something for it.
  *
- * The web build ships ads OFF. `?ads=demo` turns on a sample provider that plays a fake,
- * clearly-labelled ad, so placements can be reviewed before any network is wired up.
+ * Modes:
+ *  - LIVE_ADS = false (until Google approves H5 Games Ads for deadsignal.info): ads OFF. Every
+ *    ad-gated reward (like 2× speed) is simply free.
+ *  - LIVE_ADS = true: real rewarded ads through Google's H5 Games Ads (Ad Placement API).
+ *  - `?ads=test`: the real H5 integration in Google's test mode (fake Google ads, no revenue),
+ *    to check the wiring on the live site before approval.
+ *  - `?ads=demo`: a local sample ad, no network at all.
  */
-import { h } from '../ui/dom';
+
+/** Flip to true once AdSense has approved H5 Games Ads for the site. */
+export const LIVE_ADS = false;
+const AD_CLIENT = 'ca-pub-6900407641110608';
+
+/** The game sets these so ads can silence and resume its audio. */
+export const adAudio = { mute: () => {}, unmute: () => {} };
+import { h, toast } from '../ui/dom';
 
 export type Placement = 'revive' | 'double' | 'key' | 'speed';
 
@@ -104,6 +116,77 @@ class DemoAds implements AdProvider {
   }
 }
 
+type AdBreak = (o: Record<string, unknown>) => void;
+type W = Window & { adsbygoogle?: unknown[]; adBreak?: AdBreak; adConfig?: AdBreak };
+
+/**
+ * Google H5 Games Ads: rewarded breaks only (never interstitials, never mid-run). The player has
+ * already tapped "Watch ad", so the ad is shown as soon as Google offers one (beforeReward).
+ */
+class H5Ads implements AdProvider {
+  readonly name: string;
+  private ready = false;
+  constructor(test: boolean) {
+    this.name = test ? 'h5-test' : 'h5';
+    const w = window as W;
+    w.adsbygoogle = w.adsbygoogle || [];
+    w.adBreak = w.adConfig = (o) => w.adsbygoogle!.push(o);
+    const sc = document.createElement('script');
+    sc.async = true;
+    sc.crossOrigin = 'anonymous';
+    sc.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${AD_CLIENT}`;
+    sc.setAttribute('data-ad-client', AD_CLIENT);
+    sc.setAttribute('data-ad-frequency-hint', '30s');
+    if (test) sc.setAttribute('data-adbreak-test', 'on');
+    document.head.append(sc);
+    w.adConfig({ preloadAdBreaks: 'on', sound: 'on', onReady: () => (this.ready = true) });
+  }
+  isReady() {
+    return this.ready;
+  }
+  showRewarded(p: Placement): Promise<boolean> {
+    return new Promise((resolve) => {
+      // ad blocker / offline / Google's script never loaded: answer straight away
+      if (!this.ready) {
+        toast('Ads aren’t available right now (an ad blocker or a weak connection?)', '#8d97ab');
+        return resolve(false);
+      }
+      let viewed = false;
+      let offered = false;
+      let done = false;
+      const finish = (ok: boolean) => {
+        if (done) return;
+        done = true;
+        adAudio.unmute();
+        resolve(ok);
+      };
+      // no answer from Google at all: don't leave the button hanging
+      setTimeout(() => {
+        if (!offered) {
+          toast('No ad available right now. Try again in a minute', '#8d97ab');
+          finish(false);
+        }
+      }, 8000);
+      (window as W).adBreak!({
+        type: 'reward',
+        name: p,
+        beforeAd: () => adAudio.mute(),
+        afterAd: () => adAudio.unmute(),
+        beforeReward: (showAdFn: () => void) => {
+          offered = true;
+          showAdFn();
+        },
+        adViewed: () => (viewed = true),
+        adDismissed: () => (viewed = false),
+        adBreakDone: () => {
+          if (!offered && !done) toast('No ad available right now. Try again in a minute', '#8d97ab');
+          finish(viewed);
+        },
+      });
+    });
+  }
+}
+
 class NoAds implements AdProvider {
   readonly name = 'none';
   isReady() {
@@ -116,9 +199,13 @@ class NoAds implements AdProvider {
 
 function pick(): AdProvider {
   try {
-    if (new URLSearchParams(location.search).get('ads') === 'demo') return new DemoAds();
+    const q = new URLSearchParams(location.search).get('ads');
+    if (q === 'demo') return new DemoAds();
+    if (q === 'test') return new H5Ads(true);
+    if (q === 'off') return new NoAds();
+    if (LIVE_ADS) return new H5Ads(false);
   } catch {
-    /* no location (tests) */
+    /* no window/location (tests) */
   }
   return new NoAds();
 }
