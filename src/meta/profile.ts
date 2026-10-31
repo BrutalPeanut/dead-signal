@@ -15,6 +15,7 @@ import {
   MERGE_COUNT,
   RARITIES,
   SLOTS,
+  SLOT_NAMES,
   activePerks,
   dropWeights,
   gearStat,
@@ -63,6 +64,11 @@ export interface SaveData {
   best: Record<number, number>; // best survival time per sector
   gear: GearItem[];
   equipped: Partial<Record<Slot, string>>;
+  /**
+   * Gear levels belong to the slot, not the item: whatever is equipped there uses the slot's level
+   * (capped by its rarity's max level), so swapping in better gear never costs levelling.
+   */
+  slotLv: Partial<Record<Slot, number>>;
   tracks: Record<TrackId, number>;
   relayAt: number; // ms timestamp of last relay claim
   lastDaily: string;
@@ -133,6 +139,7 @@ function fresh(): SaveData {
       { uid: 'g2', def: 'kevlar', rarity: 0, level: 1 },
     ],
     equipped: { weapon: 'g1', vest: 'g2' },
+    slotLv: {},
     tracks: { atk: 0, hp: 0, def: 0, heal: 0 },
     relayAt: Date.now(),
     lastDaily: '',
@@ -158,7 +165,23 @@ export function normalizeSave(raw: unknown): SaveData | null {
   const d = raw as SaveData;
   if (d.v !== 1 || typeof d.unlocked !== 'number' || !Array.isArray(d.gear)) return null;
   const f = fresh();
+  if (!d.slotLv) migrateSlotLevels(d);
   return { ...f, ...d, settings: { ...f.settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? f.daily, endless: d.endless ?? f.endless, character: d.character ?? 'courier', online: d.online ?? f.online, pass: d.pass ?? f.pass };
+}
+
+/**
+ * Older saves levelled each item. Move that onto the slots: each slot takes the highest level any
+ * of its items had (nobody loses power), and items go back to level 1 so nothing is counted twice.
+ */
+function migrateSlotLevels(d: SaveData) {
+  const lv: Partial<Record<Slot, number>> = {};
+  for (const it of d.gear) {
+    const s = GEAR[it.def]?.slot;
+    if (!s) continue;
+    lv[s] = Math.max(lv[s] ?? 1, it.level | 0 || 1);
+    it.level = 1;
+  }
+  d.slotLv = lv;
 }
 
 /** How far along a save is, for "keep the furthest" merges: sector, then account level, then XP. */
@@ -317,8 +340,8 @@ export class Profile {
     let hp = 120 + d.tracks.hp * 15;
     for (const it of this.equippedItems()) {
       const g = GEAR[it.def];
-      if (g.stat === 'atk') atk += gearStat(it);
-      else hp += gearStat(it);
+      if (g.stat === 'atk') atk += this.statOf(it);
+      else hp += this.statOf(it);
     }
     const p = this.perkSum();
     const ch = charById(d.character);
@@ -618,19 +641,42 @@ export class Profile {
     return Object.values(this.data.equipped).includes(uid);
   }
 
+  /** Level of a gear slot (what any item equipped there is levelled to, up to its rarity cap). */
+  slotLevel(s: Slot) {
+    return Math.max(1, this.data.slotLv[s] ?? 1);
+  }
+  /** The level this item has (or would have) in its slot. */
+  lvOf(it: GearItem) {
+    return Math.min(this.slotLevel(GEAR[it.def].slot), MAX_LEVEL[it.rarity]);
+  }
+  /** ATK/HP this item gives (or would give) in its slot. */
+  statOf(it: GearItem) {
+    return gearStat({ ...it, level: this.lvOf(it) });
+  }
+  /** The slot's level is past this item's rarity cap (merge it to use the rest). */
+  capped(it: GearItem) {
+    return this.slotLevel(GEAR[it.def].slot) >= MAX_LEVEL[it.rarity];
+  }
+  levelCostOf(it: GearItem) {
+    return levelCost(this.slotLevel(GEAR[it.def].slot), it.rarity);
+  }
+
+  /** Only the equipped item's slot can be levelled (cost scales with that item's rarity). */
   canLevel(it: GearItem) {
-    if (it.level >= MAX_LEVEL[it.rarity]) return false;
-    const c = levelCost(it.level, it.rarity);
+    if (!this.isEquipped(it.uid) || this.capped(it)) return false;
+    const c = this.levelCostOf(it);
     return this.data.gold >= c.gold && this.data.scrap >= c.scrap;
   }
 
+  /** Level up the slot the item `uid` is equipped in. */
   levelUp(uid: string): boolean {
     const it = this.item(uid);
     if (!it || !this.canLevel(it)) return false;
-    const c = levelCost(it.level, it.rarity);
+    const c = this.levelCostOf(it);
+    const s = GEAR[it.def].slot;
     this.data.gold -= c.gold;
     this.data.scrap -= c.scrap;
-    it.level++;
+    this.data.slotLv[s] = this.slotLevel(s) + 1;
     this.track('levelgear', 1);
     this.save();
     return true;
@@ -738,7 +784,26 @@ export class Profile {
   bestFor(slot: Slot): GearItem | undefined {
     return this.data.gear
       .filter((g) => GEAR[g.def].slot === slot)
-      .sort((a, b) => gearStat(b) - gearStat(a) || b.rarity - a.rarity)[0];
+      .sort((a, b) => this.statOf(b) - this.statOf(a) || b.rarity - a.rarity)[0];
+  }
+
+  /**
+   * An unequipped item that beats what's in this slot (or fills it if empty), or undefined.
+   * Weapons keep their own play style, so a weapon only counts as an upgrade within the same item.
+   * The 5% margin keeps near-ties from nagging.
+   */
+  upgradeFor(slot: Slot): GearItem | undefined {
+    const uid = this.data.equipped[slot];
+    const cur = uid ? this.item(uid) : undefined;
+    const pool = this.data.gear.filter((g) => GEAR[g.def].slot === slot && g.uid !== cur?.uid && (slot !== 'weapon' || !cur || g.def === cur.def));
+    const best = pool.sort((a, b) => this.statOf(b) - this.statOf(a) || b.rarity - a.rarity)[0];
+    if (!best) return undefined;
+    return !cur || this.statOf(best) > this.statOf(cur) * 1.05 ? best : undefined;
+  }
+
+  /** Is this unequipped item better than what's equipped in its slot? */
+  isUpgrade(it: GearItem) {
+    return !this.isEquipped(it.uid) && this.upgradeFor(GEAR[it.def].slot)?.uid === it.uid;
   }
 
   /**
@@ -780,14 +845,12 @@ export class Profile {
     if (free > 0) {
       return { kind: 'collect', label: 'Collect free rewards', detail: `${free} ready`, apply: () => this.collectAll() > 0 };
     }
-    // 1. better gear sitting unequipped (weapons keep their own play style, so only upgrade within the same item)
+    // 1. better gear sitting unequipped
     for (const s of SLOTS) {
       const cur = d.equipped[s] ? this.item(d.equipped[s]!) : undefined;
-      const best = this.bestFor(s);
-      if (!best || best.uid === cur?.uid) continue;
-      if (s === 'weapon' && cur && best.def !== cur.def) continue;
-      if (!cur || gearStat(best) > gearStat(cur) * 1.05) {
-        const gain = Math.round(gearStat(best) - (cur ? gearStat(cur) : 0));
+      const best = this.upgradeFor(s);
+      if (best) {
+        const gain = Math.round(this.statOf(best) - (cur ? this.statOf(cur) : 0));
         return { kind: 'equip', label: `Equip ${RARITIES[best.rarity]} ${GEAR[best.def].name}`, detail: `+${gain} ${GEAR[best.def].stat === 'atk' ? 'ATK' : 'HP'}`, apply: () => (this.equip(best.uid), true) };
       }
     }
@@ -808,8 +871,8 @@ export class Profile {
     }
     for (const it of this.equippedItems()) {
       if (this.canLevel(it)) {
-        const c = levelCost(it.level, it.rarity);
-        opts.push({ cost: c.gold, a: { kind: 'level', label: `Level up ${GEAR[it.def].name}`, detail: `${c.gold} gold`, apply: () => this.levelUp(it.uid) } });
+        const c = this.levelCostOf(it);
+        opts.push({ cost: c.gold, a: { kind: 'level', label: `Level up ${SLOT_NAMES[GEAR[it.def].slot]} slot`, detail: `${c.gold} gold`, apply: () => this.levelUp(it.uid) } });
       }
     }
     opts.sort((a, b) => a.cost - b.cost);

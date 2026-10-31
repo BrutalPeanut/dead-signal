@@ -7,8 +7,6 @@ import {
   RARITY_COLORS,
   SLOTS,
   SLOT_NAMES,
-  gearStat,
-  levelCost,
   salvageValue,
   type GearItem,
   type Slot,
@@ -40,6 +38,9 @@ const UNLOCK: Partial<Record<Tab, { runs: number; text: string }>> = {
   talents: { runs: 1, text: 'Unlocks after your first deployment' },
   missions: { runs: 1, text: 'Unlocks after your first deployment' },
 };
+
+/** Green "upgrade available" arrow for gear tiles. */
+const UP_ARROW = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2L10.5 7H7.6V10H4.4V7H1.5Z" fill="currentColor"/></svg>';
 
 const avatarUrls = new Map<string, string>();
 let currentSkin = 'courier';
@@ -189,7 +190,7 @@ export class Hub {
     const p = this.p;
     const dots: Partial<Record<Tab, boolean>> = {
       supply: p.data.keys > 0 || p.dailyAvailable() || p.relayPending().hours >= 1,
-      armory: p.data.gear.some((g) => p.mergeMates(g.uid).length >= MERGE_COUNT - 1),
+      armory: p.data.gear.some((g) => p.mergeMates(g.uid).length >= MERGE_COUNT - 1) || SLOTS.some((s) => !!p.upgradeFor(s)),
       talents: p.trackInfo().some((t) => p.canBuyTrack(t.id)) || p.labAffordable(),
       missions: p.missionsClaimable() > 0,
       deploy: p.starChestsReady() > 0,
@@ -786,19 +787,23 @@ export class Hub {
     const slotBtn = (s: Slot) => {
       const uid = p.data.equipped[s];
       const it = uid ? p.item(uid) : undefined;
-      if (!it) return h('button.slot', { onclick: () => this.pickForSlot(s) }, h('div.empty', { style: { padding: '24px 0', textAlign: 'center' } }, SLOT_NAMES[s]));
+      const up = p.upgradeFor(s);
+      const upBadge = up ? h('i.up', { title: 'Better gear available', html: UP_ARROW }) : null;
+      // with a better item waiting, tapping the slot opens that item (one tap from Equip)
+      if (!it) return h('button.slot', { onclick: () => this.pickForSlot(s) }, h('div.empty', { style: { padding: '24px 0', textAlign: 'center' } }, SLOT_NAMES[s]), upBadge);
       return h(
         'button.slot',
-        { onclick: () => this.itemSheet(it.uid), style: { borderStyle: 'solid', borderColor: RARITY_COLORS[it.rarity] } },
+        { onclick: () => this.itemSheet(up ? up.uid : it.uid), style: { borderStyle: 'solid', borderColor: RARITY_COLORS[it.rarity] } },
         h('img', { src: gearIcon(s, RARITY_COLORS[it.rarity], it.def), alt: GEAR[it.def].name }),
-        h('span.lv', `Lv${it.level}`),
+        h('span.lv', `Lv${p.lvOf(it)}`),
+        upBadge,
       );
     };
     const left: Slot[] = ['weapon', 'visor', 'gloves'];
     const right: Slot[] = ['vest', 'belt', 'boots'];
     const items = p.data.gear
       .slice()
-      .sort((a, b2) => b2.rarity - a.rarity || SLOTS.indexOf(GEAR[a.def].slot) - SLOTS.indexOf(GEAR[b2.def].slot) || b2.level - a.level);
+      .sort((a, b2) => b2.rarity - a.rarity || SLOTS.indexOf(GEAR[a.def].slot) - SLOTS.indexOf(GEAR[b2.def].slot) || p.statOf(b2) - p.statOf(a));
     const sel = charById(p.data.character);
     const roster = h(
       'div.roster',
@@ -913,13 +918,14 @@ export class Hub {
             'button.item',
             { onclick: () => this.itemSheet(it.uid), style: { borderColor: RARITY_COLORS[it.rarity] } },
             h('img', { src: gearIcon(slot, RARITY_COLORS[it.rarity], it.def), alt: GEAR[it.def].name }),
-            h('span.lv', `Lv${it.level}`),
+            p.isEquipped(it.uid) ? h('span.lv', `Lv${p.lvOf(it)}`) : null,
             p.isEquipped(it.uid) ? h('span.eq', 'E') : null,
             canMerge ? h('i.merge') : null,
+            p.isUpgrade(it) ? h('i.up', { title: 'Better than what you have equipped', html: UP_ARROW }) : null,
           );
         }),
       ),
-      h('div.help', 'Merge 3 identical items (same item + rarity) to raise rarity. Higher rarity unlocks perks and a higher level cap.'),
+      h('div.help', 'Levels belong to the slot: anything you equip there uses the slot’s level, so swapping in better gear never loses your upgrades. Merge 3 identical items (same item + rarity) to raise rarity: higher rarity unlocks perks and a higher level cap.'),
     );
   }
 
@@ -929,7 +935,7 @@ export class Hub {
       toast(`No ${SLOT_NAMES[s].toLowerCase()} yet — open supply crates`, '#8d97ab');
       return;
     }
-    const best = this.p.data.gear.filter((g) => GEAR[g.def].slot === s).sort((a, b) => gearStat(b) - gearStat(a))[0];
+    const best = this.p.data.gear.filter((g) => GEAR[g.def].slot === s).sort((a, b) => this.p.statOf(b) - this.p.statOf(a))[0];
     this.itemSheet(best.uid);
   }
 
@@ -980,10 +986,14 @@ export class Hub {
     if (!it) return;
     const def = GEAR[it.def];
     const col = RARITY_COLORS[it.rarity];
-    const cost = levelCost(it.level, it.rarity);
-    const maxed = it.level >= MAX_LEVEL[it.rarity];
+    const cost = p.levelCostOf(it);
+    const maxed = p.capped(it);
     const mates = p.mergeMates(uid).length;
     const eq = p.isEquipped(uid);
+    const slotLv = p.slotLevel(def.slot);
+    const curUid = p.data.equipped[def.slot];
+    const cur = curUid && curUid !== uid ? p.item(curUid) : undefined;
+    const diff = cur ? Math.round(p.statOf(it) - p.statOf(cur)) : 0;
     const sv = salvageValue(it);
     const rerender = () => this.itemSheet(uid);
     const sheet = h(
@@ -1002,8 +1012,13 @@ export class Hub {
       h(
         'div',
         { style: { marginTop: '12px' } },
-        h('div.kv', h('span', 'Level'), h('b', `${it.level} / ${MAX_LEVEL[it.rarity]}`)),
-        h('div.kv', h('span', def.stat === 'atk' ? 'Attack' : 'Health'), h('b', `+${fmtNum(gearStat(it))}`)),
+        h('div.kv', h('span', eq ? `${SLOT_NAMES[def.slot]} slot level` : `Level in your ${SLOT_NAMES[def.slot].toLowerCase()} slot`), h('b', `${p.lvOf(it)} / ${MAX_LEVEL[it.rarity]}`)),
+        h(
+          'div.kv',
+          h('span', def.stat === 'atk' ? 'Attack' : 'Health'),
+          h('b', `+${fmtNum(p.statOf(it))}`, cur && diff ? h('span', { style: { color: diff > 0 ? 'var(--green)' : 'var(--red)', marginLeft: '6px' } }, `${diff > 0 ? '▲ +' : '▼ '}${fmtNum(diff)} vs equipped`) : null),
+        ),
+        slotLv > MAX_LEVEL[it.rarity] ? h('div.help', { style: { textAlign: 'left', margin: '4px 0 0' } }, `Your slot is Lv${slotLv}; ${RARITIES[it.rarity]} gear caps at ${MAX_LEVEL[it.rarity]}. Merge it to use the rest.`) : null,
       ),
       h(
         'div.perks',
@@ -1020,7 +1035,7 @@ export class Hub {
         h(
           'button.btn.primary',
           {
-            disabled: maxed || !p.canLevel(it),
+            disabled: !eq || maxed || !p.canLevel(it),
             onclick: () => {
               if (p.levelUp(uid)) {
                 audio.levelUp();
@@ -1029,7 +1044,7 @@ export class Hub {
               }
             },
           },
-          maxed ? 'Max level' : h('span', 'Level up ', coin('gold'), ` ${fmtNum(cost.gold)} `, coin('scrap'), ` ${cost.scrap}`),
+          !eq ? 'Equip to level' : maxed ? 'Max for rarity' : h('span', 'Level up slot ', coin('gold'), ` ${fmtNum(cost.gold)} `, coin('scrap'), ` ${cost.scrap}`),
         ),
         h(
           'button.btn.cyan',
