@@ -4463,3 +4463,40 @@ button {
   box-shadow: 0 0 8px rgba(255, 155, 240, 0.5);
   z-index: 2;
 }
+
+/* "better gear available" arrow on loadout slots and inventory tiles */
+.slot .up,
+.item .up {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: #00230f;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(67, 255, 164, 0.7);
+  z-index: 2;
+  animation: up-bob 1.6s ease-in-out infinite;
+}
+
+.slot .up svg,
+.item .up svg {
+  width: 13px;
+  height: 13px;
+}
+
+@keyframes up-bob {
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot .up,
+  .item .up {
+    animation: none;
+  }
+}

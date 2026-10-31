@@ -4,7 +4,7 @@
  * Reports how many runs each sector takes so we can tune pacing. Usage: npm run progression -- [maxRuns] [seed]
  */
 import { Profile } from '../src/meta/profile';
-import { GEAR, SLOTS, gearStat, levelCost } from '../src/meta/gear';
+import { GEAR, SLOTS } from '../src/meta/gear';
 import { CHAPTER_COUNT, getChapter } from '../src/sim/chapters';
 import { Game } from '../src/sim/game';
 import { botChoose, botMove } from '../src/sim/bot';
@@ -41,7 +41,7 @@ function manage() {
   while (d.keys > 0) p.openCrate(new Rng(rng.int(1, 1e9)));
   p.mergeAll();
   for (const s of SLOTS) {
-    const best = d.gear.filter((g) => GEAR[g.def].slot === s).sort((a, b) => b.rarity - a.rarity || gearStat(b) - gearStat(a))[0];
+    const best = d.gear.filter((g) => GEAR[g.def].slot === s).sort((a, b) => b.rarity - a.rarity || p.statOf(b) - p.statOf(a))[0];
     if (best) p.equip(best.uid);
   }
   // salvage junk: commons/uncommons that can't merge soon and aren't equipped, keep a few
@@ -54,7 +54,7 @@ function manage() {
   for (let guard = 0; guard < 500; guard++) {
     const opts: { cost: number; act: () => boolean }[] = [];
     for (const it of p.equippedItems()) {
-      if (p.canLevel(it)) opts.push({ cost: levelCost(it.level, it.rarity).gold, act: () => p.levelUp(it.uid) });
+      if (p.canLevel(it)) opts.push({ cost: p.levelCostOf(it).gold, act: () => p.levelUp(it.uid) });
     }
     for (const t of ['atk', 'hp', 'def', 'heal'] as const) {
       if (p.canBuyTrack(t)) opts.push({ cost: trackCost(d.tracks[t]) * (t === 'heal' || t === 'def' ? 1.6 : 1), act: () => p.buyTrack(t) });
