@@ -54,6 +54,13 @@ export class Audio {
     if (this.sfxBus) this.sfxBus.gain.value = on ? 0.55 : 0; // also silences sounds already queued
   }
 
+  /** While an ad plays: silence everything without touching the player's settings. */
+  muteForAd(on: boolean) {
+    if (!this.ctx) return;
+    if (on) void this.ctx.suspend();
+    else void this.ctx.resume();
+  }
+
   setMusic(on: boolean) {
     this.musicOn = on;
     if (this.musicBus) this.musicBus.gain.value = on ? 0.32 : 0;
