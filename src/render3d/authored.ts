@@ -254,6 +254,8 @@ export interface HeroState {
   hit: boolean;
   /** Angle between where the courier runs and where it shoots (three.js yaw, radians). */
   twist: number;
+  /** 0..1: how much the gun arm is raised (only while the gun is firing). */
+  aim: number;
 }
 
 export type GlowAt = { obj: THREE.Object3D; at: THREE.Vector3; size: number; color: string; pulse?: number };
@@ -410,7 +412,7 @@ export class AuthoredHero {
       this.to('hit', 0.08);
     } else if (this.mode !== 'hit' || this.hitT < 0.5) this.to(s.moving ? 'run' : 'idle');
     const aiming = !s.dead && !s.won;
-    this.acts.aim.weight = aiming ? 1 : 0;
+    this.acts.aim.weight = aiming ? s.aim : 0;
     // undo last frame's lift first: clips that don't key the hips would otherwise accumulate it
     this.hips.position.y -= this.lift;
     this.r.mixer.update(dt);

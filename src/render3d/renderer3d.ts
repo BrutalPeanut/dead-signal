@@ -123,6 +123,7 @@ export class Renderer3D {
   private heroSkin: HeroSkin | null = null;
   private heroYaw = 0;
   private twist = 0;
+  private aimW = 0;
   private moveAng = 0;
   private lastPx = 0;
   private lastPy = 0;
@@ -1179,25 +1180,31 @@ export class Renderer3D {
     this.lastPy = g.py;
     const moving = g.moving && dx * dx + dy * dy > 1e-4;
     if (moving) this.moveAng = Math.atan2(dy, dx);
-    const want = moving ? -this.moveAng : -g.aim;
+    // only while the gun is actually firing: otherwise stand/run square, arm down
+    const shooting = g.gunAimT > 0;
+    const want = moving ? -this.moveAng : shooting ? -g.gunAim : this.heroYaw;
     let d = (want - this.heroYaw) % (Math.PI * 2);
     if (d > Math.PI) d -= Math.PI * 2;
     if (d < -Math.PI) d += Math.PI * 2;
     this.heroYaw += d * Math.min(1, dt * 14);
-    let tw = (-g.aim - this.heroYaw) % (Math.PI * 2);
-    if (tw > Math.PI) tw -= Math.PI * 2;
-    if (tw < -Math.PI) tw += Math.PI * 2;
+    let tw = 0;
+    if (shooting) {
+      tw = (-g.gunAim - this.heroYaw) % (Math.PI * 2);
+      if (tw > Math.PI) tw -= Math.PI * 2;
+      if (tw < -Math.PI) tw += Math.PI * 2;
+    }
     // ease the upper body toward each new target instead of snapping (fast guns retarget several
     // times a second, and a long bazooka tube made every snap obvious)
     tw = Math.max(-1.3, Math.min(1.3, tw));
     this.twist += (tw - this.twist) * Math.min(1, dt * 9);
     tw = this.twist;
+    this.aimW += ((shooting ? 1 : 0) - this.aimW) * Math.min(1, dt * 8);
     const hitNow = g.hurtT > 0 && this.lastHurt <= 0;
     this.lastHurt = g.hurtT;
     h.group.position.set(g.px, 0, g.py);
     h.group.rotation.y = this.heroYaw;
     h.group.scale.setScalar(ACTOR_SCALE);
-    h.update(dt, { moving: g.moving, dead: g.state === 'dead' || g.state === 'revive', won: g.state === 'won', hit: hitNow, twist: tw });
+    h.update(dt, { moving: g.moving, dead: g.state === 'dead' || g.state === 'revive', won: g.state === 'won', hit: hitNow, twist: tw, aim: this.aimW });
     h.setHurt(g.hurtT > 0 ? 1 : 0);
     h.group.updateMatrixWorld();
     for (const gl of h.glows) {

@@ -155,3 +155,39 @@ describe('primary guns', () => {
     expect(g.weapons.map((w) => w.id)).toEqual(['bazooka']);
   });
 });
+
+describe('courier aim pose', () => {
+  it.each(GUN_IDS)('%s: the body only turns to aim while the gun is actually firing', (id) => {
+    const g = new Game(getChapter(0), base(id), 5);
+    const dt = 1 / 60;
+    let sinceShot = Infinity;
+    let aimed = 0, idle = 0;
+    for (let i = 0; i < 60 * 40; i++) {
+      if (g.state === 'levelup') g.choose(0);
+      else if (g.state === 'chest') g.closeChest();
+      g.step(0, 0);
+      sinceShot += dt;
+      if (g.fx.some((e) => e.t === 'shoot' && e.weapon === id)) sinceShot = 0;
+      g.fx.length = 0;
+      if (g.gunAimT > 0) {
+        aimed++;
+        expect(sinceShot).toBeLessThan(1.7); // never aiming long after the last shot
+      } else idle++;
+      if (i % 600 === 300) {
+        // nothing to shoot (no infected on screen): the courier must drop its aim
+        const [vw, vh] = [g.viewW, g.viewH];
+        g.viewW = g.viewH = -1e6;
+        for (let j = 0; j < 100; j++) {
+          if (g.state === 'levelup') g.choose(0);
+          else if (g.state === 'chest') g.closeChest();
+          g.step(0, 0);
+          g.fx.length = 0;
+        }
+        expect(g.gunAimT).toBe(0);
+        [g.viewW, g.viewH] = [vw, vh];
+        sinceShot = Infinity;
+      }
+    }
+    expect(aimed).toBeGreaterThan(0);
+  });
+});

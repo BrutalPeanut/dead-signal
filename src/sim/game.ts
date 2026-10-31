@@ -95,6 +95,9 @@ export class Game {
   rerolls: number;
   revives: number;
   aim = 0; // facing angle of player's gun
+  /** Where the primary gun last fired, and how long the courier keeps aiming there (visual only). */
+  gunAim = 0;
+  gunAimT = 0;
   hurtT = 0;
   contactWindow = 0;
   moving = false;

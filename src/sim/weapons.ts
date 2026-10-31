@@ -120,8 +120,15 @@ export function withPartner(g: Game, w: WeaponState, s: WeaponLevel): WeaponLeve
   return t;
 }
 
+/** The gun fired toward `a`: hold the aim pose until just after the next shot is due. */
+function aimGun(g: Game, a: number, cd: number) {
+  g.gunAim = a;
+  g.gunAimT = Math.min(1.6, cd * g.cdMul + 0.25);
+}
+
 export function updateWeapons(g: Game, dt: number) {
   const atk = g.base.atk;
+  g.gunAimT = Math.max(0, g.gunAimT - dt);
   for (const w of g.weapons) {
     const s = withPartner(g, w, weaponStats(w));
     const dmg = s.dmg * atk;
@@ -142,7 +149,10 @@ export function updateWeapons(g: Game, dt: number) {
           const t = targets[k % targets.length];
           let a = Math.atan2(t.y - g.py, t.x - g.px);
           if (k >= targets.length) a += (k - targets.length + 1) * 0.12 * (k % 2 ? 1 : -1);
-          if (k === 0) g.aim = a;
+          if (k === 0) {
+            g.aim = a;
+            aimGun(g, a, s.cd);
+          }
           fire(g, {
             kind: w.evolved ? 'rail' : 'bolt',
             x: g.px + Math.cos(a) * 14,
@@ -175,6 +185,7 @@ export function updateWeapons(g: Game, dt: number) {
         const t = nearest(g, vis, 1)[0];
         const base = Math.atan2(t.y - g.py, t.x - g.px);
         g.aim = base;
+        aimGun(g, base, s.cd);
         const sp = s.speed * g.projSpeedMul;
         for (let k = 0; k < s.count; k++) {
           const a = base + g.rng.range(-s.extra, s.extra);
@@ -215,6 +226,7 @@ export function updateWeapons(g: Game, dt: number) {
         else w.angle += Math.atan2(Math.sin(want - w.angle), Math.cos(want - w.angle)) * 0.5;
         w.active = 0.3;
         g.aim = w.angle;
+        aimGun(g, w.angle, s.cd);
         const sp = s.speed * g.projSpeedMul;
         for (let k = 0; k < s.count; k++) {
           const a = w.angle + g.rng.range(-s.extra, s.extra);
@@ -252,7 +264,10 @@ export function updateWeapons(g: Game, dt: number) {
         for (let k = 0; k < s.count; k++) {
           const t = targets[k % targets.length];
           const a = Math.atan2(t.y - g.py, t.x - g.px) + (k >= targets.length ? (k % 2 ? 0.18 : -0.18) : 0);
-          if (k === 0) g.aim = a;
+          if (k === 0) {
+            g.aim = a;
+            aimGun(g, a, s.cd);
+          }
           fire(g, {
             kind: 'rocket',
             x: g.px + Math.cos(a) * 18,
