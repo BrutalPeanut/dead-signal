@@ -26,9 +26,9 @@ ADS = {
         'music': 'music.wav',
         'caps': [
             (0.0, 1.5, '1 COURIER'),
-            (1.5, 4.2, 'VS {Y}500 ZOMBIES'),
+            (1.5, 4.2, 'VS {Y}THE HORDE'),
             (4.2, 6.5, 'ONE THUMB.\\NALL CHAOS.'),
-            (6.5, 9.5, '{O}EVOLVE{W} YOUR GUNS'),
+            (6.5, 9.5, '{\\fs100}{O}EVOLVE{W} YOUR GUNS'),
             (9.5, 12.5, 'HOW LONG\\NCAN YOU LAST?'),
         ],
     },
@@ -37,7 +37,7 @@ ADS = {
         'music': 'music.wav',
         'nocount': 1.3,  # the level-up card fills the screen
         'caps': [
-            (1.35, 4.2, 'YOUR FLAMETHROWER\\N{O}JUST EVOLVED'),
+            (1.35, 4.2, '{\\fs94}YOUR FLAMETHROWER\\N{O}{\\fs118}JUST EVOLVED'),
             (4.2, 7.5, 'BURN IT\\NALL DOWN'),
             (7.5, 10.0, '13 WEAPONS.\\N{Y}13 EVOLUTIONS.'),
             (10.0, 12.5, 'BUILD YOUR\\NPERFECT RUN'),
@@ -72,7 +72,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Cap,Poppins,104,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,0,0,1,9,4,8,60,60,300,1
+Style: Cap,Poppins,118,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,0,0,1,9,4,8,60,60,300,1
 Style: Low,Poppins,96,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,0,0,1,9,4,2,60,60,330,1
 Style: Kills,Poppins,66,&H00FFFFFF,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,1,0,1,7,3,5,60,60,0,1
 Style: Title,Poppins,148,&H00FFF25E,&H00FFFFFF,&H00000000,&H96000000,1,0,0,0,100,100,2,0,1,10,5,5,40,40,0,1
