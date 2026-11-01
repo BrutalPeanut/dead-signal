@@ -1,0 +1,5 @@
+-- Applied to Supabase project "dead-signal" as migration stats_v2_leave_feature.
+-- Adds 'leave' (active seconds + where the player stopped) and 'feature' (first use per session)
+-- events, and reporting views: stats.playtime, stats.exits, stats.features, stats.perf,
+-- stats.sources, stats.run_quits. Same locked design: clients can only call log_events.
+-- (Full SQL lives in the Supabase migration history.)

@@ -48,4 +48,24 @@ describe('stats', () => {
     for (let i = 0; i < 1000; i++) s.track('ad');
     expect(s.pending()).toBe(200);
   });
+
+  it('opting out drops queued events and records nothing', () => {
+    const s = new Stats(() => 'p', true, 0);
+    s.track('session');
+    s.setOptOut(true);
+    expect(s.pending()).toBe(0);
+    s.track('run_start');
+    s.feature('tab:armory');
+    expect(s.pending()).toBe(0);
+    s.setOptOut(false);
+    s.track('session');
+    expect(s.pending()).toBe(1);
+  });
+
+  it('reports each feature once per session', () => {
+    const s = new Stats(() => 'p', true, 0);
+    for (let i = 0; i < 5; i++) s.feature('powerup');
+    s.feature('tab:armory');
+    expect(s.pending()).toBe(2);
+  });
 });

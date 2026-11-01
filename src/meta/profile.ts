@@ -57,6 +57,8 @@ export interface Settings {
   graphics?: '3d' | '2d';
   /** Game speed during runs (the 1×/2× button next to pause). */
   speed?: 1 | 2;
+  /** Anonymous gameplay stats. Unset = on, unless the browser sends a do-not-track signal. */
+  stats?: boolean;
 }
 
 export type ControlMode = 'drag' | 'left' | 'right';
@@ -96,6 +98,8 @@ export interface SaveData {
   online: { id: string; name: string; crew: string; pending: Submission[] };
   pass: PassState;
   adKeys?: { date: string; n: number };
+  /** When this save was first started (ms). */
+  since?: number;
   /** Day the sign-in reward was doubled by an ad. */
   dailyAd?: string;
   /** Chosen primary gun (replaces the Pulse Pistol). Unset = the newest one unlocked. */
@@ -407,6 +411,15 @@ export class Profile {
   }
 
   // ------------------------------------------------------------------ online
+
+  /** Whole days since this save first started (for "day N" in stats). */
+  daysPlayed(now = Date.now()) {
+    if (!this.data.since) {
+      this.data.since = now;
+      this.save();
+    }
+    return Math.max(0, Math.floor((now - this.data.since) / 864e5));
+  }
 
   /** Stable anonymous player id (created on first use). */
   playerId() {

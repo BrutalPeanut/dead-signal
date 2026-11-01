@@ -27,7 +27,7 @@ import { LEVELUP_TIP, Tutorial } from './ui/tutorial';
 import { adAudio, adListeners, ads, adsOn } from './ads/ads';
 adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
-import { Stats } from './net/stats';
+import { Stats, browserSaysNo } from './net/stats';
 import { Hud, chestModal, levelUpModal, pauseModal, reviveModal } from './ui/hud';
 import { introModal, resultsModal, settingsModal } from './ui/screens';
 
@@ -99,6 +99,12 @@ function makeProfile() {
   return new Profile(store);
 }
 
+/** Where a player came from, for launch-channel comparisons: ?utm_source=… or ?src=… (short, lowercase). */
+function utmSource(): string {
+  const q = new URLSearchParams(location.search);
+  return (q.get('utm_source') ?? q.get('src') ?? '').toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 32);
+}
+
 class App {
   canvas = document.getElementById('game') as HTMLCanvasElement;
   ui = document.getElementById('ui')!;
@@ -121,8 +127,21 @@ class App {
   private last = performance.now();
   private endT = -1;
 
+  /** Real frame time spent in live runs, for the run_end frame-rate figure. */
+  private runFrames = 0;
+  private runMs = 0;
+  /** Active time since the last 'leave' event (the tab being visible counts, background doesn't). */
+  private activeFrom = performance.now();
+  private retreated = false;
+
+  statsOn() {
+    const s = this.profile.data.settings.stats;
+    return s ?? !browserSaysNo();
+  }
+
   constructor() {
     this.profile.adEcon = adsOn();
+    this.stats.setOptOut(!this.statsOn());
     useSkin(this.profile.data.character);
     this.input.mode = this.profile.data.settings.controls ?? 'drag';
     this.profile.flushScores();
@@ -139,6 +158,7 @@ class App {
       (sec, mode) => this.startRun(sec, mode),
       () => this.openSettings(),
     );
+    this.hub.onFeature = (name) => this.stats.feature(name);
     this.hub.onAscended = (rank, cores) => this.stats.track('unlock', { s: 0, d: { ascend: rank, cores } });
     this.ui.append(this.hub.el);
 
@@ -184,9 +204,10 @@ class App {
     void this.sync.startup(() => this.mode === 'hub');
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
+        this.trackLeave();
         void this.sync.pushNow();
         void this.stats.flush(true);
-      }
+      } else this.activeFrom = performance.now();
     });
     try {
       if (sessionStorage.getItem('ds.synced')) {
@@ -254,6 +275,8 @@ class App {
     this.speedOk = !adsOn() || this.profile.speedActive();
     this.hud.setSpeed(this.speed, !this.tutorialOn, this.speedOk);
     this.game.adRevive = adsOn();
+    this.runFrames = this.runMs = 0;
+    this.retreated = false;
     this.stats.track('run_start', { s: sector, m: mode, d: { gun: this.game.weapons[0]?.id, power: this.profile.power(), char: this.profile.data.character } });
     this.renderer.setGame(this.game);
     this.renderer.fx.parts.length = 0;
@@ -307,6 +330,7 @@ class App {
         () => {
           this.closeModal();
           this.paused = false;
+          this.retreated = true;
           this.finishRun();
         },
         s.controls ?? 'drag',
@@ -330,6 +354,7 @@ class App {
   }
 
   private openSettings() {
+    this.stats.feature('settings');
     const s = this.profile.data.settings;
     this.showModal(
       settingsModal(
@@ -357,6 +382,16 @@ class App {
           },
         },
         this.sync.enabled ? { status: statusText(this.sync), open: () => this.openCloud() } : undefined,
+        this.stats.allowedHere
+          ? {
+              on: this.statsOn(),
+              toggle: () => {
+                s.stats = !this.statsOn();
+                this.profile.save();
+                this.stats.setOptOut(!s.stats);
+              },
+            }
+          : undefined,
       ),
       'settings',
     );
@@ -383,6 +418,8 @@ class App {
         h: window.innerHeight,
         inApp: /FBAN|FBAV|FB_IAB|Messenger|Instagram/i.test(ua) ? 'facebook' : /; wv\)|WebView/i.test(ua) ? 'webview' : '',
         ref,
+        src: utmSource(),
+        days: this.profile.daysPlayed(),
       },
     });
     adListeners.push((placement, ok) => this.stats.track('ad', { d: { placement, stage: 'result', ok } }));
@@ -397,6 +434,22 @@ class App {
       if (this.modal || this.hub.busy) return tries < 60 && this.queueProtect(tries + 1);
       this.showModal(protectModal(this.sync, () => this.closeModal()), 'protect');
     }, tries ? 1000 : 1200);
+  }
+
+  /** The player left (tab hidden or closed): how long they were active and where they stopped. */
+  private trackLeave() {
+    const secs = Math.round((performance.now() - this.activeFrom) / 1000);
+    this.activeFrom = performance.now();
+    if (secs < 2) return;
+    this.stats.track('leave', {
+      s: this.mode === 'run' ? this.sector : undefined,
+      m: this.mode === 'run' ? this.runMode : undefined,
+      d: {
+        secs: Math.min(secs, 6 * 3600),
+        at: this.modalFor === 'results' ? 'results' : this.mode === 'run' ? 'run' : this.modalFor || this.hub.tab,
+        runT: this.mode === 'run' && this.modalFor !== 'results' ? Math.round(this.game.time) : undefined,
+      },
+    });
   }
 
   /** A rewarded-ad button was shown (for offer → watch rates). */
@@ -443,8 +496,16 @@ class App {
     this.stats.track('run_end', {
       s: this.sector,
       m: mode,
-      d: { won: r.won, time: Math.round(r.time), level: r.level, kills: r.kills, killedBy: r.killedBy ?? null, gun: g.weapons[0]?.id, evos: r.evolutions ?? 0, score: r.score ?? 0, revives: g.revivesUsed },
+      d: {
+        won: r.won, time: Math.round(r.time), level: r.level, kills: r.kills, killedBy: r.killedBy ?? null, gun: g.weapons[0]?.id, evos: r.evolutions ?? 0, score: r.score ?? 0, revives: g.revivesUsed,
+        retreat: this.retreated,
+        fps: this.runMs > 0 ? Math.round((this.runFrames * 1000) / this.runMs) : null,
+        r: this.renderer instanceof Renderer3D ? '3d' : '2d',
+        speed: this.speed,
+        power: this.profile.power(),
+      },
     });
+    this.retreated = false;
     if (rw.unlockedSector) this.stats.track('unlock', { s: this.profile.data.unlocked, d: { gun: rw.newGun ?? null, char: rw.newCharacter ?? null } });
     if (adsOn()) this.adOffer('double');
     void this.stats.flush();
@@ -609,6 +670,7 @@ class App {
   private speedOk = true;
 
   private toggleSpeed() {
+    this.stats.feature('speed');
     const s = this.profile.data.settings;
     if (!this.speedOk) {
       audio.click();
@@ -625,7 +687,10 @@ class App {
   private frame = (now: number) => {
     // rAF timestamps can predate a performance.now() stored mid-frame (e.g. on resume): never step backwards
     const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
-    if (this.mode === 'run' && !this.paused && this.game.state === 'play') this.renderer.adapt(now - this.last);
+    if (this.mode === 'run' && !this.paused && this.game.state === 'play') {
+      this.renderer.adapt(now - this.last);
+      if (now - this.last < 250) (this.runFrames++, (this.runMs += now - this.last));
+    }
     this.last = now;
     const g = this.game;
 
