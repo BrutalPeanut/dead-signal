@@ -45,7 +45,7 @@ No tracking pixels: the privacy policy promises no third-party trackers, and the
 
 **TikTok captions**
 - how long would you last? 🧟 #survivorgame #zombiegame #indiegame #browsergame
-- the evolution at 0:08 😮‍💨 #roguelite #gaming #indiedev
+- picked the right upgrade 😮‍💨 #roguelite #gaming #indiedev
 
 **Call-to-action button:** Play Game (Meta), Play Now (TikTok), Play Now (Reddit).
 
