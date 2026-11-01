@@ -6,7 +6,7 @@ import '@fontsource/chakra-petch/latin-700-italic.css';
 import '@fontsource/saira-stencil-one/latin-400.css';
 import './style.css';
 import './theme.css';
-import { audio } from './audio';
+import { Audio, audio } from './audio';
 import { Input } from './input';
 import { KEY, Profile } from './meta/profile';
 import { Renderer } from './render/renderer';
@@ -684,7 +684,54 @@ class App {
     this.hud.setSpeed(this.speed, !this.tutorialOn, this.speedOk);
   }
 
+  /** Recording mode (scripts/admovie.mjs): the live loop stands still and filmFrame() drives it. */
+  filming = false;
+
+  /** While recording: per-frame sound events and kill count, for the ad soundtrack and counter. */
+  filmLog: { t: number; kills: number; fx: Record<string, unknown>[] }[] | null = null;
+  private filmT = 0;
+
+  /**
+   * Advance the run by exactly `dt` on the autopilot and draw one frame (for recording videos).
+   * `hold` draws without advancing the sim (e.g. while the level-up card is on screen).
+   */
+  filmFrame(dt: number, hold = false) {
+    const g = this.game;
+    if (!hold) {
+      this.acc += dt;
+      while (this.acc >= DT) {
+        this.acc -= DT;
+        if (g.state === 'levelup') g.choose(botChoose(g, g.offers));
+        else if (g.state === 'chest') g.closeChest();
+        else if (g.state === 'revive') g.revive(true);
+        if (g.state !== 'play') continue;
+        const [mx, my] = botMove(g);
+        this.interp.capture(g);
+        g.step(mx, my);
+      }
+    }
+    if (this.filmLog) {
+      const fx = g.fx
+        .filter((e) => e.t !== 'dmg' && e.t !== 'arc' && e.t !== 'slash' && e.t !== 'shake' && e.t !== 'heal')
+        .map((e) => ({ t: e.t, weapon: (e as { weapon?: string }).weapon, kind: (e as { kind?: string }).kind, text: (e as { text?: string }).text, color: (e as { color?: string }).color, big: (e as { big?: boolean }).big }));
+      this.filmLog.push({ t: this.filmT, kills: g.kills, fx });
+    }
+    this.filmT += dt;
+    this.interp.apply(g, hold ? 1 : Math.min(1, this.acc / DT));
+    try {
+      this.renderer.render(hold ? 0 : dt);
+    } finally {
+      this.interp.restore(g);
+    }
+    if (this.mode === 'run') this.hud.update(g, this.renderer.fx.banners);
+  }
+
   private frame = (now: number) => {
+    if (this.filming) {
+      this.last = now;
+      requestAnimationFrame(this.frame);
+      return;
+    }
     // rAF timestamps can predate a performance.now() stored mid-frame (e.g. on resume): never step backwards
     const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
     if (this.mode === 'run' && !this.paused && this.game.state === 'play') {
@@ -773,6 +820,8 @@ const app = new App();
 // Test hook (used by the screenshot/playtest scripts): fast-forward the current run with the autopilot.
 (window as any).__ds = {
   app,
+  /** The synthesizer class, so the ad recorder can render a run's sound offline. */
+  Audio,
   botIntent: (g: Game) => botMove(g),
   advance(seconds: number) {
     const g = app.game;
