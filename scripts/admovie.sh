@@ -47,20 +47,20 @@ join() {
 txt h1 '1 COURIER
 VS 500 ZOMBIES'; txt h2 'ONE THUMB.
 ALL CHAOS.'; txt h3 'EVOLVE YOUR GUNS'
-clip horde horde 0 375 "$(cap h1 230 0 2.8 120 white),$(cap h2 230 3.2 7.2 110 white),$(cap h3 1500 7.6 12.5 96 '#ffd34d')"
+clip horde horde 0 375 "$(cap h1 230 0 2.8 112 white),$(cap h2 230 3.2 7.2 110 white),$(cap h3 1500 7.6 12.5 96 '#ffd34d')"
 endcard horde horde; join dead-signal-horde "$T/horde.mp4" "$T/horde-end.mp4"
 
 # 2. Flamethrower power fantasy
 txt f1 'POV: YOUR FLAMETHROWER
 JUST EVOLVED'; txt f2 'PICK AN UPGRADE
 EVERY LEVEL'; txt f3 'BURN IT ALL DOWN'
-clip flame flame 0 375 "$(cap f1 230 0 3.2 96 white),$(cap f2 230 3.6 7.6 104 white),$(cap f3 1500 8 12.5 104 '#ff7a1f')"
+clip flame flame 0 375 "$(cap f1 230 0 3.2 76 white),$(cap f2 230 3.6 7.6 104 white),$(cap f3 1500 8 12.5 94 '#ff7a1f')"
 endcard flame flame; join dead-signal-flamethrower "$T/flame.mp4" "$T/flame-end.mp4"
 
 # 3. Boss
 txt b1 'THE TOWER WALKS'; txt b2 'CAN YOU SURVIVE
 5 MINUTES?'; txt b3 '20 SECTORS. 5 BOSSES.'
-clip boss boss 0 375 "$(cap b1 230 0 3.0 120 '#ff4d3d'),$(cap b2 230 3.4 8.2 110 white),$(cap b3 1500 8.6 12.5 88 '#5ef2ff')"
+clip boss boss 0 375 "$(cap b1 230 0 3.0 100 '#ff4d3d'),$(cap b2 230 3.4 8.2 100 white),$(cap b3 1500 8.6 12.5 74 '#5ef2ff')"
 endcard boss boss; join dead-signal-boss "$T/boss.mp4" "$T/boss-end.mp4"
 
 # 4. Minute 1 vs minute 5
