@@ -1,7 +1,10 @@
 import { defineConfig } from 'vite';
+import pkg from './package.json';
 
 export default defineConfig({
   base: './',
+  // the settings footer shows package.json's version, so there's one place to bump it
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // rigged character models (Option D) are imported as assets
   assetsInclude: ['**/*.glb'],
   build: {
