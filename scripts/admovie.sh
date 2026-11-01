@@ -12,7 +12,7 @@ want() { [[ -z "${ONLY:-}" || " $ONLY " == *" $1 "* ]]; }
 
 # big caption: textfile, y, start, end, size, color
 cap() {
-  echo "drawtext=fontfile=$FONT:textfile=$T/$1.txt:fontsize=$5:fontcolor=$6:borderw=7:bordercolor=black@0.85:line_spacing=6:x=(w-text_w)/2:y=$2:enable='between(t,$3,$4)':alpha='if(lt(t,$3+0.15),(t-$3)/0.15,1)'"
+  echo "drawtext=fontfile=$FONT:textfile=$T/$1.txt:fontsize=$5:fontcolor=$6:borderw=7:bordercolor=black@0.85:line_spacing=6:text_align=C:x=(w-text_w)/2:y=$2:enable='between(t,$3,$4)':alpha='if(lt(t,$3+0.15),(t-$3)/0.15,1)'"
 }
 
 # clip <scene> <startFrame> <frames> -> T/<name>.mp4 (scaled, with captions)
@@ -31,7 +31,7 @@ No download'; txt url 'deadsignal.info'
   ffmpeg -loglevel error -y -loop 1 -framerate 30 -i "$FR/$scene/$last" -t 2.5 \
     -vf "scale=1080:1920:flags=lanczos,setsar=1,boxblur=18:2,eq=brightness=-0.28:saturation=1.2,\
 drawtext=fontfile=$FONT:textfile=$T/title.txt:fontsize=150:fontcolor=#5ef2ff:borderw=8:bordercolor=black:x=(w-text_w)/2:y=640,\
-drawtext=fontfile=$FONT:textfile=$T/sub.txt:fontsize=74:fontcolor=white:borderw=6:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=880,\
+drawtext=fontfile=$FONT:textfile=$T/sub.txt:fontsize=74:fontcolor=white:borderw=6:bordercolor=black:line_spacing=10:text_align=C:x=(w-text_w)/2:y=880,\
 drawbox=x=170:y=1150:w=740:h=150:color=#ffd34d@1:t=fill,\
 drawtext=fontfile=$FONT:textfile=$T/url.txt:fontsize=78:fontcolor=#141820:x=(w-text_w)/2:y=1180" \
     -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p "$T/$name-end.mp4"
@@ -41,7 +41,7 @@ join() {
   local name=$1; shift
   printf "file '%s'\n" "$@" > "$T/$name.list"
   ffmpeg -loglevel error -y -f concat -safe 0 -i "$T/$name.list" -f lavfi -i anullsrc=r=44100:cl=stereo -shortest \
-    -c:v libx264 -preset veryfast -crf 19 -pix_fmt yuv420p -r 30 -c:a aac -b:a 96k -movflags +faststart "$OUT/$name.mp4"
+    -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p -r 30 -c:a aac -b:a 96k -movflags +faststart "$OUT/$name.mp4"
   echo "$OUT/$name.mp4"
 }
 
@@ -60,7 +60,7 @@ want flame && clip flame flame 0 375 "$(cap f1 230 0 3.2 76 white),$(cap f2 230 
 want flame && endcard flame flame && join dead-signal-flamethrower "$T/flame.mp4" "$T/flame-end.mp4"
 
 # 3. Boss
-txt b1 'THE TOWER WALKS'; txt b2 'CAN YOU SURVIVE
+txt b1 'BOSS INCOMING'; txt b2 'CAN YOU SURVIVE
 5 MINUTES?'; txt b3 '20 SECTORS. 5 BOSSES.'
 want boss && clip boss boss 0 375 "$(cap b1 230 0 3.0 100 '#ff4d3d'),$(cap b2 230 3.4 8.2 100 white),$(cap b3 1500 8.6 12.5 74 '#5ef2ff')"
 want boss && endcard boss boss && join dead-signal-boss "$T/boss.mp4" "$T/boss-end.mp4"
