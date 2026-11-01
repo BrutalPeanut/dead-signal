@@ -112,6 +112,8 @@ export interface SaveData {
   speedUntil?: number;
   /** Ascension (see meta/ascension.ts). Unset = never ascended. */
   asc?: AscState;
+  /** Campaign losses in a row on one sector (drives the lobby's "stuck" Power Up nudge). Unset = none. */
+  streak?: { sector: number; losses: number };
 }
 
 export interface RunRewards {
@@ -183,6 +185,7 @@ export function normalizeSave(raw: unknown): SaveData | null {
   if (d.v !== 1 || typeof d.unlocked !== 'number' || !Array.isArray(d.gear)) return null;
   const f = fresh();
   if (!d.slotLv) migrateSlotLevels(d);
+  if (d.streak && !(Number.isInteger(d.streak.sector) && Number.isInteger(d.streak.losses))) delete d.streak;
   return { ...f, ...d, settings: { ...f.settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? f.daily, endless: d.endless ?? f.endless, character: d.character ?? 'courier', online: d.online ?? f.online, pass: d.pass ?? f.pass };
 }
 
@@ -928,6 +931,12 @@ export class Profile {
     return n;
   }
 
+  /** Lost this campaign sector twice or more in a row: time to push the Power Up coach harder. */
+  stuckOn(sector: number) {
+    const s = this.data.streak;
+    return !!s && s.sector === sector && s.losses >= 2;
+  }
+
   coach(): CoachAction | null {
     const d = this.data;
     // 0. free stuff first: a red badge the player hasn't noticed is the cheapest power there is
@@ -1135,6 +1144,8 @@ export class Profile {
     d.stats.kills += r.kills;
     d.stats.bossKills += r.bossKills;
     if (r.won) d.stats.wins++;
+    if (r.won) delete d.streak;
+    else d.streak = d.streak?.sector === sector ? { sector, losses: d.streak.losses + 1 } : { sector, losses: 1 };
 
     let levelsGained = 0;
     d.accountXp += xp;

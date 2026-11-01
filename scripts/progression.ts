@@ -19,6 +19,8 @@ const p = new Profile(new Mem() as unknown as Storage);
 const rng = new Rng(seed0);
 
 const NAIVE = process.env.NAIVE === '1';
+const NUDGE = process.env.NUDGE === '1';
+let nudged = 0;
 // ECON=free: ads exist but this player never watches one. ECON=ads: watches the optional ones.
 const ECON = process.env.ECON ?? '';
 p.adEcon = ECON === 'free' || ECON === 'ads';
@@ -28,6 +30,14 @@ function manage() {
   const d = p.data;
   if (NAIVE) {
     // a player who only presses Battle: no merging, equipping, levelling, talents or crates
+    // NUDGE=1: ...except they tap the lobby's Power Up once it lights up after two losses in a row
+    if (NUDGE && p.stuckOn(d.unlocked)) {
+      nudged++;
+      for (let i = 0; i < 6; i++) {
+        const c = p.coach();
+        if (!c || !c.apply()) break;
+      }
+    }
     return;
   }
   if (process.env.COACH === '1') {
@@ -127,4 +137,5 @@ for (const [k, a] of Object.entries(deaths)) {
   const last = Object.entries(a.last).sort((x, y) => y[1] - x[1]).map(([s2, v]) => `${s2}×${v}`).join(' ');
   console.log(`${k} ${a.n} | ${last} | ${share} | ${a.t.sort((x, y) => x - y).join(',')}`);
 }
+if (NUDGE) console.log(`stuck nudges acted on: ${nudged}`);
 console.log(`(${((performance.now() - t0) / 1000).toFixed(0)}s)`);

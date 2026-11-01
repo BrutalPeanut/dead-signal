@@ -451,6 +451,14 @@
   border: 1px solid rgba(67, 255, 164, 0.55);
 }
 
+/* stuck on a sector: the same strip in hazard amber */
+.lobby-body .coach.stuck {
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 211, 77, 0.07) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #3a2c08, #1f1805);
+  border: 1px solid #ffd34d;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn.go span::after {
     animation: none;

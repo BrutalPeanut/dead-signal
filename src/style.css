@@ -3153,6 +3153,37 @@ button {
   }
 }
 
+/* lost this sector twice in a row: the coach gets loud (amber, bouncing) until the sector is cleared */
+.coach.stuck {
+  border-color: #ffd34d;
+  background: linear-gradient(180deg, rgba(255, 211, 77, 0.24), rgba(255, 211, 77, 0.08)), #1c1a0e;
+  animation: coachStuck 1.1s ease-in-out infinite;
+}
+
+.coach.stuck .ch-bolt {
+  filter: drop-shadow(0 0 8px #ffd34d);
+}
+
+.coach.stuck .ch-t small {
+  color: #ffd34d;
+}
+
+.coach.stuck .ch-d {
+  color: #fff1c2;
+}
+
+@keyframes coachStuck {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(255, 211, 77, 0.25);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 30px rgba(255, 211, 77, 0.65);
+  }
+}
+
 .res-powerup {
   display: flex;
   flex-direction: column;
@@ -3173,7 +3204,8 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .coach {
+  .coach,
+  .coach.stuck {
     animation: none;
   }
 }
