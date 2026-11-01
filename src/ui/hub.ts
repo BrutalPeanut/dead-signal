@@ -13,7 +13,7 @@ import {
 } from '../meta/gear';
 import { RELAY_CAP_H, type Profile } from '../meta/profile';
 import { LOGIN_DAYS, loginReward } from '../meta/login';
-import { ads, adsOn } from '../ads/ads';
+import { ads, adsOn, type Placement } from '../ads/ads';
 import { DAILY_TIERS, ENDLESS_BOSS_EVERY, dailyChallenge, type RunMode } from '../sim/modes';
 import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
 import { drawHero } from '../render/art';
@@ -1102,6 +1102,19 @@ export class Hub {
 
   // ------------------------------------------------------------------ ascension
 
+  /** A rewarded-ad button: plays the ad, then runs `grant` only if it was watched to the end. */
+  private adButton(label: string, placement: Placement, grant: () => void) {
+    const btn = h('button.btn.ad-btn', { style: { width: '100%', marginTop: '8px' } }, h('span.ad-play', '▶'), label) as HTMLButtonElement;
+    btn.onclick = () => {
+      btn.disabled = true;
+      ads.showRewarded(placement).then((ok) => {
+        btn.disabled = false;
+        if (ok) grant();
+      });
+    };
+    return btn;
+  }
+
   private ascensionPanel() {
     const p = this.p;
     const d = p.data;
@@ -1126,6 +1139,12 @@ export class Hub {
           h('div', h('b', rank ? `Ascension ${romanRank(rank)}` : 'Ascension'), h('small', rank ? `+${Math.round((rankRewardMul(rank) - 1) * 100)}% campaign rewards · infected +${Math.round((rankHpMul(rank) - 1) * 100)}% HP` : 'Ready: restart the campaign stronger')),
           h('div.asc-cores', h('b', a?.cores ?? 0), h('small', 'Cores')),
         ),
+        adsOn() && p.ascendBonus()
+          ? this.adButton(`Watch ad · +${p.ascendBonus()} bonus cores`, 'ascend', () => {
+              const n = p.claimAscendBonus();
+              if (n) toast(`+${n} Signal Cores`, '#b18cff');
+            })
+          : null,
         p.canAscend()
           ? h('button.btn.primary', { style: { width: '100%', marginTop: '10px' }, onclick: () => this.ascendSheet() }, `Ascend to ${romanRank(rank + 1)} · +${p.coresOnAscend()} cores`)
           : h('div.help', { style: { textAlign: 'left', margin: '8px 0 0' } }, `Clear Sector ${ASCEND_AT} again to ascend to ${romanRank(rank + 1)}. Every star you earn adds cores.`),
@@ -1240,6 +1259,13 @@ export class Hub {
       h('h2', { style: { fontSize: '24px', textAlign: 'center' } }, `Ascension ${romanRank(rank)}`),
       h('div.help', { style: { marginTop: 0 } }, `+${cores} Signal Cores · +${keys} crate keys`),
       h('div.help', 'Spend your cores in the Signal Lab, then retake Sector 1. Your gear came with you.'),
+      adsOn() && this.p.ascendBonus()
+        ? this.adButton(`Watch ad · +${this.p.ascendBonus()} bonus cores`, 'ascend', () => {
+            const n = this.p.claimAscendBonus();
+            if (n) toast(`+${n} Signal Cores`, '#b18cff');
+            this.ascendedSheet(rank, cores + n, keys);
+          })
+        : null,
       h('button.btn.primary', { style: { width: '100%', marginTop: '14px' }, onclick: () => { this.closeModal(); this.setTab('talents'); } }, 'Open the Signal Lab'),
     );
     this.present(sheet, 'ascended');
@@ -1377,6 +1403,13 @@ export class Hub {
           },
           'Claim',
         ),
+        adsOn() && relay.gold >= 1
+          ? this.adButton(`Watch ad · Claim ×2 (+${fmtNum(relay.gold * 2)} gold)`, 'relay', () => {
+              const r = p.claimRelay(Date.now(), 2);
+              audio.pickup('gold');
+              toast(`+${fmtNum(r.gold)} gold, +${r.scrap} scrap`, '#ffd34d');
+            })
+          : null,
       ),
       h(
         'div.crate-card',
@@ -1448,6 +1481,15 @@ export class Hub {
           { style: { width: '100%', marginTop: '12px' }, disabled: !can, onclick: claim },
           can ? `Claim Day ${today + 1}` : `Next reward in ${Math.floor(left / 3.6e6)}h ${Math.floor((left % 3.6e6) / 6e4)}m`,
         ),
+        adsOn() && p.canDoubleDaily()
+          ? this.adButton('Watch ad · Double today’s reward', 'daily', () => {
+              const r = p.doubleDaily();
+              if (!r) return;
+              audio.pickup('chest');
+              this.toastReward(r, '#5ef2ff');
+              this.calendar();
+            })
+          : null,
         h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
       ),
       'cal',

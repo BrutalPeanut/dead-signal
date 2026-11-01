@@ -38,6 +38,10 @@ export interface CoachAction {
 
 export const KEY = 'deadsignal.save.v1';
 export const RELAY_CAP_H = 8;
+/** Share of base gold and scrap a player gets without watching ads (only when ads exist). */
+export const FREE_ECON = 0.85;
+/** Bonus cores for watching an ad right after ascending. */
+export const ASC_AD_BONUS = 0.5;
 /** One ad = 30 minutes of 2× speed, stacking to 2 hours. */
 export const SPEED_AD_MS = 30 * 60_000;
 export const SPEED_CAP_MS = 2 * 3_600_000;
@@ -92,6 +96,8 @@ export interface SaveData {
   online: { id: string; name: string; crew: string; pending: Submission[] };
   pass: PassState;
   adKeys?: { date: string; n: number };
+  /** Day the sign-in reward was doubled by an ad. */
+  dailyAd?: string;
   /** Chosen primary gun (replaces the Pulse Pistol). Unset = the newest one unlocked. */
   gun?: WeaponId;
   /** Cloud save sync code (see meta/sync.ts); `saved` = the player confirmed they kept a copy. */
@@ -532,6 +538,44 @@ export class Profile {
     return true;
   }
 
+  /** Results screen ad: pay the run's gold and scrap a second time. */
+  grantRunDouble(rw: { gold: number; scrap: number }) {
+    this.grant({ gold: rw.gold, scrap: rw.scrap });
+    this.save();
+  }
+
+  /** Sign-in calendar ad: today's gold/scrap/keys again, once per day, after claiming. */
+  canDoubleDaily(now = new Date()) {
+    return !this.dailyAvailable(now) && this.data.dailyAd !== now.toDateString();
+  }
+  doubleDaily(now = new Date()): LoginReward | null {
+    if (!this.canDoubleDaily(now)) return null;
+    const day = (this.data.login.claimed - 1 + LOGIN_DAYS) % LOGIN_DAYS;
+    const r = loginReward(day, this.reach());
+    const g = { gold: r.gold ?? 0, scrap: r.scrap ?? 0, keys: r.keys ?? 0 };
+    this.grant(g);
+    this.data.dailyAd = now.toDateString();
+    this.save();
+    return g;
+  }
+
+  /** Ascension ad: +50% of the cores from the latest ascension, once per rank. */
+  ascendBonus(): number {
+    const a = this.data.asc;
+    if (!a || a.rank <= 0 || (a.adRank ?? 0) >= a.rank || !a.lastCores) return 0;
+    return Math.max(1, Math.round(a.lastCores * ASC_AD_BONUS));
+  }
+  claimAscendBonus(): number {
+    const n = this.ascendBonus();
+    if (!n) return 0;
+    const a = this.asc();
+    a.cores += n;
+    a.earned += n;
+    a.adRank = a.rank;
+    this.save();
+    return n;
+  }
+
   /** Is 2× speed unlocked right now? (Only matters when ads are on; otherwise it's free.) */
   speedActive(now = Date.now()) {
     return (this.data.speedUntil ?? 0) > now;
@@ -597,6 +641,7 @@ export class Profile {
     a.rank++;
     a.cores += cores;
     a.earned += cores;
+    a.lastCores = cores;
     const keys = ascendKeys(a.rank);
     d.keys += keys;
     d.gun = this.gun(); // keep the gun in hand (unlocks follow the peak)
@@ -627,9 +672,19 @@ export class Profile {
   labAffordable() {
     return LAB.some((p) => this.canBuyLab(p.id));
   }
-  /** Gold/scrap multiplier from the Lab (all modes). */
+  /**
+   * Set when rewarded ads are available. With ads on, the base gold and scrap from runs and the
+   * relay are trimmed (FREE_ECON) and the optional ads (double rewards, relay ×2, sign-in ×2,
+   * free keys, ascension bonus) more than make it back. With ads off nothing is trimmed, so a
+   * player who has no way to watch one is never penalised.
+   */
+  adEcon = false;
+  econ() {
+    return this.adEcon ? FREE_ECON : 1;
+  }
+  /** Gold/scrap multiplier from the Lab and the ad economy (all modes). */
   private lootMul() {
-    return 1 + this.lab('loot') * 0.1;
+    return (1 + this.lab('loot') * 0.1) * this.econ();
   }
   private xpMul() {
     return 1 + this.lab('xp') * 0.15;
@@ -1090,7 +1145,8 @@ export class Profile {
   relayRates() {
     const s = this.reach();
     const k = 1 + this.lab('relay') * 0.2;
-    return { goldPerH: Math.round(60 * (1 + s * 0.6) * k), scrapPerH: Math.round((3 + s) * k), xpPerH: Math.round((40 + s * 10) * k) };
+    const e = this.econ();
+    return { goldPerH: Math.round(60 * (1 + s * 0.6) * k * e), scrapPerH: Math.round((3 + s) * k * e), xpPerH: Math.round((40 + s * 10) * k) };
   }
 
   relayPending(now = Date.now()) {
@@ -1099,9 +1155,11 @@ export class Profile {
     return { hours: h, gold: Math.floor(r.goldPerH * h), scrap: Math.floor(r.scrapPerH * h), xp: Math.floor(r.xpPerH * h) };
   }
 
-  claimRelay(now = Date.now()) {
-    const p = this.relayPending(now);
-    if (p.gold <= 0 && p.scrap <= 0) return p;
+  /** `mult` = 2 when the player watched an ad to double this collection. */
+  claimRelay(now = Date.now(), mult = 1) {
+    const p0 = this.relayPending(now);
+    if (p0.gold <= 0 && p0.scrap <= 0) return p0;
+    const p = { ...p0, gold: p0.gold * mult, scrap: p0.scrap * mult, xp: p0.xp * mult };
     this.data.gold += p.gold;
     this.data.scrap += p.scrap;
     this.data.accountXp += p.xp;

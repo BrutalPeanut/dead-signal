@@ -124,12 +124,12 @@ export function resultsModal(
     h('div.rewards', rewards),
     onDoubleAd && rw.gold > 0
       ? (() => {
-          const btn = h('button.btn.cyan.ad-btn', { style: { margin: '8px auto 0' } }, h('span.ad-play', '▶'), `Watch ad · Double gold (+${fmtNum(rw.gold)})`) as HTMLButtonElement;
+          const btn = h('button.btn.cyan.ad-btn', { style: { margin: '8px auto 0' } }, h('span.ad-play', '▶'), `Watch ad · Double rewards (+${fmtNum(rw.gold)} gold${rw.scrap ? `, +${rw.scrap} scrap` : ''})`) as HTMLButtonElement;
           btn.onclick = () =>
             onDoubleAd().then((ok) => {
               if (!ok) return;
               btn.disabled = true;
-              btn.replaceChildren(`✓ Gold doubled: +${fmtNum(rw.gold * 2)}`);
+              btn.replaceChildren(`✓ Rewards doubled: +${fmtNum(rw.gold * 2)} gold`);
             });
           return h('div', { style: { textAlign: 'center' } }, btn);
         })()

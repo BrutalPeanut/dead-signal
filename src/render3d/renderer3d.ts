@@ -85,6 +85,9 @@ const FLASH_ELITE = new THREE.Color(1.7, 1.7, 1.7);
  * (fx, joystick, guide, setGame, resize, adapt, render) and it reads the exact same sim state,
  * so gameplay, balance and UI are untouched; only the picture changes.
  */
+/** Flight height of the hero's bullets, rockets and bolts: about where the gun is held (muzzle ≈ 60-84). */
+const SHOT_H = 62;
+
 export class Renderer3D {
   readonly fx = new Fx();
   joystick: { ox: number; oy: number; x: number; y: number } | null = null;
@@ -167,6 +170,10 @@ export class Renderer3D {
   private lights: Light[] = [];
   private motes: Mote[] = [];
   private muzzle = 0;
+  /** Gun muzzle in world space this frame: the player's shots start here instead of the hero's middle. */
+  private muzzleAt = new THREE.Vector3();
+  private muzzleOk = false;
+  private off = { x: 0, y: 0, z: 0 };
   private muzzleCol = '#5ef2ff';
   private corpseSeed = 1;
   private m4 = new THREE.Matrix4();
@@ -1212,6 +1219,8 @@ export class Renderer3D {
       this.glowAdd.add(this.v3.x, this.v3.y, this.v3.z, gl.size * 1.6, rgbC(gl.color), 0.9);
     }
     this.light(g.px, g.py, 48, rgbC(skin.glow), 0.12);
+    h.muzzleWorld(this.muzzleAt);
+    this.muzzleOk = true;
     if (this.muzzle > 0) {
       h.muzzleWorld(this.v3);
       const k = this.muzzle / 0.07;
@@ -1277,23 +1286,52 @@ export class Renderer3D {
 
   // ------------------------------------------------------------------ projectiles
 
+  /**
+   * The sim fires from the hero's centre; draw fresh shots offset to the gun's muzzle, easing the
+   * offset out over ~0.15 s so they converge on their real (hit-tested) path.
+   * Writes the offset for a projectile drawn at height `ht` into this.off.
+   */
+  private fromMuzzle(p: { x: number; y: number; vx: number; vy: number; life: number; maxLife: number }, ht: number) {
+    const o = this.off;
+    o.x = o.y = o.z = 0;
+    if (!this.muzzleOk) return o;
+    const age = p.maxLife - p.life;
+    const k = 1 - age / 0.15;
+    if (k <= 0) return o;
+    const g = this.game;
+    // only shots that left from the hero (not orbiters or bounced/split projectiles)
+    if (Math.hypot(p.x - p.vx * age - g.px, p.y - p.vy * age - g.py) > 30) return o;
+    const m = this.muzzleAt;
+    o.x = (m.x - g.px) * k;
+    o.y = (m.y - ht) * k;
+    o.z = (m.z - g.py) * k;
+    return o;
+  }
+
   private drawProjectiles() {
     const g = this.game;
     let shells = 0, discs = 0, drills = 0;
-    for (const p of g.projectiles) {
+    for (const p0 of g.projectiles) {
+      let p = p0;
+      let lift = 0;
+      if (p0.kind === 'bullet' || p0.kind === 'slug' || p0.kind === 'bolt' || p0.kind === 'rail' || p0.kind === 'rocket' || p0.kind === 'flame') {
+        const ht = p0.kind === 'flame' ? 22 : SHOT_H;
+        const o = this.fromMuzzle(p0, ht);
+        if (o.x || o.y || o.z) (p = { ...p0, x: p0.x + o.x, y: p0.y + o.z }), (lift = o.y);
+      }
       switch (p.kind) {
         case 'bolt': {
           const sp = Math.hypot(p.vx, p.vy) || 1;
-          this.glowAdd.add(p.x, 34, p.y, 20, rgbC('#5ef2ff'), 1);
+          this.glowAdd.add(p.x, SHOT_H + lift, p.y, 20, rgbC('#5ef2ff'), 1);
           this.light(p.x, p.y, 30, rgbC('#5ef2ff'), 0.2);
-          this.ribbons.seg(p.x, 34, p.y, p.x - (p.vx / sp) * 16, 34, p.y - (p.vy / sp) * 16, p.r * 1.1, rgbC('#bffbff'), 1, 0.1);
+          this.ribbons.seg(p.x, SHOT_H + lift, p.y, p.x - (p.vx / sp) * 16, SHOT_H + lift, p.y - (p.vy / sp) * 16, p.r * 1.1, rgbC('#bffbff'), 1, 0.1);
           break;
         }
         case 'rail': {
           const sp = Math.hypot(p.vx, p.vy) || 1;
           const bx = p.x - (p.vx / sp) * 46, bz = p.y - (p.vy / sp) * 46;
-          this.ribbons.seg(p.x, 34, p.y, bx, 34, bz, p.r * 2.4, rgbC('#5ef2ff'), 0.6, 0);
-          this.ribbons.seg(p.x, 34, p.y, bx, 34, bz, p.r * 0.8, rgbC('#ffffff'), 1, 0.2);
+          this.ribbons.seg(p.x, SHOT_H + lift, p.y, bx, SHOT_H + lift, bz, p.r * 2.4, rgbC('#5ef2ff'), 0.6, 0);
+          this.ribbons.seg(p.x, SHOT_H + lift, p.y, bx, SHOT_H + lift, bz, p.r * 0.8, rgbC('#ffffff'), 1, 0.2);
           this.light(p.x, p.y, 40, rgbC('#5ef2ff'), 0.25);
           break;
         }
@@ -1322,15 +1360,15 @@ export class Renderer3D {
           const slug = p.kind === 'slug';
           const l = slug ? 26 : 18;
           const col = slug ? '#ffb02e' : '#ffd34d';
-          this.ribbons.seg(p.x, 32, p.y, p.x - (p.vx / sp) * l, 32, p.y - (p.vy / sp) * l, p.r * (slug ? 1.3 : 0.9), rgbC(col), 0.9, 0.1);
-          this.glowAdd.add(p.x, 32, p.y, slug ? 16 : 11, rgbC('#fff1c4'), 0.8);
+          this.ribbons.seg(p.x, SHOT_H + lift, p.y, p.x - (p.vx / sp) * l, SHOT_H + lift, p.y - (p.vy / sp) * l, p.r * (slug ? 1.3 : 0.9), rgbC(col), 0.9, 0.1);
+          this.glowAdd.add(p.x, SHOT_H + lift, p.y, slug ? 16 : 11, rgbC('#fff1c4'), 0.8);
           break;
         }
         case 'flame': {
           const k = 1 - Math.max(0, p.life) / p.maxLife; // 0 fresh → 1 burnt out
           const col = k < 0.3 ? '#ffe08a' : k < 0.65 ? '#ff7a1f' : '#c2341a';
           const a = (1 - k * k) * 0.75;
-          this.glowAdd.add(p.x, 22 + k * 14, p.y, p.r * (p.evo ? 3.2 : 2.8), rgbC(col), a);
+          this.glowAdd.add(p.x, 22 + k * 14 + lift, p.y, p.r * (p.evo ? 3.2 : 2.8), rgbC(col), a);
           if ((p.id & 7) === 0) this.light(p.x, p.y, 60, rgbC('#ff7a1f'), 0.12 * (1 - k));
           break;
         }
@@ -1339,13 +1377,13 @@ export class Renderer3D {
           const ux = p.vx / sp, uz = p.vy / sp;
           if (shells < 120) {
             this.q.setFromEuler(this.e3.set(0, -Math.atan2(p.vy, p.vx), 0));
-            this.m4.compose(this.v3.set(p.x, 30, p.y), this.q, this.s3.set(2.1, 1.25, 1.25));
+            this.m4.compose(this.v3.set(p.x, SHOT_H + lift, p.y), this.q, this.s3.set(2.1, 1.25, 1.25));
             this.shellMesh.setMatrixAt(shells, this.m4);
             this.shellMesh.setColorAt(shells++, this.tmpCol.set('#9aa874'));
           }
           // exhaust flame + smoke trail
-          this.glowAdd.add(p.x - ux * 12, 30, p.y - uz * 12, 22, rgbC('#ffcf6a'), 1);
-          this.ribbons.seg(p.x - ux * 10, 30, p.y - uz * 10, p.x - ux * 46, 30, p.y - uz * 46, 5, rgbC('#ff4d3d'), 0.55, 0);
+          this.glowAdd.add(p.x - ux * 12, SHOT_H + lift, p.y - uz * 12, 22, rgbC('#ffcf6a'), 1);
+          this.ribbons.seg(p.x - ux * 10, SHOT_H + lift, p.y - uz * 10, p.x - ux * 46, SHOT_H + lift, p.y - uz * 46, 5, rgbC('#ff4d3d'), 0.55, 0);
           this.light(p.x, p.y, 50, rgbC('#ff7a3d'), 0.22);
           break;
         }

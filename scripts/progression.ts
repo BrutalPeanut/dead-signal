@@ -19,6 +19,10 @@ const p = new Profile(new Mem() as unknown as Storage);
 const rng = new Rng(seed0);
 
 const NAIVE = process.env.NAIVE === '1';
+// ECON=free: ads exist but this player never watches one. ECON=ads: watches the optional ones.
+const ECON = process.env.ECON ?? '';
+p.adEcon = ECON === 'free' || ECON === 'ads';
+const WATCH = ECON === 'ads';
 
 function manage() {
   const d = p.data;
@@ -36,8 +40,16 @@ function manage() {
   }
   // passive income: assume ~40 min between runs on average → relay + a daily every 6 runs
   d.relayAt -= 40 * 60 * 1000;
-  p.claimRelay();
-  if (d.stats.runs % 6 === 0) { d.lastDaily = ''; p.claimDaily(new Date(2026, 0, d.stats.runs)); }
+  p.claimRelay(Date.now(), WATCH ? 2 : 1);
+  if (d.stats.runs % 6 === 0) {
+    const day = new Date(2026, 0, d.stats.runs);
+    d.lastDaily = '';
+    p.claimDaily(day);
+    if (WATCH) {
+      p.doubleDaily(day);
+      for (let i = 0; i < 3; i++) p.grantAdKey(day);
+    }
+  }
   while (d.keys > 0) p.openCrate(new Rng(rng.int(1, 1e9)));
   p.mergeAll();
   for (const s of SLOTS) {
@@ -90,7 +102,8 @@ for (let run = 1; run <= maxRuns && p.data.unlocked < CHAPTER_COUNT; run++) {
   }
   const won = g.state === 'won';
   const was = p.data.unlocked;
-  p.applyRun(sector, g.result(), rng.int(1, 1e9));
+  const rw = p.applyRun(sector, g.result(), rng.int(1, 1e9));
+  if (WATCH) p.grantRunDouble(rw);
   if (!won) {
     const k = `S${sector + 1}`;
     const a = (deaths[k] ??= { n: 0, last: {}, dmg: {}, t: [] });

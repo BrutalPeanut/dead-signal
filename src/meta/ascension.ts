@@ -25,6 +25,9 @@ export interface AscState {
   peak: number;
   /** Signal Lab upgrade levels. */
   lab: Partial<Record<LabId, number>>;
+  /** Cores from the latest ascension, and the rank whose ad bonus was claimed. */
+  lastCores?: number;
+  adRank?: number;
 }
 
 export const freshAsc = (): AscState => ({ rank: 0, cores: 0, earned: 0, peak: 0, lab: {} });
