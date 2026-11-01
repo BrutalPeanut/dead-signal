@@ -132,7 +132,11 @@ export class Hub {
     audio.click();
     this.body.scrollTop = 0;
     this.refresh();
+    this.onFeature(`tab:${t}`);
   }
+
+  /** First use of a lobby feature this session (anonymous stats; set by the app). */
+  onFeature: (name: string) => void = () => {};
 
   tick(dt: number) {
     this.t += dt;
@@ -654,6 +658,7 @@ export class Hub {
           const d = this.p.data;
           const before = { g: d.gold, s: d.scrap, k: d.keys };
           if (c.apply()) {
+            this.onFeature('powerup');
             audio.levelUp();
             haptic(25);
             if (c.kind === 'crate' && d.keys < before.k) {
@@ -1397,6 +1402,7 @@ export class Hub {
             disabled: relay.gold < 1,
             onclick: () => {
               const r = p.claimRelay();
+              this.onFeature('relay');
               audio.pickup('gold');
               toast(`+${fmtNum(r.gold)} gold, +${r.scrap} scrap`, '#ffd34d');
             },
@@ -1461,6 +1467,7 @@ export class Hub {
     const claim = () => {
       const r = p.claimDaily();
       if (!r) return;
+      this.onFeature('signin');
       audio.pickup('chest');
       haptic(40);
       if (r.item) this.revealItem(r.item);

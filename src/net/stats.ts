@@ -6,7 +6,7 @@
  */
 import { rpc } from './leaderboard';
 
-export type StatKind = 'session' | 'run_start' | 'run_end' | 'ad' | 'unlock' | 'error';
+export type StatKind = 'session' | 'run_start' | 'run_end' | 'ad' | 'unlock' | 'error' | 'leave' | 'feature';
 export type StatMode = 'campaign' | 'daily' | 'endless';
 
 interface Ev {
@@ -27,9 +27,35 @@ export class Stats {
   /** Sent counter, for tests and debugging. */
   sent = 0;
 
-  constructor(private player: () => string, readonly enabled: boolean, flushEveryMs = 20_000) {
-    if (!enabled) return;
+  /** First-use features already reported this session (each is sent at most once per session). */
+  private seen = new Set<string>();
+  private optedOut = false;
+
+  constructor(private player: () => string, private allowed: boolean, flushEveryMs = 20_000) {
+    if (!allowed) return;
     if (flushEveryMs > 0 && typeof setInterval !== 'undefined') this.timer = setInterval(() => void this.flush(), flushEveryMs);
+  }
+
+  /** Stats can run on this save at all (not a test save); the Settings toggle only shows then. */
+  get allowedHere() {
+    return this.allowed;
+  }
+
+  get enabled() {
+    return this.allowed && !this.optedOut;
+  }
+
+  /** Player turned stats off in Settings (or their browser sends Global Privacy Control / Do Not Track). */
+  setOptOut(off: boolean) {
+    this.optedOut = off;
+    if (off) this.q.length = 0;
+  }
+
+  /** A feature was used: reported once per session, so it costs at most a handful of events. */
+  feature(name: string, extra: Record<string, unknown> = {}) {
+    if (!this.enabled || this.seen.has(name)) return;
+    this.seen.add(name);
+    this.track('feature', { d: { f: name, ...extra } });
   }
 
   track(k: StatKind, extra: { s?: number; m?: StatMode; d?: Record<string, unknown> } = {}) {
@@ -65,4 +91,11 @@ export class Stats {
   stop() {
     if (this.timer) clearInterval(this.timer);
   }
+}
+
+/** The browser asks sites not to track (Global Privacy Control or Do Not Track). */
+export function browserSaysNo(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const n = navigator as Navigator & { globalPrivacyControl?: boolean };
+  return n.globalPrivacyControl === true || n.doNotTrack === '1';
 }

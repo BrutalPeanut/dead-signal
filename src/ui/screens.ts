@@ -174,6 +174,7 @@ export function settingsModal(
   onControls: (m: 'drag' | 'left' | 'right') => void = () => {},
   graphics?: { on3d: boolean; toggle: () => void },
   cloud?: { status: string; open: () => void },
+  stats?: { on: boolean; toggle: () => void },
 ) {
   const toggle = (label: string, key: 'sfx' | 'music' | 'haptics') => {
     const sw = h('span.sw' + (s[key] ? '.on' : ''));
@@ -204,6 +205,12 @@ export function settingsModal(
         : null,
       cloud
         ? h('button.toggle', { onclick: cloud.open }, h('span', { style: { textAlign: 'left' } }, 'Cloud save', h('small', { style: { display: 'block', fontSize: '11px', opacity: 0.65, fontWeight: 400 } }, `${cloud.status} · play on any device`)), h('span.chev', '›'))
+        : null,
+      stats
+        ? (() => {
+            const sw = h('span.sw' + (stats.on ? '.on' : ''));
+            return h('button.toggle', { onclick: () => (stats.toggle(), sw.classList.toggle('on')) }, h('span', { style: { textAlign: 'left' } }, 'Share anonymous stats', h('small', { style: { display: 'block', fontSize: '11px', opacity: 0.65, fontWeight: 400 } }, 'Helps balance the game · no names, no ads tracking')), sw);
+          })()
         : null,
       controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),
