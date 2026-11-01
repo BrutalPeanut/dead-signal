@@ -20,7 +20,16 @@ const AD_CLIENT = 'ca-pub-6900407641110608';
 export const adAudio = { mute: () => {}, unmute: () => {} };
 import { h, toast } from '../ui/dom';
 
-export type Placement = 'revive' | 'double' | 'key' | 'speed';
+export type Placement = 'revive' | 'double' | 'key' | 'speed' | 'relay' | 'daily' | 'ascend';
+const AD_REWARD: Record<Placement, string> = {
+  revive: 'get back up',
+  double: 'double your run rewards',
+  key: '1 crate key',
+  speed: '30 minutes of 2× speed',
+  relay: 'double your relay collection',
+  daily: 'double today’s sign-in reward',
+  ascend: 'bonus Signal Cores',
+};
 
 export interface AdProvider {
   readonly name: string;
@@ -48,7 +57,7 @@ class DemoAds implements AdProvider {
         h('div.ad-top', h('span.ad-tag', 'SAMPLE AD'), count, close),
         canvas,
         h('div.ad-cta', h('b', 'Gem Grove'), h('span', 'Fictional game used for this preview'), h('button.ad-install', 'Play free')),
-        h('div.ad-foot', `Reward: ${p === 'revive' ? 'get back up' : p === 'double' ? 'double your gold' : p === 'speed' ? '30 minutes of 2× speed' : '1 crate key'}`),
+        h('div.ad-foot', `Reward: ${AD_REWARD[p]}`),
       );
       document.getElementById('ui')!.append(el);
       const ctx = canvas.getContext('2d')!;

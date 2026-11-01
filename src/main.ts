@@ -122,6 +122,7 @@ class App {
   private endT = -1;
 
   constructor() {
+    this.profile.adEcon = adsOn();
     useSkin(this.profile.data.character);
     this.input.mode = this.profile.data.settings.controls ?? 'drag';
     this.profile.flushScores();
@@ -453,7 +454,7 @@ class App {
     const goNext = rw.unlockedSector;
     const coach = !r.won ? this.profile.coach() : null;
     this.showModal(
-      resultsModal(r, rw, mode === 'campaign' ? `Sector ${this.sector + 1} · ${g.chapter.name}` : mode === 'daily' ? `Daily Challenge · ${dailyChallenge().mods.map((m) => m.name).join(' + ')}` : 'Endless', () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false), adsOn() ? () => ads.showRewarded('double').then((ok) => (ok && (this.profile.grant({ gold: rw.gold }), this.profile.save()), ok)) : undefined),
+      resultsModal(r, rw, mode === 'campaign' ? `Sector ${this.sector + 1} · ${g.chapter.name}` : mode === 'daily' ? `Daily Challenge · ${dailyChallenge().mods.map((m) => m.name).join(' + ')}` : 'Endless', () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false), adsOn() ? () => ads.showRewarded('double').then((ok) => (ok && this.profile.grantRunDouble(rw), ok)) : undefined),
       'results',
     );
     if (r.won) audio.evolve();
