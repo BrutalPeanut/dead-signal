@@ -214,7 +214,7 @@ export function settingsModal(
         : null,
       controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),
-      h('div.help', cloud ? 'Dead Signal · v0.1 · progress backs up to the cloud' : 'Dead Signal · v0.1 · progress is saved on this device', ' · ', h('a', { href: './privacy.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Privacy')),
+      h('div.help', `Dead Signal · v${__APP_VERSION__.replace(/\.0$/, '')} · ${cloud ? 'progress backs up to the cloud' : 'progress is saved on this device'}`, ' · ', h('a', { href: './privacy.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Privacy')),
       h('button.btn', { style: { width: '100%', marginTop: '12px' }, onclick: onClose }, 'Done'),
     ),
   );
