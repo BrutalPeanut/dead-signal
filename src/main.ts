@@ -684,7 +684,38 @@ class App {
     this.hud.setSpeed(this.speed, !this.tutorialOn, this.speedOk);
   }
 
+  /** Recording mode (scripts/admovie.mjs): the live loop stands still and filmFrame() drives it. */
+  filming = false;
+
+  /** Advance the run by exactly `dt` on the autopilot and draw one frame (for recording videos). */
+  filmFrame(dt: number) {
+    const g = this.game;
+    this.acc += dt;
+    while (this.acc >= DT) {
+      this.acc -= DT;
+      if (g.state === 'levelup') g.choose(botChoose(g, g.offers));
+      else if (g.state === 'chest') g.closeChest();
+      else if (g.state === 'revive') g.revive(true);
+      if (g.state !== 'play') continue;
+      const [mx, my] = botMove(g);
+      this.interp.capture(g);
+      g.step(mx, my);
+    }
+    this.interp.apply(g, Math.min(1, this.acc / DT));
+    try {
+      this.renderer.render(dt);
+    } finally {
+      this.interp.restore(g);
+    }
+    if (this.mode === 'run') this.hud.update(g, this.renderer.fx.banners);
+  }
+
   private frame = (now: number) => {
+    if (this.filming) {
+      this.last = now;
+      requestAnimationFrame(this.frame);
+      return;
+    }
     // rAF timestamps can predate a performance.now() stored mid-frame (e.g. on resume): never step backwards
     const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
     if (this.mode === 'run' && !this.paused && this.game.state === 'play') {
