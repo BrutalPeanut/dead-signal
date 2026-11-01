@@ -68,6 +68,39 @@ describe('gear levels belong to the slot', () => {
   });
 });
 
+describe('stuck nudge', () => {
+  const run = (won: boolean) => ({ time: won ? 600 : 90, kills: 50, bossKills: 0, eliteKills: 0, gold: 10, won, score: 100 }) as Parameters<Profile['applyRun']>[1];
+
+  it('flags a sector after two losses in a row there, and clears on a win', () => {
+    const p = mk();
+    p.applyRun(0, run(false));
+    expect(p.stuckOn(0)).toBe(false);
+    p.applyRun(0, run(false));
+    expect(p.stuckOn(0)).toBe(true);
+    expect(p.stuckOn(1)).toBe(false);
+    p.applyRun(0, run(true));
+    expect(p.stuckOn(0)).toBe(false);
+    expect(p.data.streak).toBeUndefined();
+  });
+
+  it('a loss on another sector restarts the count', () => {
+    const p = mk();
+    p.applyRun(0, run(false));
+    p.applyRun(1, run(false));
+    expect(p.data.streak).toEqual({ sector: 1, losses: 1 });
+    expect(p.stuckOn(1)).toBe(false);
+  });
+
+  it('old saves without a streak load fine, and a garbled one is dropped', () => {
+    const raw = JSON.parse(JSON.stringify(mk().data));
+    expect(normalizeSave(raw)!.streak).toBeUndefined();
+    raw.streak = { sector: 'x' };
+    expect(normalizeSave(raw)!.streak).toBeUndefined();
+    raw.streak = { sector: 3, losses: 2 };
+    expect(normalizeSave(raw)!.streak).toEqual({ sector: 3, losses: 2 });
+  });
+});
+
 describe('better gear indicator', () => {
   it('flags an empty slot with gear available, and a stronger unequipped item', () => {
     const p = mk();

@@ -650,15 +650,17 @@ export class Hub {
     if (this.p.data.stats.runs < 1) return null;
     const c = this.p.coach();
     if (!c) return null;
+    // two losses in a row here: make the coach impossible to miss before the next attempt
+    const stuck = this.p.stuckOn(this.sector);
     return h(
-      'button.coach',
+      'button.coach' + (stuck ? '.stuck' : ''),
       {
         onclick: () => {
           const label = c.label;
           const d = this.p.data;
           const before = { g: d.gold, s: d.scrap, k: d.keys };
           if (c.apply()) {
-            this.onFeature('powerup');
+            this.onFeature(stuck ? 'powerup_stuck' : 'powerup');
             audio.levelUp();
             haptic(25);
             if (c.kind === 'crate' && d.keys < before.k) {
@@ -676,7 +678,7 @@ export class Hub {
         },
       },
       h('span.ch-bolt', '⚡'),
-      h('span.ch-t', h('small', 'POWER UP'), h('b', c.label)),
+      h('span.ch-t', h('small', stuck ? 'STUCK? POWER UP' : 'POWER UP'), h('b', c.label)),
       h('span.ch-d', c.detail),
     );
   }
