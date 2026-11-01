@@ -13,7 +13,8 @@
     "weapons": "vite-node scripts/weapons.ts",
     "builds": "vite-node scripts/melee.ts",
     "pacing": "vite-node scripts/pacing.ts",
-    "ascension": "vite-node scripts/ascension.ts"
+    "ascension": "vite-node scripts/ascension.ts",
+    "stats": "node scripts/stats.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",
@@ -21,6 +22,7 @@
     "@types/node": "^22.20.5",
     "@types/pngjs": "^6.0.5",
     "@types/three": "^0.170.0",
+    "pg": "^8.23.1",
     "playwright": "^1.64.1",
     "pngjs": "^7.0.0",
     "typescript": "^5.9.3",

@@ -26,6 +26,7 @@ npm run build        # tsc --noEmit + vite build
 npm run progression -- 140 1   # bot plays the whole campaign (env: NAIVE=1, COACH=1, ECON=free|ads)
 npm run ascension    # Ascension climb bot
 npm run pacing / sim / weapons / builds   # other balance sims
+npm run stats -- --days 30     # live stats report (read-only; needs DATABASE_URL, e.g. in .env.local)
 ```
 
 Headless browser checks use Playwright (`scripts/*.mjs`). Use the 2D renderer (`?r=2d` or
