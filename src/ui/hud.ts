@@ -322,12 +322,32 @@ function ctag(g: Game, o: Offer) {
   return h('span.ctag.misc', 'BONUS');
 }
 
-export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string) {
+export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string, onCloseTip?: () => void) {
   const cards = h('div.cards', g.offers.map((o, i) => offerCard(g, o, () => onPick(i))));
   return h(
     'div.modal',
     h('h2', { style: { color: '#5ef2ff', textShadow: '0 0 20px rgba(94,242,255,.6)' } }, 'LEVEL UP'),
-    tip ? h('div.lvl-tip', tip) : h('div.sub', 'Choose one upgrade'),
+    tip
+      ? (() => {
+          const box: HTMLElement = h(
+            'div.lvl-tip',
+            h('span', tip),
+            h(
+              'button.tt-x',
+              {
+                'aria-label': 'Dismiss tip',
+                title: 'Dismiss tip',
+                onclick: () => {
+                  onCloseTip?.();
+                  box.replaceWith(h('div.sub', 'Choose one upgrade'));
+                },
+              },
+              '✕',
+            ),
+          );
+          return box;
+        })()
+      : h('div.sub', 'Choose one upgrade'),
     h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big', g.loadout.maxW, g.loadout.maxP)),
     cards,
     h(

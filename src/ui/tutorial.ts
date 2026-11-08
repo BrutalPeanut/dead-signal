@@ -30,12 +30,42 @@ export class Tutorial {
   private wall = 0;
   target: { x: number; y: number } | null = null;
   controls: 'drag' | 'left' | 'right' = 'drag';
+  /** Tips the player closed with ✕; after two, the coach stays quiet for the rest of the run. */
+  private dismissed = 0;
+  private muted = false;
+  /** After a ✕, ordinary tips wait a few seconds instead of popping straight back up. */
+  private quietUntil = 0;
+  /** The level-up card tip was closed: don't show it again this run. */
+  levelTipOff = false;
 
   constructor() {
     this.text = h('span.tt-text');
     this.icon = h('span.tt-ico');
     this.hand = h('div.hand');
-    this.el = h('div.tut', this.icon, this.hand, this.text);
+    const close = h(
+      'button.tt-x',
+      {
+        'aria-label': 'Dismiss tip',
+        title: 'Dismiss tip',
+        // the bubble floats over the play field: don't let the tap start a joystick drag
+        onpointerdown: (e: Event) => e.stopPropagation(),
+        onclick: () => this.dismiss(),
+      },
+      '✕',
+    );
+    this.el = h('div.tut', this.icon, this.hand, this.text, close);
+  }
+
+  /** Close the current tip now. Two closes and the remaining tips are switched off for this run. */
+  dismiss() {
+    if (!this.cur) return;
+    this.dismissed++;
+    if (this.dismissed >= 2) this.muted = true;
+    this.quietUntil = this.wall + 10;
+    if (this.cur.id === 'move') this.shown.add('move-closed');
+    this.cur = null;
+    this.target = null;
+    this.el.classList.remove('on');
   }
 
   reset() {
@@ -45,6 +75,10 @@ export class Tutorial {
     this.surroundCd = 0;
     this.wall = 0;
     this.target = null;
+    this.dismissed = 0;
+    this.muted = false;
+    this.quietUntil = 0;
+    this.levelTipOff = false;
     this.el.classList.remove('on');
   }
 
@@ -77,11 +111,15 @@ export class Tutorial {
   update(g: Game, dt: number) {
     this.wall += dt;
     if (g.state !== 'play') return;
+    if (this.muted) {
+      this.target = null;
+      return;
+    }
     this.surroundCd -= dt;
 
     // 0: nothing moves until you do
     if (g.waitingForMove) {
-      if (this.cur?.id !== 'move') this.show({ id: 'move', icon: '👆', text: this.controls === 'drag' ? 'Drag anywhere to move. Try it!' : `Use the pad in the bottom ${this.controls} corner to move. Try it!`, until: 1e9, hand: this.controls === 'drag' }, g);
+      if (this.cur?.id !== 'move' && !this.shown.has('move-closed')) this.show({ id: 'move', icon: '👆', text: this.controls === 'drag' ? 'Drag anywhere to move. Try it!' : `Use the pad in the bottom ${this.controls} corner to move. Try it!`, until: 1e9, hand: this.controls === 'drag' }, g);
       this.target = null;
       return;
     }
@@ -131,7 +169,7 @@ export class Tutorial {
 
     const cur = this.cur;
     const curDone = !cur || cur.id === 'move' || g.time >= cur.until || (cur.done?.(g) ?? false);
-    const next = urgent[0] ?? (curDone ? tips[0] : undefined);
+    const next = urgent[0] ?? (curDone && this.wall >= this.quietUntil ? tips[0] : undefined);
     if (next && (curDone || urgent.length)) this.show(next, g);
     else if (curDone && cur) {
       this.cur = null;
