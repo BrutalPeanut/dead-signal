@@ -1,9 +1,8 @@
-import type { WeaponId } from '../sim/data';
 
 export type Slot = 'weapon' | 'visor' | 'vest' | 'gloves' | 'belt' | 'boots';
 export const SLOTS: Slot[] = ['weapon', 'visor', 'vest', 'gloves', 'belt', 'boots'];
 export const SLOT_NAMES: Record<Slot, string> = {
-  weapon: 'Weapon',
+  weapon: 'Gun Mod',
   visor: 'Visor',
   vest: 'Vest',
   gloves: 'Gloves',
@@ -32,7 +31,6 @@ export interface GearDef {
   /** ATK or HP at Common Lv1. */
   base: number;
   stat: 'atk' | 'hp';
-  startWeapon?: WeaponId;
   /** Perks unlocked at Rare, Epic, Legendary, Mythic. */
   perks: [Perk, Perk, Perk, Perk];
   flavor: string;
@@ -42,39 +40,39 @@ const p = (stat: PerkStat, value: number, text: string): Perk => ({ stat, value,
 
 export const GEAR: Record<string, GearDef> = {
   sidearm: {
-    id: 'sidearm', slot: 'weapon', name: 'Pulse Sidearm', base: 10, stat: 'atk', startWeapon: 'pistol',
+    id: 'sidearm', slot: 'weapon', name: 'Pulse Coil', base: 10, stat: 'atk',
     perks: [p('atkPct', 0.1, '+10% ATK'), p('crit', 0.05, '+5% crit chance'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
-    flavor: 'Standard courier issue. Never jams. Never asks questions.',
+    flavor: 'Standard courier issue. Clips onto any gun; never jams, never asks questions.',
   },
   gauntlet: {
-    id: 'gauntlet', slot: 'weapon', name: 'Arc Gauntlet', base: 9, stat: 'atk', startWeapon: 'arc',
+    id: 'gauntlet', slot: 'weapon', name: 'Arc Capacitor', base: 9, stat: 'atk',
     perks: [p('atkPct', 0.1, '+10% ATK'), p('critMul', 0.25, '+25% crit damage'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
-    flavor: 'A transformer coil strapped to a welding glove.',
+    flavor: 'A transformer coil wired into the trigger. Every round leaves with a spark.',
   },
   thrower: {
-    id: 'thrower', slot: 'weapon', name: 'Disc Thrower', base: 9.5, stat: 'atk', startWeapon: 'disc',
+    id: 'thrower', slot: 'weapon', name: 'Gyro Stabilizer', base: 9.5, stat: 'atk',
     perks: [p('atkPct', 0.1, '+10% ATK'), p('move', 0.05, '+5% move speed'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
-    flavor: 'Built from a lawnmower and spite.',
+    flavor: 'Built from a lawnmower gyro and spite. Keeps the muzzle steady on the run.',
   },
   tube: {
-    id: 'tube', slot: 'weapon', name: 'Frag Tube', base: 10.5, stat: 'atk', startWeapon: 'frag',
+    id: 'tube', slot: 'weapon', name: 'Heavy Primer', base: 10.5, stat: 'atk',
     perks: [p('atkPct', 0.1, '+10% ATK'), p('hpPct', 0.1, '+10% max HP'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
-    flavor: 'Point it away from yourself.',
+    flavor: 'Overcharged cartridges. Point it away from yourself.',
   },
   drillrig: {
-    id: 'drillrig', slot: 'weapon', name: 'Drill Rig', base: 9.5, stat: 'atk', startWeapon: 'drill',
+    id: 'drillrig', slot: 'weapon', name: 'Tungsten Rounds', base: 9.5, stat: 'atk',
     perks: [p('atkPct', 0.1, '+10% ATK'), p('crit', 0.05, '+5% crit chance'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
-    flavor: 'Mining tech. The infected are softer than rock.',
+    flavor: 'Mining-grade slugs. The infected are softer than rock.',
   },
   sawhalo: {
-    id: 'sawhalo', slot: 'weapon', name: 'Saw Halo', base: 9.5, stat: 'atk', startWeapon: 'blades',
+    id: 'sawhalo', slot: 'weapon', name: 'Serrated Barrel', base: 9.5, stat: 'atk',
     perks: [p('atkPct', 0.1, '+10% ATK'), p('def', 0.04, '+4% damage reduction'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
-    flavor: 'A ring of salvaged sawblades on a gyroscope. Get close.',
+    flavor: 'A barrel shroud ground into teeth. For when they get close.',
   },
   riftcleaver: {
-    id: 'riftcleaver', slot: 'weapon', name: 'Rift Cleaver', base: 10, stat: 'atk', startWeapon: 'cleaver',
+    id: 'riftcleaver', slot: 'weapon', name: 'Plasma Converter', base: 10, stat: 'atk',
     perks: [p('atkPct', 0.1, '+10% ATK'), p('hpPct', 0.1, '+10% max HP'), p('startLevel', 1, 'Start runs with +1 level-up'), p('atkPct', 0.2, '+20% ATK')],
-    flavor: 'Industrial plasma cutter, safety interlock removed.',
+    flavor: 'Industrial plasma cell, safety interlock removed.',
   },
   scout: {
     id: 'scout', slot: 'visor', name: 'Scout Visor', base: 4, stat: 'atk',

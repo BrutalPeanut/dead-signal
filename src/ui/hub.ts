@@ -891,12 +891,13 @@ export class Hub {
     const gd = WEAPONS[gunNow];
     return h(
       'div',
-      h('div.section-h', 'Primary Gun', h('span.reset', `${p.gunsUnlocked().length}/${GUN_IDS.length} unlocked`)),
+      h('div.section-h', 'Your Gun', h('span.reset', `${p.gunsUnlocked().length}/${GUN_IDS.length} unlocked`)),
       guns,
       h(
         'div.ch-perk',
         h('b', `${gd.name} · evolves into ${gd.evoName}`),
         h('span', gd.gun!.blurb),
+        h('span.mod-note', 'The gun you take into every run. Your Gun Mod (gear below) boosts whichever gun you carry.'),
       ),
       h('div.section-h', 'Couriers', h('span.reset', `${CHARACTERS.filter((c) => p.charUnlocked(c.id)).length}/${CHARACTERS.length} unlocked`)),
       roster,
@@ -1040,6 +1041,9 @@ export class Hub {
           h('span', def.stat === 'atk' ? 'Attack' : 'Health'),
           h('b', `+${fmtNum(p.statOf(it))}`, cur && diff ? h('span', { style: { color: diff > 0 ? 'var(--green)' : 'var(--red)', marginLeft: '6px' } }, `${diff > 0 ? '▲ +' : '▼ '}${fmtNum(diff)} vs equipped`) : null),
         ),
+        def.slot === 'weapon'
+          ? h('div.help', { style: { textAlign: 'left', margin: '6px 0 0' } }, `Gun Mods fit any gun. This one boosts whichever gun you carry (now: ${WEAPONS[p.gun()].name}). Pick your gun under Your Gun.`)
+          : null,
         slotLv > MAX_LEVEL[it.rarity] ? h('div.help', { style: { textAlign: 'left', margin: '4px 0 0' } }, `Your slot is Lv${slotLv}; ${RARITIES[it.rarity]} gear caps at ${MAX_LEVEL[it.rarity]}. Merge it to use the rest.`) : null,
       ),
       h(
