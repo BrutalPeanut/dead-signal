@@ -28,7 +28,7 @@ import { adAudio, adListeners, ads, adsOn } from './ads/ads';
 adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
 import { Stats, browserSaysNo } from './net/stats';
-import { Hud, chestModal, levelUpModal, pauseModal, reviveModal } from './ui/hud';
+import { Hud, chestModal, levelUpModal, lobbyCtx, pauseModal, reviveModal, showSkillInfo } from './ui/hud';
 import { introModal, resultsModal, settingsModal } from './ui/screens';
 
 type Mode = 'hub' | 'run';
@@ -153,6 +153,11 @@ class App {
     this.game = this.demoGame(this.profile.data.unlocked);
     this.renderer = want3d(s.graphics) ? new Renderer3D(this.canvas, this.game) : new Renderer(this.canvas, this.game);
     this.hud = new Hud(() => this.pause(), () => this.toggleSpeed());
+    // tapping a gun or skill in the in-run HUD pauses and opens its stats over the pause screen
+    this.hud.onSkillTap = (kind, id) => {
+      this.pause();
+      if (this.paused) showSkillInfo(this.game, kind, id);
+    };
     this.hub = new Hub(
       this.profile,
       (sec, mode) => this.startRun(sec, mode),
@@ -515,7 +520,7 @@ class App {
     const goNext = rw.unlockedSector;
     const coach = !r.won ? this.profile.coach() : null;
     this.showModal(
-      resultsModal(r, rw, mode === 'campaign' ? `Sector ${this.sector + 1} · ${g.chapter.name}` : mode === 'daily' ? `Daily Challenge · ${dailyChallenge().mods.map((m) => m.name).join(' + ')}` : 'Endless', () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false), adsOn() ? () => ads.showRewarded('double').then((ok) => (ok && this.profile.grantRunDouble(rw), ok)) : undefined),
+      resultsModal(r, rw, mode === 'campaign' ? `Sector ${this.sector + 1} · ${g.chapter.name}` : mode === 'daily' ? `Daily Challenge · ${dailyChallenge().mods.map((m) => m.name).join(' + ')}` : 'Endless', () => this.backToHub(goNext), coach?.label ?? null, () => this.backToHub(false), adsOn() ? () => ads.showRewarded('double').then((ok) => (ok && this.profile.grantRunDouble(rw), ok)) : undefined, (id) => showSkillInfo(lobbyCtx(this.profile.baseStats().atk), 'weapon', id, undefined, true)),
       'results',
     );
     if (r.won) audio.evolve();

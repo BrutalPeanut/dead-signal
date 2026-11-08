@@ -27,6 +27,7 @@ import { BOSSES, GUN_IDS, WEAPONS, gunUnlock, isGun, runLengthFor, starTimes } f
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
 import { coin, fmtNum, fmtTime, h, haptic, toast } from './dom';
 import { HomeScene } from './homeScene';
+import { lobbyCtx, showSkillInfo } from './hud';
 import { icon } from './svgicons';
 import { MISSION_DEFS, dailyBonus, starReward, type Reward } from '../meta/missions';
 import { ASCEND_AT, LAB, ascendKeys, rankDmgMul, rankHpMul, rankRewardMul, romanRank } from '../meta/ascension';
@@ -868,6 +869,19 @@ export class Hub {
             },
           },
           h('img', { src: skillIcon(id), alt: wd.name }),
+          h(
+            'span.gun-info',
+            {
+              title: 'Show stats',
+              'aria-label': `${wd.name} stats`,
+              // the tile equips; the (i) only shows the numbers
+              onclick: (e: Event) => {
+                e.stopPropagation();
+                showSkillInfo(lobbyCtx(p.baseStats().atk), 'weapon', id, undefined, true);
+              },
+            },
+            'i',
+          ),
           h('b', wd.name),
           h('small', open ? (on ? 'Equipped' : 'Tap to equip') : `Sector ${gunUnlock(id)}`),
           open ? null : h('i.lk', { html: icon('lock', 14) }),

@@ -200,8 +200,11 @@ export class Hud {
     this.banner.style.opacity = b ? String(Math.min(1, b.t * 2)) : '0';
   }
 
+  /** Tapping a weapon/support in the HUD row (the app pauses and opens its stats). */
+  onSkillTap?: (kind: 'weapon' | 'passive', id: string) => void;
+
   private renderSkills(ws: WeaponState[], ps: PassiveState[], maxW = MAX_WEAPON_SLOTS, maxP = MAX_PASSIVE_SLOTS) {
-    this.skills.replaceChildren(...loadoutRows(ws, ps, 'hud', maxW, maxP));
+    this.skills.replaceChildren(...loadoutRows(ws, ps, 'hud', maxW, maxP, this.onSkillTap));
   }
 }
 
@@ -315,10 +318,23 @@ const PASSIVE_FX: Partial<Record<PassiveId, [number, string]>> = {
   warhead: [0.08, 'Damage (all weapons)'],
 };
 
+/** What the stats sheet needs: a live run, or a lobby stand-in built from the profile. */
+export type StatCtx = Pick<Game, 'base' | 'dmgMul' | 'cdMul' | 'areaMul' | 'durMul' | 'weapons' | 'passives' | 'passiveLevel'>;
+
+/** Stats context outside a run (Armory, results): your ATK, no supports picked yet. */
+export function lobbyCtx(atk: number): StatCtx {
+  return { base: { atk } as Game['base'], dmgMul: 1, cdMul: 1, areaMul: 1, durMul: 1, weapons: [], passives: [], passiveLevel: () => 0 };
+}
+
+/** Open the stats sheet over whatever is on screen (level-up, pause, chest, lobby, results). */
+export function showSkillInfo(g: StatCtx, kind: 'weapon' | 'passive', id: string, toLevel?: number, range = false) {
+  (document.getElementById('ui') ?? document.body).append(skillInfo(g, kind, id, toLevel, range));
+}
+
 /** One weapon level's numbers as they'd play in this run (your ATK, supports and partner). */
-function weaponNumbers(g: Game, id: WeaponId, level: number, evolved: boolean) {
+function weaponNumbers(g: StatCtx, id: WeaponId, level: number, evolved: boolean) {
   const w: WeaponState = { id, level, evolved, timer: 0 } as WeaponState;
-  const s: WeaponLevel = withPartner(g, w, weaponStats(w));
+  const s: WeaponLevel = withPartner(g as Game, w, weaponStats(w));
   const rows: [string, string][] = [
     ['Damage per hit', fmtNum(s.dmg * g.base.atk * g.dmgMul)],
     ['Attacks every', `${(s.cd * g.cdMul).toFixed(2)}s`],
@@ -337,7 +353,7 @@ function weaponNumbers(g: Game, id: WeaponId, level: number, evolved: boolean) {
  * or the icon on an upgrade card). Shows the real numbers for this run and, when `toLevel` is
  * given, what picking the upgrade would change. Closing it never picks anything.
  */
-export function skillInfo(g: Game, kind: 'weapon' | 'passive', id: string, toLevel?: number) {
+export function skillInfo(g: StatCtx, kind: 'weapon' | 'passive', id: string, toLevel?: number, range = false) {
   const close = () => sheet.remove();
   let body: HTMLElement[];
   let title: string;
@@ -352,17 +368,26 @@ export function skillInfo(g: Game, kind: 'weapon' | 'passive', id: string, toLev
     icon = skillIcon(d.id, evo);
     const now = have ? weaponNumbers(g, d.id, have.level, evo) : null;
     const next = toLevel && !evo ? weaponNumbers(g, d.id, toLevel, false) : null;
-    const head = now && next ? ['', `Lv ${have!.level}`, `Lv ${toLevel}`] : now ? ['', evo ? 'Evolved' : `Lv ${have!.level}`] : ['', `Lv ${toLevel ?? 1}`];
-    const cols = now && next ? [now, next] : [now ?? next ?? weaponNumbers(g, d.id, 1, false)];
+    let head: string[];
+    let cols: [string, string][][];
+    if (range) {
+      // outside a run: how the weapon grows from a fresh pick to evolved
+      head = ['', 'Lv 1', `Lv ${MAX_SKILL_LEVEL}`, 'Evolved'];
+      cols = [weaponNumbers(g, d.id, 1, false), weaponNumbers(g, d.id, MAX_SKILL_LEVEL, false), weaponNumbers(g, d.id, MAX_SKILL_LEVEL, true)];
+    } else {
+      head = now && next ? ['', `Lv ${have!.level}`, `Lv ${toLevel}`] : now ? ['', evo ? 'Evolved' : `Lv ${have!.level}`] : ['', `Lv ${toLevel ?? 1}`];
+      cols = now && next ? [now, next] : [now ?? next ?? weaponNumbers(g, d.id, 1, false)];
+    }
     // match rows by stat name: a level can add a stat (pierce, more projectiles) the other lacks
-    const labels = [...new Set(cols.flatMap((c) => c.map(([l]) => l)))];
+    const ORDER = ['Damage per hit', 'Attacks every', 'Projectiles', 'Blades', 'Pierce', 'Area', 'Duration'];
+    const labels = [...new Set(cols.flatMap((c) => c.map(([l]) => l)))].sort((x, y) => ORDER.indexOf(x) - ORDER.indexOf(y));
     const rows = labels.map((label) => {
       const vals = cols.map((c) => c.find(([l]) => l === label)?.[1] ?? '—');
-      const changed = vals.length > 1 && vals[0] !== vals[1];
-      return h('tr', h('th', label), vals.map((v, j) => h(j === 1 && changed ? 'td.up' : 'td', v)));
+      return h('tr', h('th', label), vals.map((v, j) => h(j > 0 && v !== vals[j - 1] ? 'td.up' : 'td', v)));
     });
     body = [
       h('p.si-desc', evo ? d.evoDesc : d.desc),
+      ...(range ? [h('p.si-note', 'With your current ATK, before any supports from the run.')] : []),
       h('table.si-table', h('tr.si-head', head.map((x) => h('td', x))), rows),
       ...(toLevel && !evo && d.levelText[toLevel - 1] ? [h('p.si-next', `Lv ${toLevel}: ${d.levelText[toLevel - 1]}`)] : []),
       evo
@@ -396,7 +421,7 @@ export function skillInfo(g: Game, kind: 'weapon' | 'passive', id: string, toLev
       { style: { borderColor: color + 'aa' } },
       h('div.si-top', h('img', { src: icon, alt: '' }), h('b', { style: { color } }, title), h('button.tt-x', { 'aria-label': 'Close', onclick: close }, '✕')),
       body,
-      h('button.btn.small', { style: { marginTop: '10px', width: '100%' }, onclick: close }, 'Back to upgrades'),
+      h('button.btn.small', { style: { marginTop: '10px', width: '100%' }, onclick: close }, 'Back'),
     ),
   );
   return sheet;
@@ -454,12 +479,12 @@ function ctag(g: Game, o: Offer) {
 }
 
 export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string, onCloseTip?: () => void) {
-  const info = (kind: 'weapon' | 'passive', id: string, toLevel?: number) => modal.append(skillInfo(g, kind, id, toLevel));
+  const info = (kind: 'weapon' | 'passive', id: string, toLevel?: number) => showSkillInfo(g, kind, id, toLevel);
   const cards = h(
     'div.cards',
     g.offers.map((o, i) => offerCard(g, o, () => onPick(i), o.type === 'weapon' || o.type === 'passive' ? () => info(o.type as 'weapon' | 'passive', o.id, o.level) : undefined)),
   );
-  const modal: HTMLElement = h(
+  return h(
     'div.modal',
     h('h2', { style: { color: '#5ef2ff', textShadow: '0 0 20px rgba(94,242,255,.6)' } }, 'LEVEL UP'),
     tip
@@ -491,7 +516,6 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
       h('button.btn.small', { onclick: onReroll, disabled: g.rerolls <= 0 }, `↻ Reroll (${g.rerolls})`),
     ),
   );
-  return modal;
 }
 
 export function chestModal(g: Game, onClose: () => void) {
@@ -504,12 +528,12 @@ export function chestModal(g: Game, onClose: () => void) {
         'div.card',
         { style: { borderColor: '#ffd34d' } },
         h('span.badge.evo', 'EVOLVED'),
-        h('img', { src: skillIcon(id, true), alt: '' }),
+        h('span.info-ico', { title: 'Show stats', onclick: () => showSkillInfo(g, 'weapon', id) }, h('img', { src: skillIcon(id, true), alt: '' }), h('i', 'i')),
         h('div', h('div.name', { style: { color: '#ffd34d' } }, w.evoName), h('div.desc', w.evoDesc)),
       ),
     );
   }
-  for (const o of c.upgrades) items.push(offerCard(g, o, null));
+  for (const o of c.upgrades) items.push(offerCard(g, o, null, o.type === 'weapon' || o.type === 'passive' ? () => showSkillInfo(g, o.type as 'weapon' | 'passive', o.id) : undefined));
   return h(
     'div.modal',
     h('div.chest-box', h('div.lid')),
@@ -547,7 +571,8 @@ export function pauseModal(
     'div.modal',
     h('h2', 'PAUSED'),
     h('div.sub', `${g.chapter.name} · ${fmtTime(g.time)} · ${fmtNum(g.kills)} kills`),
-    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big', g.loadout.maxW, g.loadout.maxP)),
+    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big', g.loadout.maxW, g.loadout.maxP, (kind, id) => showSkillInfo(g, kind, id))),
+    h('div.si-hint', 'Tap an icon to see its stats'),
     h('div', { style: { width: 'min(100%, 380px)' } }, toggle('Sound effects', 'sfx'), toggle('Music', 'music'), controlsPicker(controls, onControls)),
     h(
       'div.actions',

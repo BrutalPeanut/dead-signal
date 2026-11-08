@@ -36,6 +36,7 @@ export function resultsModal(
   powerUp: string | null = null,
   onPowerUp: () => void = onContinue,
   onDoubleAd?: () => Promise<boolean>,
+  onGunInfo?: (id: string) => void,
 ) {
   const title = rw.mode === 'endless' ? (rw.newBest ? 'NEW RECORD' : 'SIGNAL LOST') : rw.mode === 'daily' ? (r.won ? 'CHALLENGE CLEARED' : 'CHALLENGE OVER') : r.won ? 'SECTOR CLEARED' : 'SIGNAL LOST';
   const color = r.won || (rw.mode === 'endless' && rw.newBest) ? '#43ffa4' : '#ff3b5c';
@@ -110,9 +111,9 @@ export function resultsModal(
     rw.newGun
       ? h(
           'div.new-gun',
-          { style: { borderColor: WEAPONS[rw.newGun].color } },
+          { style: { borderColor: WEAPONS[rw.newGun].color, cursor: onGunInfo ? 'pointer' : undefined }, onclick: onGunInfo ? () => onGunInfo(rw.newGun!) : undefined },
           h('img', { src: skillIcon(rw.newGun), alt: '' }),
-          h('div', h('small', 'NEW GUN UNLOCKED'), h('b', { style: { color: WEAPONS[rw.newGun].color } }, WEAPONS[rw.newGun].name), h('span', 'Equipped for your next run · swap any time in the Armory')),
+          h('div', h('small', 'NEW GUN UNLOCKED'), h('b', { style: { color: WEAPONS[rw.newGun].color } }, WEAPONS[rw.newGun].name), h('span', 'Equipped for your next run · swap any time in the Armory'), onGunInfo ? h('span.ng-stats', 'Tap for stats ›') : null),
         )
       : null,
     h(
