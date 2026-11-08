@@ -275,6 +275,10 @@ export class AuthoredHero {
   /** How far the longer legs push the feet below the floor (bone space), added back to the hips. */
   private lift = 0;
   private muzzle!: THREE.Object3D;
+  /** The gun and its muzzle; held in front of the chest by both hands (see hold()). */
+  private gunRoot!: THREE.Object3D;
+  private armR!: Arm;
+  private armL!: Arm;
   private acts: Record<string, THREE.AnimationAction> = {};
   private mode = '';
   private hitT = 0;
@@ -387,8 +391,20 @@ export class AuthoredHero {
       this.glows.push({ obj: this.chest, at: tip.position.clone(), size: 5, color: s.glow });
 
       this.hand = bone(m, 'handslot.r');
+      const arm = (side: 'r' | 'l', sign: 1 | -1): Arm => ({
+        up: bone(m, 'upperarm.' + side),
+        low: bone(m, 'lowerarm.' + side),
+        wrist: bone(m, 'wrist.' + side),
+        hand: bone(m, 'hand.' + side),
+        slot: bone(m, 'handslot.' + side),
+        sign,
+      });
+      this.armR = arm('r', -1);
+      this.armL = arm('l', 1);
+      this.gunRoot = new THREE.Object3D();
       this.muzzle = new THREE.Object3D();
-      this.hand.add(this.muzzle);
+      this.gunRoot.add(this.muzzle);
+      this.hand.add(this.gunRoot);
       this.setGun('pistol');
     });
   }
@@ -425,6 +441,73 @@ export class AuthoredHero {
       this.spine.rotation.y += tw * 0.45;
       this.chest.rotation.y += tw * 0.55;
     }
+    this.hold(aiming, s.aim);
+  }
+
+  /**
+   * Both hands on the gun. The gun rides in front of the chest (so it turns with the upper body
+   * toward the target): low ready when idle or running, raised and level while firing. After the
+   * clips have posed the body, two-bone IK puts the right hand on the grip and the left hand on
+   * the foregrip. Dead or cheering, the gun just stays in the right hand.
+   */
+  private hold(on: boolean, aim: number) {
+    const g = this.gunRoot;
+    if (!g) return;
+    if (!on) {
+      if (g.parent !== this.hand) {
+        this.hand.add(g);
+        g.position.set(0, 0, 0);
+        g.rotation.set(0, 0, 0);
+      }
+      return;
+    }
+    const hp = HOLD[this.gunId] ?? HOLD.pistol;
+    if (g.parent !== this.chest) this.chest.add(g);
+    const k = aim * aim * (3 - 2 * aim);
+    g.position.set(lerp(hp.low[0], hp.high[0], k), lerp(hp.low[1], hp.high[1], k), lerp(hp.low[2], hp.high[2], k));
+    // barrel (+Y) forward along the chest's +Z, grip hanging down; pitched toward the floor at low ready
+    g.rotation.set(Math.PI / 2 + hp.pitch * (1 - k), 0, 0);
+    this.r.model.updateMatrixWorld(true);
+    const gq = g.getWorldQuaternion(_q0);
+    // right hand: its hand slot sits exactly on the gun's grip frame
+    this.reach(this.armR, g.getWorldPosition(_v0), gq);
+    // left hand: on the foregrip (or cupping the pistol grip), palm toward the gun
+    const fore = _v1.set(hp.fore[0], hp.fore[1], hp.fore[2]);
+    g.localToWorld(fore);
+    this.reach(this.armL, fore, _q1.copy(gq).multiply(LEFT_GRIP));
+  }
+
+  /** Two-bone IK: move `arm` so its hand slot lands at `pos` with world rotation `rot`. */
+  private reach(arm: Arm, pos: THREE.Vector3, rot: THREE.Quaternion) {
+    const { up, low, wrist, hand, slot } = arm;
+    // the wrist frame that puts the hand slot where we want it
+    const qHand = _q2.copy(rot).multiply(_q3.copy(slot.quaternion).invert());
+    const pHand = _v2.copy(slot.position).multiplyScalar(hand.getWorldScale(_v3).x).applyQuaternion(qHand).negate().add(pos);
+    const qWrist = _q4.copy(qHand).multiply(_q3.copy(hand.quaternion).invert());
+    const pWrist = _v4.copy(hand.position).multiplyScalar(wrist.getWorldScale(_v3).x).applyQuaternion(qWrist).negate().add(pHand);
+    // elbow: law of cosines in the plane through the shoulder, the target and a pole that keeps
+    // the elbow down and out to the side
+    const a = up.getWorldPosition(_v5);
+    const b = low.getWorldPosition(_v6);
+    const c = wrist.getWorldPosition(_v7);
+    const lab = a.distanceTo(b), lbc = b.distanceTo(c);
+    const dir = _v8.copy(pWrist).sub(a);
+    const d = Math.max(Math.abs(lab - lbc) + 1e-4, Math.min(lab + lbc - 1e-4, dir.length()));
+    dir.normalize();
+    const x = (lab * lab - lbc * lbc + d * d) / (2 * d);
+    const hgt = Math.sqrt(Math.max(0, lab * lab - x * x));
+    const pole = this.chest.localToWorld(_v9.set(0.9 * arm.sign, -0.7, -0.25)).sub(a);
+    pole.addScaledVector(dir, -pole.dot(dir));
+    if (pole.lengthSq() < 1e-8) pole.set(0, -1, 0);
+    pole.normalize();
+    const elbow = _v3.copy(a).addScaledVector(dir, x).addScaledVector(pole, hgt);
+    aimBone(up, b, elbow);
+    up.updateMatrixWorld(true);
+    const target = _v10.copy(a).addScaledVector(dir, d);
+    aimBone(low, wrist.getWorldPosition(_v7), target);
+    low.updateMatrixWorld(true);
+    setWorldQuat(wrist, qWrist);
+    wrist.updateMatrixWorld(true);
   }
 
   private reshape() {
@@ -438,27 +521,14 @@ export class AuthoredHero {
   private hand!: THREE.Object3D;
   private gunMesh: THREE.Object3D | null = null;
   gunId = '';
-  /** Swap the gun in the courier's hand (Pulse Pistol or one of the primary guns). */
+  /** Swap the gun the courier is holding (Pulse Pistol or one of the primary guns). */
   setGun(id: string) {
     if (id === this.gunId) return;
     this.gunId = id;
     this.gunMesh?.parent?.remove(this.gunMesh);
     const [part, muzzle] = detailed(2.2, () => gunModel(id, this.skin.glow));
     this.gunMesh = solid(part);
-    if (id === 'bazooka') {
-      // shoulder-mounted on the chest so it points where the upper body aims, instead of
-      // swinging with the running hand like a club
-      const mount = new THREE.Object3D();
-      mount.position.set(SHOULDER_MOUNT[0], SHOULDER_MOUNT[1], SHOULDER_MOUNT[2]);
-      mount.rotation.x = Math.PI / 2;
-      mount.add(this.gunMesh);
-      this.gunMesh = mount;
-      this.chest.add(mount);
-      mount.add(this.muzzle);
-    } else {
-      this.hand.add(this.gunMesh);
-      this.hand.add(this.muzzle);
-    }
+    this.gunRoot.add(this.gunMesh);
     this.muzzle.position.set(0, muzzle, 0);
     inkOutline(this.gunMesh, HERO_INK());
   }
@@ -473,8 +543,60 @@ export class AuthoredHero {
   }
 }
 
-/** Chest-space spot on the right shoulder where the bazooka rests. */
-const SHOULDER_MOUNT: [number, number, number] = [-0.34, 0.62, 0.05];
+interface Arm {
+  up: THREE.Object3D;
+  low: THREE.Object3D;
+  wrist: THREE.Object3D;
+  hand: THREE.Object3D;
+  slot: THREE.Object3D;
+  /** Chest-space side: -1 right, +1 left. */
+  sign: 1 | -1;
+}
+
+/**
+ * Where each gun is held, in chest space (+Z forward, +Y up, -X the courier's right): the grip
+ * position at low ready and while firing, how far the barrel dips at low ready, and the left
+ * hand's spot in the gun's own space (barrel along +Y, grip side +Z).
+ */
+interface Hold {
+  low: [number, number, number];
+  high: [number, number, number];
+  pitch: number;
+  fore: [number, number, number];
+}
+const HOLD: Record<string, Hold> = {
+  pistol: { low: [-0.1, -0.1, 0.48], high: [-0.04, 0.26, 0.72], pitch: 0.6, fore: [0.06, -0.02, 0.1] },
+  smg: { low: [-0.14, -0.08, 0.42], high: [-0.12, 0.22, 0.5], pitch: 0.45, fore: [0, 0.38, 0.12] },
+  mg: { low: [-0.16, -0.1, 0.38], high: [-0.14, 0.2, 0.44], pitch: 0.4, fore: [0, 0.5, 0.12] },
+  flamer: { low: [-0.14, -0.1, 0.42], high: [-0.12, 0.18, 0.48], pitch: 0.45, fore: [0, 0.42, 0.1] },
+  // on the right shoulder whether firing or not, so it points where the upper body aims
+  bazooka: { low: [-0.3, 0.6, 0.12], high: [-0.3, 0.6, 0.12], pitch: 0, fore: [0, 0.32, 0.15] },
+};
+/** The left hand's slot rotation relative to the gun: palm up under the barrel. */
+const LEFT_GRIP = new THREE.Quaternion();
+
+const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+const _v0 = new THREE.Vector3(), _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3(), _v6 = new THREE.Vector3(), _v7 = new THREE.Vector3();
+const _v8 = new THREE.Vector3(), _v9 = new THREE.Vector3(), _v10 = new THREE.Vector3(), _v11 = new THREE.Vector3();
+const _q0 = new THREE.Quaternion(), _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+const _q4 = new THREE.Quaternion(), _q5 = new THREE.Quaternion(), _q6 = new THREE.Quaternion();
+
+/** Give `o` this world rotation (its parent's world matrix must be current). */
+function setWorldQuat(o: THREE.Object3D, q: THREE.Quaternion) {
+  o.parent!.getWorldQuaternion(_q5);
+  o.quaternion.copy(_q5.invert().multiply(q));
+}
+
+/** Rotate bone `o` (in world space) so the point `from` swings onto `to`. */
+function aimBone(o: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3) {
+  const p = o.getWorldPosition(_v11);
+  const u = _v9.copy(from).sub(p).normalize();
+  const w = _v2.copy(to).sub(p).normalize();
+  if (u.lengthSq() < 1e-10 || w.lengthSq() < 1e-10) return;
+  const d = _q6.setFromUnitVectors(u, w);
+  setWorldQuat(o, d.multiply(o.getWorldQuaternion(_q3)));
+}
 
 /**
  * Hand-held guns in the courier's right-hand slot space: the barrel runs along +Y, the grip
