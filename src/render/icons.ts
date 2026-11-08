@@ -505,8 +505,124 @@ export function skillIcon(id: WeaponId | PassiveId, evolved = false): string {
   return url;
 }
 
+
+/** Gun Mods (the gear slot that boosts whatever gun you carry): attachments, not guns. */
+const MOD_GLYPH: Record<string, (x: C, col: string) => void> = {
+  // Pulse Coil: a barrel coil with glowing windings
+  coil(x, col) {
+    x.beginPath();
+    x.roundRect(12, 24, 40, 16, 6);
+    glyph(x, '#c9d0db');
+    for (let i = 0; i < 4; i++) {
+      x.beginPath();
+      x.roundRect(17 + i * 8.5, 19, 5, 26, 2.5);
+      glyph(x, col);
+    }
+  },
+  // Arc Capacitor: a cell with a lightning bolt
+  capacitor(x, col) {
+    x.beginPath();
+    x.roundRect(19, 12, 26, 42, 7);
+    glyph(x, '#c9d0db');
+    x.beginPath();
+    x.roundRect(26, 7, 12, 6, 2);
+    glyph(x, '#8d97ab');
+    x.beginPath();
+    x.moveTo(35, 17);
+    x.lineTo(25, 35);
+    x.lineTo(32, 35);
+    x.lineTo(28, 49);
+    x.lineTo(40, 29);
+    x.lineTo(33, 29);
+    x.lineTo(37, 17);
+    x.closePath();
+    glyph(x, col);
+  },
+  // Gyro Stabilizer: crossed gimbal rings around a hub
+  gyro(x, col) {
+    for (const a of [0.55, -0.55]) {
+      x.beginPath();
+      x.ellipse(32, 32, 22, 9, a, 0, Math.PI * 2);
+      x.lineWidth = 9;
+      x.strokeStyle = '#0b0d12';
+      x.stroke();
+      x.lineWidth = 4.5;
+      x.strokeStyle = col;
+      x.stroke();
+    }
+    x.beginPath();
+    x.arc(32, 32, 8, 0, Math.PI * 2);
+    glyph(x, '#c9d0db');
+  },
+  // Heavy Primer: one fat cartridge
+  primer(x, col) {
+    x.beginPath();
+    x.roundRect(22, 28, 20, 26, 3);
+    glyph(x, '#d9a441');
+    x.beginPath();
+    x.moveTo(22, 29);
+    x.quadraticCurveTo(32, 2, 42, 29);
+    x.closePath();
+    glyph(x, col);
+    x.beginPath();
+    x.roundRect(20, 50, 24, 5, 2);
+    glyph(x, '#b07d22');
+  },
+  // Tungsten Rounds: three slugs
+  rounds(x, col) {
+    for (let i = 0; i < 3; i++) {
+      const cx = 18 + i * 14;
+      x.beginPath();
+      x.roundRect(cx - 5, 30, 10, 22, 2);
+      glyph(x, '#8d97ab');
+      x.beginPath();
+      x.moveTo(cx - 5, 31);
+      x.quadraticCurveTo(cx, 10, cx + 5, 31);
+      x.closePath();
+      glyph(x, col);
+    }
+  },
+  // Serrated Barrel: a shroud with teeth
+  barrel(x, col) {
+    x.beginPath();
+    x.roundRect(8, 30, 48, 14, 4);
+    glyph(x, '#c9d0db');
+    x.beginPath();
+    x.moveTo(10, 31);
+    for (let i = 0; i < 8; i++) {
+      x.lineTo(13 + i * 5.5, 20);
+      x.lineTo(16 + i * 5.5, 31);
+    }
+    x.closePath();
+    glyph(x, col);
+    x.beginPath();
+    x.arc(52, 37, 4, 0, Math.PI * 2);
+    glyph(x, '#0b0d12');
+  },
+  // Plasma Converter: a chip with a hot core
+  chip(x, col) {
+    x.lineWidth = 3;
+    x.strokeStyle = '#8d97ab';
+    for (let i = 0; i < 3; i++) {
+      const o = 24 + i * 8;
+      x.beginPath();
+      x.moveTo(o, 9);
+      x.lineTo(o, 55);
+      x.moveTo(9, o);
+      x.lineTo(55, o);
+      x.stroke();
+    }
+    x.beginPath();
+    x.roundRect(16, 16, 32, 32, 6);
+    glyph(x, '#2b3346');
+    x.beginPath();
+    x.arc(32, 32, 9, 0, Math.PI * 2);
+    glyph(x, col);
+  },
+};
+
 const SLOT_GLYPHS: Record<Slot, (x: C, col: string) => void> = {
-  weapon: SKILL_GLYPHS.pistol,
+  weapon: MOD_GLYPH.coil,
   visor(x, col) {
     x.beginPath();
     x.arc(32, 34, 20, Math.PI, 0);
@@ -564,13 +680,13 @@ const SLOT_GLYPHS: Record<Slot, (x: C, col: string) => void> = {
 
 /** Per-item accents so two items in the same slot are distinguishable at a glance. */
 const GEAR_GLYPH: Record<string, (x: C, col: string) => void> = {
-  sidearm: SKILL_GLYPHS.pistol,
-  gauntlet: SKILL_GLYPHS.arc,
-  thrower: SKILL_GLYPHS.disc,
-  tube: SKILL_GLYPHS.frag,
-  drillrig: SKILL_GLYPHS.drill,
-  sawhalo: SKILL_GLYPHS.blades,
-  riftcleaver: SKILL_GLYPHS.cleaver,
+  sidearm: MOD_GLYPH.coil,
+  gauntlet: MOD_GLYPH.capacitor,
+  thrower: MOD_GLYPH.gyro,
+  tube: MOD_GLYPH.primer,
+  drillrig: MOD_GLYPH.rounds,
+  sawhalo: MOD_GLYPH.barrel,
+  riftcleaver: MOD_GLYPH.chip,
   optic(x, col) {
     SLOT_GLYPHS.visor(x, col);
     x.beginPath();
