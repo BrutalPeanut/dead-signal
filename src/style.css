@@ -4190,6 +4190,34 @@ button {
   opacity: 1;
 }
 
+/* ✕ on coach tips and the level-up tip: big, obvious, easy to hit with a thumb */
+.tt-x {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin: -4px -6px -4px 2px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0;
+}
+.tt-x:active {
+  background: rgba(255, 255, 255, 0.28);
+}
+.hud .tut.on .tt-x {
+  pointer-events: auto;
+}
+.hud .tut .tt-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .hud .tut.pop {
   animation: tutPop 0.35s ease-out;
 }
@@ -4224,6 +4252,9 @@ button {
 .lvl-tip {
   max-width: 340px;
   margin: 2px auto 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   border-radius: 12px;
   font-size: 13px;

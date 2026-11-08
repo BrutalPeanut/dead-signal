@@ -549,7 +549,8 @@ class App {
               () => {
                 if (g.reroll()) audio.click();
               },
-              this.tutorialOn && g.level <= 3 ? LEVELUP_TIP : undefined,
+              this.tutorialOn && g.level <= 3 && !this.tutorial.levelTipOff ? LEVELUP_TIP : undefined,
+              () => (this.tutorial.levelTipOff = true),
             ),
             key,
           );
