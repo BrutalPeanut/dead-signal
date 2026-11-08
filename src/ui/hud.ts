@@ -2,6 +2,8 @@ import { BOSSES, RUN_LENGTH, starTimes, MAX_PASSIVE_SLOTS, MAX_SKILL_LEVEL, MAX_
 import type { Game } from '../sim/game';
 import { offerDesc, offerTitle } from '../sim/offers';
 import type { Offer, PassiveState, WeaponState } from '../sim/types';
+import type { PassiveId, WeaponId, WeaponLevel } from '../sim/data';
+import { weaponStats, withPartner } from '../sim/weapons';
 import type { Banner } from '../render/fx';
 import { skillIcon } from '../render/icons';
 import { coin, controlsPicker, fmtNum, fmtTime, h } from './dom';
@@ -209,7 +211,16 @@ export class Hud {
  * Two labelled rows of 6 slots: Attack (weapons) and Support (passives). Empty slots are drawn so
  * players always know how many abilities they can still add.
  */
-export function loadoutRows(ws: WeaponState[], ps: PassiveState[], variant: 'hud' | 'big', maxW = MAX_WEAPON_SLOTS, maxP = MAX_PASSIVE_SLOTS) {
+export function loadoutRows(
+  ws: WeaponState[],
+  ps: PassiveState[],
+  variant: 'hud' | 'big',
+  maxW = MAX_WEAPON_SLOTS,
+  maxP = MAX_PASSIVE_SLOTS,
+  onTap?: (kind: 'weapon' | 'passive', id: string) => void,
+) {
+  const tap = (kind: 'weapon' | 'passive', id: string) => (onTap ? { onclick: () => onTap(kind, id), role: 'button', title: 'Show stats' } : {});
+  const cls = onTap ? 'div.sk.tap' : 'div.sk';
   const row = (kind: 'atk' | 'sup', label: string, filled: HTMLElement[]) => {
     const max = kind === 'atk' ? maxW : maxP;
     const slots: HTMLElement[] = [...filled];
@@ -224,12 +235,12 @@ export function loadoutRows(ws: WeaponState[], ps: PassiveState[], variant: 'hud
     row(
       'atk',
       'Attack',
-      ws.map((w) => h('div.sk', h('img', { src: skillIcon(w.id, w.evolved), alt: WEAPONS[w.id].name }), h('b', w.evolved ? '★' : w.level))),
+      ws.map((w) => h(cls, tap('weapon', w.id), h('img', { src: skillIcon(w.id, w.evolved), alt: WEAPONS[w.id].name }), h('b', w.evolved ? '★' : w.level))),
     ),
     row(
       'sup',
       'Support',
-      ps.map((p) => h('div.sk', h('img', { src: skillIcon(p.id), alt: PASSIVES[p.id].name }), h('b', p.level))),
+      ps.map((p) => h(cls, tap('passive', p.id), h('img', { src: skillIcon(p.id), alt: PASSIVES[p.id].name }), h('b', p.level))),
     ),
   ];
 }
@@ -247,7 +258,7 @@ function offerIcon(o: Offer) {
   return skillIcon(o.type === 'heal' ? 'medkit' : 'magnet');
 }
 
-export function offerCard(g: Game, o: Offer, onPick: (() => void) | null) {
+export function offerCard(g: Game, o: Offer, onPick: (() => void) | null, onInfo?: () => void) {
   let badge: HTMLElement | null = null;
   if (o.type === 'weapon' && o.isNew) badge = h('span.badge', 'NEW');
   if (o.type === 'passive') {
@@ -266,9 +277,129 @@ export function offerCard(g: Game, o: Offer, onPick: (() => void) | null) {
     onPick ? 'button.card' : 'div.card',
     { onclick: onPick ?? undefined, style: { borderColor: col + '88' } },
     badge,
-    h('img', { src: offerIcon(o), alt: '' }),
+    onInfo && (o.type === 'weapon' || o.type === 'passive')
+      ? h(
+          'span.info-ico',
+          {
+            title: 'Show stats',
+            // the card itself is the pick button: tapping the icon only opens the stats
+            onclick: (e: Event) => {
+              e.stopPropagation();
+              onInfo();
+            },
+          },
+          h('img', { src: offerIcon(o), alt: '' }),
+          h('i', 'i'),
+        )
+      : h('img', { src: offerIcon(o), alt: '' }),
     h('div', h('div.ctag-row', ctag(g, o)), h('div.name', offerTitle(o)), h('div.desc', offerDesc(o)), combo(g, o), lvl),
   );
+}
+
+// ------------------------------------------------------------------ skill stats
+
+const pct = (v: number) => `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%`;
+/** Per-level effect of each support item, for "now → after" lines. */
+const PASSIVE_FX: Partial<Record<PassiveId, [number, string]>> = {
+  chip: [0.12, 'Damage'],
+  plating: [-0.07, 'Damage taken'],
+  capacitor: [-0.07, 'Cooldowns'],
+  fuel: [0.1, 'Area'],
+  medkit: [0.12, 'Max HP'],
+  magnet: [0.3, 'Pickup range'],
+  gel: [0.12, 'Duration'],
+  boots: [0.08, 'Move speed'],
+  extmag: [0.08, 'Damage (all weapons)'],
+  injector: [0.08, 'Damage (all weapons)'],
+  beltfeed: [0.08, 'Damage (all weapons)'],
+  warhead: [0.08, 'Damage (all weapons)'],
+};
+
+/** One weapon level's numbers as they'd play in this run (your ATK, supports and partner). */
+function weaponNumbers(g: Game, id: WeaponId, level: number, evolved: boolean) {
+  const w: WeaponState = { id, level, evolved, timer: 0 } as WeaponState;
+  const s: WeaponLevel = withPartner(g, w, weaponStats(w));
+  const rows: [string, string][] = [
+    ['Damage per hit', fmtNum(s.dmg * g.base.atk * g.dmgMul)],
+    ['Attacks every', `${(s.cd * g.cdMul).toFixed(2)}s`],
+  ];
+  if (s.count > 1 || level > 1) rows.push([id === 'blades' ? 'Blades' : 'Projectiles', String(s.count)]);
+  if (s.pierce > 0) rows.push(['Pierce', s.pierce >= 999 ? 'Everything' : String(s.pierce)]);
+  // for bullet guns `area` is the bullet's hit size and `dur` its flight time: not worth showing
+  const bullet = id === 'pistol' || id === 'smg' || id === 'mg';
+  if (!bullet && s.area > 0) rows.push(['Area', String(Math.round(s.area * g.areaMul))]);
+  if (!bullet && id !== 'bazooka' && s.dur > 0 && s.dur < 60) rows.push(['Duration', `${(s.dur * g.durMul).toFixed(1)}s`]);
+  return rows;
+}
+
+/**
+ * Stats sheet for a weapon or support item, opened from the level-up screen (tap a loadout icon,
+ * or the icon on an upgrade card). Shows the real numbers for this run and, when `toLevel` is
+ * given, what picking the upgrade would change. Closing it never picks anything.
+ */
+export function skillInfo(g: Game, kind: 'weapon' | 'passive', id: string, toLevel?: number) {
+  const close = () => sheet.remove();
+  let body: HTMLElement[];
+  let title: string;
+  let color: string;
+  let icon: string;
+  if (kind === 'weapon') {
+    const d = WEAPONS[id as WeaponId];
+    const have = g.weapons.find((w) => w.id === id);
+    const evo = !!have?.evolved;
+    title = evo ? d.evoName : d.name;
+    color = d.color;
+    icon = skillIcon(d.id, evo);
+    const now = have ? weaponNumbers(g, d.id, have.level, evo) : null;
+    const next = toLevel && !evo ? weaponNumbers(g, d.id, toLevel, false) : null;
+    const head = now && next ? ['', `Lv ${have!.level}`, `Lv ${toLevel}`] : now ? ['', evo ? 'Evolved' : `Lv ${have!.level}`] : ['', `Lv ${toLevel ?? 1}`];
+    const cols = now && next ? [now, next] : [now ?? next ?? weaponNumbers(g, d.id, 1, false)];
+    // match rows by stat name: a level can add a stat (pierce, more projectiles) the other lacks
+    const labels = [...new Set(cols.flatMap((c) => c.map(([l]) => l)))];
+    const rows = labels.map((label) => {
+      const vals = cols.map((c) => c.find(([l]) => l === label)?.[1] ?? '—');
+      const changed = vals.length > 1 && vals[0] !== vals[1];
+      return h('tr', h('th', label), vals.map((v, j) => h(j === 1 && changed ? 'td.up' : 'td', v)));
+    });
+    body = [
+      h('p.si-desc', evo ? d.evoDesc : d.desc),
+      h('table.si-table', h('tr.si-head', head.map((x) => h('td', x))), rows),
+      ...(toLevel && !evo && d.levelText[toLevel - 1] ? [h('p.si-next', `Lv ${toLevel}: ${d.levelText[toLevel - 1]}`)] : []),
+      evo
+        ? h('p.si-evo', '★ Fully evolved')
+        : h('p.si-evo', `🔗 Evolves into ${d.evoName} at Lv ${MAX_SKILL_LEVEL} while you hold ${PASSIVES[d.partner].name}. ${d.evoDesc}`),
+    ];
+  } else {
+    const d = PASSIVES[id as PassiveId];
+    const lv = g.passives.find((p) => p.id === id)?.level ?? 0;
+    title = d.name;
+    color = d.color;
+    icon = skillIcon(d.id);
+    const fx = PASSIVE_FX[d.id];
+    const after = toLevel ?? lv;
+    body = [
+      h('p.si-desc', `Each level: ${d.desc}`),
+      h(
+        'table.si-table',
+        h('tr.si-head', h('td', ''), h('td', `Lv ${lv}`), toLevel ? h('td', `Lv ${after}`) : null),
+        fx ? h('tr', h('th', fx[1]), h('td', pct(fx[0] * lv)), toLevel ? h('td.up', pct(fx[0] * after)) : null) : null,
+        h('tr', h('th', 'Level'), h('td', `${lv}/${MAX_SKILL_LEVEL}`), toLevel ? h('td.up', `${after}/${MAX_SKILL_LEVEL}`) : null),
+      ),
+      h('p.si-evo', `🔗 Partner of ${WEAPONS[d.partnerOf].name}: hold this when it hits Lv ${MAX_SKILL_LEVEL} to evolve it into ${WEAPONS[d.partnerOf].evoName}.`),
+    ];
+  }
+  const sheet: HTMLElement = h(
+    'div.si-wrap',
+    { onclick: (e: Event) => e.target === sheet && close() },
+    h(
+      'div.si',
+      { style: { borderColor: color + 'aa' } },
+      h('div.si-top', h('img', { src: icon, alt: '' }), h('b', { style: { color } }, title), h('button.tt-x', { 'aria-label': 'Close', onclick: close }, '✕')),
+      body,
+      h('button.btn.small', { style: { marginTop: '10px', width: '100%' }, onclick: close }, 'Back to upgrades'),
+    ),
+  );
+  return sheet;
 }
 
 /**
@@ -323,8 +454,12 @@ function ctag(g: Game, o: Offer) {
 }
 
 export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string, onCloseTip?: () => void) {
-  const cards = h('div.cards', g.offers.map((o, i) => offerCard(g, o, () => onPick(i))));
-  return h(
+  const info = (kind: 'weapon' | 'passive', id: string, toLevel?: number) => modal.append(skillInfo(g, kind, id, toLevel));
+  const cards = h(
+    'div.cards',
+    g.offers.map((o, i) => offerCard(g, o, () => onPick(i), o.type === 'weapon' || o.type === 'passive' ? () => info(o.type as 'weapon' | 'passive', o.id, o.level) : undefined)),
+  );
+  const modal: HTMLElement = h(
     'div.modal',
     h('h2', { style: { color: '#5ef2ff', textShadow: '0 0 20px rgba(94,242,255,.6)' } }, 'LEVEL UP'),
     tip
@@ -348,13 +483,15 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
           return box;
         })()
       : h('div.sub', 'Choose one upgrade'),
-    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big', g.loadout.maxW, g.loadout.maxP)),
+    h('div.loadout-big', loadoutRows(g.weapons, g.passives, 'big', g.loadout.maxW, g.loadout.maxP, (kind, id) => info(kind, id))),
+    h('div.si-hint', 'Tap an icon to see its stats'),
     cards,
     h(
       'div.actions',
       h('button.btn.small', { onclick: onReroll, disabled: g.rerolls <= 0 }, `↻ Reroll (${g.rerolls})`),
     ),
   );
+  return modal;
 }
 
 export function chestModal(g: Game, onClose: () => void) {
