@@ -69,6 +69,9 @@ export interface RunResult {
   killedByBoss?: string;
 }
 
+/** Most ad rerolls a player can take in one run. */
+export const AD_REROLL_MAX = 2;
+
 export class Game {
   readonly rng: Rng;
   readonly chapter: ChapterDef;
@@ -1135,6 +1138,17 @@ export class Game {
   reroll(): boolean {
     if (this.state !== 'levelup' || this.rerolls <= 0) return false;
     this.rerolls--;
+    this.offers = buildOffers(this.rng, this.weapons, this.passives, 3, this.loadout);
+    return true;
+  }
+
+  /** Rerolls bought with a rewarded ad this run (the app caps them at AD_REROLL_MAX). */
+  adRerolls = 0;
+
+  /** A free reroll paid for by watching an ad: same as reroll(), without spending one. */
+  adReroll(): boolean {
+    if (this.state !== 'levelup' || this.adRerolls >= AD_REROLL_MAX) return false;
+    this.adRerolls++;
     this.offers = buildOffers(this.rng, this.weapons, this.passives, 3, this.loadout);
     return true;
   }

@@ -1,5 +1,5 @@
 import { BOSSES, RUN_LENGTH, starTimes, MAX_PASSIVE_SLOTS, MAX_SKILL_LEVEL, MAX_WEAPON_SLOTS, PASSIVES, WEAPONS } from '../sim/data';
-import type { Game } from '../sim/game';
+import { AD_REROLL_MAX, type Game } from '../sim/game';
 import { offerDesc, offerTitle } from '../sim/offers';
 import type { Offer, PassiveState, WeaponState } from '../sim/types';
 import type { PassiveId, WeaponId, WeaponLevel } from '../sim/data';
@@ -478,7 +478,19 @@ function ctag(g: Game, o: Offer) {
   return h('span.ctag.misc', 'BONUS');
 }
 
-export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string, onCloseTip?: () => void) {
+export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string, onCloseTip?: () => void, onAdReroll?: () => Promise<boolean>) {
+  // out of rerolls: offer one for a rewarded ad (opt-in, the run is already paused here)
+  const adLeft = AD_REROLL_MAX - g.adRerolls;
+  let adBtn: HTMLButtonElement | null = null;
+  if (onAdReroll && g.rerolls <= 0 && adLeft > 0) {
+    adBtn = h('button.btn.small.ad-btn', h('span.ad-play', '▶'), `Reroll · watch ad (${adLeft} left)`) as HTMLButtonElement;
+    adBtn.onclick = () => {
+      adBtn!.disabled = true;
+      onAdReroll().then((ok) => {
+        if (!ok) adBtn!.disabled = false;
+      });
+    };
+  }
   const info = (kind: 'weapon' | 'passive', id: string, toLevel?: number) => showSkillInfo(g, kind, id, toLevel);
   const cards = h(
     'div.cards',
@@ -513,7 +525,7 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
     cards,
     h(
       'div.actions',
-      h('button.btn.small', { onclick: onReroll, disabled: g.rerolls <= 0 }, `↻ Reroll (${g.rerolls})`),
+      adBtn ?? h('button.btn.small', { onclick: onReroll, disabled: g.rerolls <= 0 }, `↻ Reroll (${g.rerolls})`),
     ),
   );
 }
