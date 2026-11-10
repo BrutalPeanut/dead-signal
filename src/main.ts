@@ -171,7 +171,10 @@ class App {
     window.addEventListener('orientationchange', () => setTimeout(() => this.renderer.resize(), 250));
     window.visualViewport?.addEventListener('resize', () => this.renderer.resize());
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.mode === 'run') this.pause();
+      if (document.hidden && this.mode === 'run') {
+        this.stashRun();
+        this.pause();
+      }
     });
     // Browsers require a gesture before audio can start.
     const unlock = () => {
@@ -185,6 +188,7 @@ class App {
     });
 
     const pt = playtestSector();
+    const recovered = pt === null && this.recoverRun();
     // A brand-new player goes straight into the training run: no story screen to read, no lobby to
     // figure out. The run waits for their first move, and the in-run tips teach the rest. Anyone
     // who has never finished a run gets the same treatment on their next visit.
@@ -202,7 +206,7 @@ class App {
       }, 250);
     } else {
       this.profile.data.seenIntro = true;
-      setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
+      if (!recovered) setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
     }
     if (pt !== null) setTimeout(() => this.startRun(pt, 'campaign'), 400);
     // the page's loading splash goes once the game can draw
@@ -259,6 +263,33 @@ class App {
   runMode: RunMode = 'campaign';
   tutorial = new Tutorial();
   tutorialOn = false;
+  private stashAt = 0;
+
+  /** Keep a copy of the run so far, so closing the tab mid-run doesn't lose what was earned. */
+  private stashRun() {
+    this.stashAt = performance.now();
+    const g = this.game;
+    if (this.mode !== 'run' || g.state === 'won' || g.state === 'dead' || this.modalFor === 'results') return;
+    this.profile.stashRun({ sector: this.sector, mode: this.runMode, r: { ...g.result(), won: false, killedBy: undefined, killedByBoss: undefined }, at: Date.now() });
+  }
+
+  /** Last session ended mid-run: pay out what that run had earned and show its results. */
+  private recoverRun(): boolean {
+    const st = this.profile.takeStashedRun();
+    if (!st) return false;
+    const rw = st.mode === 'daily' ? this.profile.applyDaily(st.r) : st.mode === 'endless' ? this.profile.applyEndless(st.sector, st.r) : this.profile.applyRun(st.sector, st.r);
+    this.stats.track('run_end', { s: st.sector, m: st.mode, d: { won: false, time: Math.round(st.r.time), level: st.r.level, kills: st.r.kills, score: st.r.score ?? 0, interrupted: true } });
+    const where = st.mode === 'campaign' ? `Sector ${st.sector + 1} · ${getChapter(st.sector).name}` : st.mode === 'daily' ? 'Daily Challenge' : 'Endless';
+    setTimeout(() => {
+      if (this.mode !== 'hub' || this.modalFor) return;
+      this.showModal(
+        resultsModal(st.r, rw, `${where} · run interrupted, rewards saved`, () => this.closeModal(), this.profile.coach()?.label ?? null, () => this.closeModal(), undefined, (id) => showSkillInfo(lobbyCtx(this.profile.baseStats().atk), 'weapon', id, undefined, true)),
+        'results',
+      );
+    }, 500);
+    return true;
+  }
+
   /** First-ever run: show the one-line story once the player starts moving. */
   private storyPending = false;
 
@@ -298,6 +329,8 @@ class App {
       if (this.profile.rank()) sub += ` · Ascension ${romanRank(this.profile.rank())}`;
       this.hud.startRun(this.profile.data.best[sector] ?? 0, 'campaign', 0, this.game.runLength);
     }
+    this.profile.stashRun(null);
+    this.stashAt = performance.now();
     this.speedOk = !adsOn() || this.profile.speedActive();
     this.hud.setSpeed(this.speed, !this.tutorialOn, this.speedOk);
     this.game.adRevive = adsOn();
@@ -514,6 +547,7 @@ class App {
   }
 
   private finishRun() {
+    this.profile.stashRun(null);
     const g = this.game;
     if (g.state !== 'won') g.state = 'dead';
     const r = g.result();
@@ -826,6 +860,7 @@ class App {
     }
     if (this.mode === 'run') {
       this.hud.update(this.game, this.renderer.fx.banners);
+      if (now - this.stashAt > 5000) this.stashRun();
       if (this.storyPending && !this.game.waitingForMove) {
         this.storyPending = false;
         this.renderer.fx.banners.push({ text: '03:14 AM', sub: 'The signal changed everyone. Not you.', color: '#ff7ae6', t: 3.2 });
