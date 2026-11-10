@@ -14,7 +14,8 @@
     "builds": "vite-node scripts/melee.ts",
     "pacing": "vite-node scripts/pacing.ts",
     "ascension": "vite-node scripts/ascension.ts",
-    "stats": "node scripts/stats.mjs"
+    "stats": "node scripts/stats.mjs",
+    "build:crazygames": "tsc --noEmit && VITE_PORTAL=crazygames vite build && node scripts/portal-zip.mjs crazygames"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",
