@@ -43,6 +43,7 @@ a run on the autopilot.
 - `?fresh`: brand-new player every load. `?profile=name`: separate named save.
 - `?ads=demo|test|off`: fake ads / Google test ads / no ads. `?nostats`, `?nosync`.
 - `?utm_source=…`: tags a launch channel in stats.
+- `?shop=1`: show the web shop before Stripe is live (test card 4242 4242 4242 4242).
 
 ## Layout
 
@@ -57,12 +58,19 @@ a run on the autopilot.
 - `src/ads/ads.ts`: rewarded-ad providers. `LIVE_ADS = false` until Google approves AdSense +
   H5 Games Ads; then flip it in a PR. With ads on, `Profile.adEcon` trims base gold/scrap to
   `FREE_ECON` (85%); ads off = no trim.
+- Web shop (Stripe Checkout): `src/meta/shop.ts` (catalog + `applyPurchases`), `src/net/shop.ts`,
+  `supabase/functions/shop-checkout` (prices live here; creates the Checkout session) and
+  `supabase/functions/stripe-webhook` (records paid checkouts/refunds in `public.purchases`).
+  The game picks purchases up with the `shop_claim` RPC. The shop shows itself only when the
+  server has a **live** Stripe key (`?shop=1` previews it with a test key); off in portal builds.
+  Skip Ads is only sold while ads are on. Sales report: `stats.sales`. Terms/refunds:
+  `public/legal.html` (keep prices in sync).
 - `src/main.ts`: app loop, run lifecycle, stats wiring, test hooks (`window.__ds`), and the ad
   recorder hook (`filmFrame`).
 - `supabase/migrations/`: SQL for the `dead-signal` Supabase project (tables are locked; clients
   only call RPCs). Reporting views live in the `stats` schema (`stats.retention`, `stats.sectors`,
   `stats.funnel`, `stats.ads`, `stats.playtime`, `stats.exits`, `stats.features`, `stats.perf`,
-  `stats.sources`, `stats.run_quits`, `stats.first_session`, `stats.traffic`). Views count only
+  `stats.sources`, `stats.run_quits`, `stats.first_session`, `stats.traffic`, `stats.sales`). Views count only
   real people (`stats.humans`: sent a first tap/key, started a run, or came from a touch
   device); crawlers that load the page are in `stats.traffic` only.
 - `src/portal.ts`: web-portal editions. `npm run build:crazygames` builds the same game with

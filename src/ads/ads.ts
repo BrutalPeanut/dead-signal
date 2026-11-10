@@ -284,6 +284,11 @@ function pick(): AdProvider {
   return new NoAds();
 }
 
+/** Skip Ads purchase (set by the game from the save): rewarded ads pay out without being shown. */
+export const adSkip = { on: () => false };
+/** Verb for ad buttons: "Watch ad" normally, "Free" for Skip Ads owners. */
+export const adWord = () => (adSkip.on() ? 'Free' : 'Watch ad');
+
 /** Listeners told about every rewarded ad (the stats module counts starts and completions). */
 export const adListeners: ((p: Placement, ok: boolean) => void)[] = [];
 const provider = pick();
@@ -291,6 +296,7 @@ export const ads: AdProvider = {
   name: provider.name,
   isReady: (p) => provider.isReady(p),
   showRewarded: async (p) => {
+    if (adSkip.on()) return true;
     const ok = await provider.showRewarded(p);
     for (const l of adListeners) l(p, ok);
     return ok;

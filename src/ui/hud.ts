@@ -1,3 +1,4 @@
+import { adSkip, adWord } from '../ads/ads';
 import { BOSSES, RUN_LENGTH, starTimes, MAX_PASSIVE_SLOTS, MAX_SKILL_LEVEL, MAX_WEAPON_SLOTS, PASSIVES, WEAPONS } from '../sim/data';
 import { AD_REROLL_MAX, type Game } from '../sim/game';
 import { offerDesc, offerTitle } from '../sim/offers';
@@ -483,7 +484,7 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
   const adLeft = AD_REROLL_MAX - g.adRerolls;
   let adBtn: HTMLButtonElement | null = null;
   if (onAdReroll && g.rerolls <= 0 && adLeft > 0) {
-    adBtn = h('button.btn.small.ad-btn', h('span.ad-play', '▶'), `Reroll · watch ad (${adLeft} left)`) as HTMLButtonElement;
+    adBtn = h('button.btn.small.ad-btn', h('span.ad-play', '▶'), `Reroll · ${adWord().toLowerCase()} (${adLeft} left)`) as HTMLButtonElement;
     adBtn.onclick = () => {
       adBtn!.disabled = true;
       onAdReroll().then((ok) => {
@@ -600,11 +601,11 @@ export function reviveModal(onYes: () => void, onNo: () => void, left: number, o
   return h(
     'div.modal',
     h('h2', { style: { color: '#43ffa4' } }, 'SECOND WIND'),
-    h('div.sub', byAd ? 'Watch a short ad to get back up with full HP and an EMP blast.' : `Get back up with full HP and an EMP blast. (${left} left)`),
+    h('div.sub', byAd && !adSkip.on() ? 'Watch a short ad to get back up with full HP and an EMP blast.' : `Get back up with full HP and an EMP blast. (${left} left)`),
     h(
       'div.actions',
       h('button.btn', { onclick: onNo }, 'Give up'),
-      byAd ? h('button.btn.cyan.big.ad-btn', { onclick: onAd }, h('span.ad-play', '▶'), 'Watch ad · Revive') : h('button.btn.cyan.big', { onclick: onYes }, 'Revive'),
+      byAd ? h('button.btn.cyan.big.ad-btn', { onclick: onAd }, h('span.ad-play', '▶'), `${adWord()} · Revive`) : h('button.btn.cyan.big', { onclick: onYes }, 'Revive'),
     ),
   );
 }
