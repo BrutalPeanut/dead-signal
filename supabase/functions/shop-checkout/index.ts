@@ -9,11 +9,17 @@
 // Prices live here (the server decides what is charged); tests/shop.test.ts keeps the game's
 // displayed prices in sync with this table.
 
-const PRODUCTS: Record<string, { name: string; desc: string; amount: number; once: 'ever' | 'season' }> = {
-  starter: { name: 'Starter Pack', desc: 'Epic gun mod, 10 crate keys, 3,000 gold and 100 scrap. One per player.', amount: 299, once: 'ever' },
-  pass: { name: 'Signal Pass+', desc: 'Unlocks the premium reward track for the current season.', amount: 499, once: 'season' },
-  adfree: { name: 'Skip Ads', desc: 'Every ad reward in Dead Signal, instantly, without watching the ad. Forever.', amount: 799, once: 'ever' },
+// Stripe Managed Payments (Stripe is merchant of record and handles VAT/sales tax) needs a tax
+// code per product: video game content with permanent rights, or limited rights for the season pass.
+const GAME_PERMANENT = 'txcd_10201000';
+const GAME_LIMITED = 'txcd_10201001';
+const PRODUCTS: Record<string, { name: string; desc: string; amount: number; once: 'ever' | 'season'; tax: string }> = {
+  starter: { name: 'Starter Pack', desc: 'Epic gun mod, 10 crate keys, 3,000 gold and 100 scrap. One per player.', amount: 299, once: 'ever', tax: GAME_PERMANENT },
+  pass: { name: 'Signal Pass+', desc: 'Unlocks the premium reward track for the current season.', amount: 499, once: 'season', tax: GAME_LIMITED },
+  adfree: { name: 'Skip Ads', desc: 'Every ad reward in Dead Signal, instantly, without watching the ad. Forever.', amount: 799, once: 'ever', tax: GAME_PERMANENT },
 };
+// pinned so an account-level API upgrade can't change request/response shapes under us
+const STRIPE_VERSION = '2026-04-22.dahlia';
 
 // same season clock as the game (src/meta/pass.ts): 30-day seasons from Oct 1 2026
 const EPOCH = Date.UTC(2026, 9, 1);
@@ -72,6 +78,10 @@ Deno.serve(async (req) => {
     'line_items[0][price_data][unit_amount]': String(product.amount),
     'line_items[0][price_data][product_data][name]': `Dead Signal: ${product.name}`,
     'line_items[0][price_data][product_data][description]': product.desc,
+    'line_items[0][price_data][product_data][tax_code]': product.tax,
+    // the price players see is what they pay: tax is included, not added at checkout
+    'line_items[0][price_data][tax_behavior]': 'inclusive',
+    'managed_payments[enabled]': 'true',
     'metadata[product]': body.product!,
     'metadata[season]': String(s),
     'payment_intent_data[metadata][product]': body.product!,
@@ -80,7 +90,7 @@ Deno.serve(async (req) => {
   });
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Stripe-Version': STRIPE_VERSION },
     body: form,
   });
   const out = await res.json();
