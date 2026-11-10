@@ -20,7 +20,7 @@ const AD_CLIENT = 'ca-pub-6900407641110608';
 export const adAudio = { mute: () => {}, unmute: () => {} };
 import { h, toast } from '../ui/dom';
 
-export type Placement = 'revive' | 'double' | 'key' | 'speed' | 'relay' | 'daily' | 'ascend';
+export type Placement = 'revive' | 'double' | 'key' | 'speed' | 'relay' | 'daily' | 'ascend' | 'reroll';
 const AD_REWARD: Record<Placement, string> = {
   revive: 'get back up',
   double: 'double your run rewards',
@@ -29,6 +29,7 @@ const AD_REWARD: Record<Placement, string> = {
   relay: 'double your relay collection',
   daily: 'double today’s sign-in reward',
   ascend: 'bonus Signal Cores',
+  reroll: 'a fresh set of upgrades',
 };
 
 export interface AdProvider {

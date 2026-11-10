@@ -70,3 +70,23 @@ describe('ad economy', () => {
     expect(p.ascendBonus()).toBe(0);
   });
 });
+
+import { Game, AD_REROLL_MAX } from '../src/sim/game';
+import { getChapter } from '../src/sim/chapters';
+import { defaultMods } from '../src/sim/modes';
+
+describe('ad reroll', () => {
+  it('rerolls the level-up without spending a reroll, capped per run', () => {
+    const p = mk(true);
+    const g = new Game(getChapter(3), p.baseStats(), 5, defaultMods());
+    expect(g.adReroll()).toBe(false); // not on a level-up
+    g.pendingLevels = 1;
+    (g as unknown as { openLevelUp(): void }).openLevelUp();
+    const rerolls = g.rerolls;
+    for (let i = 0; i < AD_REROLL_MAX; i++) expect(g.adReroll()).toBe(true);
+    expect(g.adReroll()).toBe(false);
+    expect(g.rerolls).toBe(rerolls);
+    expect(g.offers.length).toBeGreaterThan(0);
+    expect(g.state).toBe('levelup');
+  });
+});

@@ -10,8 +10,10 @@ https://deadsignal.info. Owner: Brian (BShack).
   auto-deploys to GitHub Pages (`.github/workflows/deploy.yml` runs `npm test` and `npm run build`
   first; CI does not run on PRs, so run both locally before merging).
 - **Don't break gameplay.** Test balance and progression changes with the bots (below), not by feel.
-- **Ads must never interrupt gameplay.** Rewarded, opt-in, lobby/results screens only. No
-  interstitials, no banners, nothing mid-run.
+- **Ads must never interrupt gameplay.** Rewarded and opt-in only, on screens where the run is
+  already stopped (lobby, results, and the two in-run pauses Brian approved: the revive offer and
+  the level-up reroll when out of rerolls, max 2 per run). No interstitials, no banners, no ads
+  between runs, nothing while the player is moving.
 - **Always give Brian the play link** (https://deadsignal.info, or a `?playtest=N` link) when
   reporting work.
 - Players' saves are sacred: any save-format change needs a migration in `normalizeSave`

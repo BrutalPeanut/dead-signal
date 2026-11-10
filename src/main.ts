@@ -695,7 +695,7 @@ class App {
     if (this.paused) return;
     switch (g.state) {
       case 'levelup': {
-        const key = 'lvl' + g.level + ':' + g.offers.map((o) => (o as any).id ?? o.type).join() + g.rerolls;
+        const key = 'lvl' + g.level + ':' + g.offers.map((o) => (o as any).id ?? o.type).join() + g.rerolls + ':' + g.adRerolls;
         if (this.modalFor !== key) {
           this.input.release();
           this.showModal(
@@ -712,6 +712,13 @@ class App {
               },
               this.tutorialOn && g.level <= 3 && !this.tutorial.levelTipOff ? LEVELUP_TIP : undefined,
               () => (this.tutorial.levelTipOff = true),
+              adsOn() && !this.tutorialOn
+                ? () =>
+                    ads.showRewarded('reroll').then((ok) => {
+                      if (ok && g.adReroll()) audio.click();
+                      return ok;
+                    })
+                : undefined,
             ),
             key,
           );
