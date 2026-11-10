@@ -152,21 +152,6 @@ export function resultsModal(
   );
 }
 
-export function introModal(onGo: () => void) {
-  return h(
-    'div.modal',
-    h('h2', { style: { color: '#ff7ae6' } }, '03:14 AM'),
-    h(
-      'div.intro',
-      h('p', 'A broadcast went out on every frequency at once. Everyone who heard it ', h('span.hl', 'changed'), '.'),
-      h('p', "You're a courier. Your rig was tuned to a dead channel — so you're still you."),
-      h('p', 'Move with one thumb. Your weapons fire on their own. Grab the green shards to level up, and survive five minutes per sector.'),
-      h('p', 'Max a weapon and pick up its partner gear to ', h('span.hl', 'evolve'), ' it from a chest.'),
-    ),
-    h('div.actions', h('button.btn.primary.big', { onclick: onGo }, "Let's go")),
-  );
-}
-
 export function settingsModal(
   s: { sfx: boolean; music: boolean; haptics: boolean; controls?: string },
   onToggle: (k: 'sfx' | 'music' | 'haptics') => void,
