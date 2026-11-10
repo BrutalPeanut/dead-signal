@@ -37,6 +37,14 @@ export interface CoachAction {
 }
 
 export const KEY = 'deadsignal.save.v1';
+
+/** A run that was still going when the page closed. */
+export interface StashedRun {
+  sector: number;
+  mode: 'campaign' | 'daily' | 'endless';
+  r: RunResult;
+  at: number;
+}
 export const RELAY_CAP_H = 8;
 /** Share of base gold and scrap a player gets without watching ads (only when ads exist). */
 export const FREE_ECON = 0.85;
@@ -239,6 +247,31 @@ export class Profile {
       this.storage?.setItem(k, v);
     } catch {
       /* storage full / private mode */
+    }
+  }
+
+  /**
+   * A run in progress, kept outside the main save so a closed tab, a phone call or the browser
+   * dropping the page doesn't throw away what the player earned. The app writes it every few
+   * seconds mid-run, clears it when the run ends normally, and pays it out on the next launch.
+   */
+  stashRun(run: StashedRun | null) {
+    this.put(this.key + ':run', run ? JSON.stringify(run) : '');
+  }
+
+  /** The interrupted run left by the last session (if any); reading it clears it. */
+  takeStashedRun(now = Date.now()): StashedRun | null {
+    const raw = this.get(this.key + ':run');
+    if (!raw) return null;
+    this.put(this.key + ':run', '');
+    try {
+      const v = JSON.parse(raw) as StashedRun;
+      const ok = v && typeof v.sector === 'number' && v.sector >= 0 && v.sector < CHAPTER_COUNT && ['campaign', 'daily', 'endless'].includes(v.mode) && v.r && typeof v.r.time === 'number' && typeof v.r.kills === 'number';
+      // stale after a week; a run that had barely begun isn't worth a results screen
+      if (!ok || now - v.at > 7 * 864e5 || v.r.time < 20) return null;
+      return { ...v, r: { ...v.r, won: false } };
+    } catch {
+      return null;
     }
   }
 
