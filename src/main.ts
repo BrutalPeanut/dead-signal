@@ -24,7 +24,9 @@ import type { BaseStats, FxEvent } from './sim/types';
 import { haptic, setHaptics, toast, fmtNum } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
 import { LEVELUP_TIP, Tutorial } from './ui/tutorial';
-import { adAudio, adListeners, ads, adsOn } from './ads/ads';
+import { adAudio, adListeners, adSkip, ads, adsOn } from './ads/ads';
+import { PRODUCTS, applyPurchases, type Granted, type ProductId } from './meta/shop';
+import { claimPurchases, shopStatus, startCheckout } from './net/shop';
 adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
 import { Stats, browserSaysNo } from './net/stats';
@@ -254,6 +256,7 @@ class App {
       );
     }
     this.trackSession();
+    this.initShop();
     // cloud save: take a further-along save from another device (only between runs), else back up
     this.sync.onAdopted = () => this.reloadSynced();
     // ask the browser not to evict our storage under pressure (Chrome/Android honor this)
@@ -308,6 +311,82 @@ class App {
   }
 
   /** Last session ended mid-run: pay out what that run had earned and show its results. */
+  /**
+   * Web shop. Hidden in portal builds (portals sell through their own stores) and until a live
+   * Stripe key is set on the server; `?shop=1` shows it early (with a test key) for checking.
+   * Returning from Stripe lands on `?shop=done`, which is removed from the address bar at once.
+   */
+  private initShop() {
+    if (PORTAL) return;
+    adSkip.on = () => this.profile.adFree();
+    let q: string | null = null;
+    try {
+      q = new URLSearchParams(location.search).get('shop');
+      if (q === '1') sessionStorage.setItem('ds.shop', '1');
+      if (q === 'done' || q === 'cancel') {
+        const u = new URL(location.href);
+        u.searchParams.delete('shop');
+        history.replaceState(null, '', u.pathname + u.search + u.hash);
+      }
+    } catch {
+      /* no storage: fine */
+    }
+    let preview = q === '1';
+    try {
+      preview ||= sessionStorage.getItem('ds.shop') === '1';
+    } catch {
+      /* private mode */
+    }
+    this.hub.onBuy = (id) => this.buy(id);
+    void shopStatus().then((st) => {
+      if (!st?.ready) return;
+      this.hub.shopOn = st.live || preview;
+      if (this.hub.shopOn) this.hub.refresh();
+      // anyone who has bought before (or just did) gets their things checked on every visit
+      if (q === 'done') void this.deliver(10);
+      else if (this.profile.data.shop || this.hub.shopOn) void this.deliver(1);
+    });
+    if (q === 'done') toast('Payment received · delivering…', '#43e08a');
+    if (q === 'cancel') setTimeout(() => toast('Checkout cancelled · nothing was charged', '#8d97ab'), 400);
+  }
+
+  private async buy(id: ProductId) {
+    const r = await startCheckout(id, this.profile.playerId());
+    if ('url' in r) {
+      this.stats.feature(`checkout:${id}`);
+      this.profile.save();
+      location.href = r.url;
+      return;
+    }
+    if (r.error === 'owned') {
+      toast('You already own this · restoring it', '#43e08a');
+      void this.deliver(1);
+    } else toast(r.error === 'offline' ? 'You’re offline · connect to buy' : 'The shop is unavailable right now. Try again in a bit', '#8d97ab');
+  }
+
+  /** Pick up purchases (the webhook can lag a few seconds behind Stripe's redirect, so retry). */
+  private async deliver(tries: number) {
+    for (let i = 0; i < tries; i++) {
+      if (i) await new Promise((r) => setTimeout(r, 2000));
+      const rows = await claimPurchases(this.profile.buyerIds());
+      if (!rows) continue;
+      const got = applyPurchases(this.profile, rows);
+      if (got.length) return this.thank(got);
+      if (tries === 1) return;
+    }
+    if (tries > 1) toast('Still processing · your purchase will appear shortly. Contact deadsignalsupportchannel@gmail.com if it doesn’t', '#ffd34d');
+  }
+
+  private thank(got: Granted[]) {
+    for (const g of got) {
+      this.stats.feature(`bought:${g.product}`);
+      audio.pickup('chest');
+      toast(`${PRODUCTS[g.product].name} unlocked · thank you!`, '#43e08a');
+      if (g.item && this.mode === 'hub') this.hub.revealItem(g.item);
+    }
+    if (got.length) this.hub.refresh();
+  }
+
   private recoverRun(): boolean {
     const st = this.profile.takeStashedRun();
     if (!st) return false;

@@ -1,3 +1,4 @@
+import { adWord } from '../ads/ads';
 import { GEAR, RARITIES, RARITY_COLORS } from '../meta/gear';
 import type { RunRewards } from '../meta/profile';
 import type { RunResult } from '../sim/game';
@@ -125,7 +126,7 @@ export function resultsModal(
     h('div.rewards', rewards),
     onDoubleAd && rw.gold > 0
       ? (() => {
-          const btn = h('button.btn.cyan.ad-btn', { style: { margin: '8px auto 0' } }, h('span.ad-play', '▶'), `Watch ad · Double rewards (+${fmtNum(rw.gold)} gold${rw.scrap ? `, +${rw.scrap} scrap` : ''})`) as HTMLButtonElement;
+          const btn = h('button.btn.cyan.ad-btn', { style: { margin: '8px auto 0' } }, h('span.ad-play', '▶'), `${adWord()} · Double rewards (+${fmtNum(rw.gold)} gold${rw.scrap ? `, +${rw.scrap} scrap` : ''})`) as HTMLButtonElement;
           btn.onclick = () =>
             onDoubleAd().then((ok) => {
               if (!ok) return;
@@ -175,7 +176,7 @@ export function welcomeBackModal(hours: number, gold: number, scrap: number, onC
   const collect = h('button.btn.primary.big', { style: { width: '100%' }, onclick: onCollect }, 'Collect');
   let ad: HTMLButtonElement | null = null;
   if (onDoubleAd) {
-    ad = h('button.btn.ad-btn', { style: { width: '100%', marginTop: '10px' } }, h('span.ad-play', '▶'), `Watch ad · Collect ×2 (+${fmtNum(gold * 2)} gold)`) as HTMLButtonElement;
+    ad = h('button.btn.ad-btn', { style: { width: '100%', marginTop: '10px' } }, h('span.ad-play', '▶'), `${adWord()} · Collect ×2 (+${fmtNum(gold * 2)} gold)`) as HTMLButtonElement;
     ad.onclick = () => {
       ad!.disabled = true;
       onDoubleAd().then((ok) => {
@@ -245,7 +246,7 @@ export function settingsModal(
         : null,
       controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),
-      h('div.help', `Dead Signal · v${__APP_VERSION__.replace(/\.0$/, '')} · ${cloud ? 'progress backs up to the cloud' : 'progress is saved on this device'}`, ' · ', h('a', { href: './privacy.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Privacy')),
+      h('div.help', `Dead Signal · v${__APP_VERSION__.replace(/\.0$/, '')} · ${cloud ? 'progress backs up to the cloud' : 'progress is saved on this device'}`, ' · ', h('a', { href: './privacy.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Privacy'), ' · ', h('a', { href: './legal.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Terms')),
       h('button.btn', { style: { width: '100%', marginTop: '12px' }, onclick: onClose }, 'Done'),
     ),
   );

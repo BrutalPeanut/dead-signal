@@ -124,6 +124,11 @@ export interface SaveData {
   asc?: AscState;
   /** Campaign losses in a row on one sector (drives the lobby's "stuck" Power Up nudge). Unset = none. */
   streak?: { sector: number; losses: number };
+  /**
+   * Web shop (meta/shop.ts). `got` = purchase ids already applied; `ids` = older player ids this
+   * save has had (a cloud restore can swap the id), so their purchases still count. Unset = none.
+   */
+  shop?: { starter?: boolean; adfree?: boolean; got?: string[]; ids?: string[] };
 }
 
 export interface RunRewards {
@@ -196,7 +201,23 @@ export function normalizeSave(raw: unknown): SaveData | null {
   const f = fresh();
   if (!d.slotLv) migrateSlotLevels(d);
   if (d.streak && !(Number.isInteger(d.streak.sector) && Number.isInteger(d.streak.losses))) delete d.streak;
+  if (d.shop !== undefined) d.shop = cleanShop(d.shop);
+  if (!d.shop) delete d.shop;
   return { ...f, ...d, settings: { ...f.settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? f.daily, endless: d.endless ?? f.endless, character: d.character ?? 'courier', online: d.online ?? f.online, pass: d.pass ?? f.pass };
+}
+
+function cleanShop(raw: unknown): SaveData['shop'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const strs = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-50) : undefined);
+  const out: NonNullable<SaveData['shop']> = {};
+  if (r.starter === true) out.starter = true;
+  if (r.adfree === true) out.adfree = true;
+  const got = strs(r.got);
+  if (got?.length) out.got = got;
+  const ids = strs(r.ids)?.slice(-6);
+  if (ids?.length) out.ids = ids;
+  return out;
 }
 
 /**
@@ -336,6 +357,19 @@ export class Profile {
     if (!d) return false;
     d.settings = this.data.settings;
     d.sync = code ? { code } : this.data.sync;
+    // purchases belong to the person, not the save: keep this device's, and remember its player id
+    const mine = this.data.shop;
+    const oldId = this.data.online.id;
+    if (mine || (oldId && oldId !== d.online.id)) {
+      const s = (d.shop ??= {});
+      if (mine?.starter) s.starter = true;
+      if (mine?.adfree) s.adfree = true;
+      s.got = [...new Set([...(s.got ?? []), ...(mine?.got ?? [])])].slice(-50);
+      const ids = new Set([...(s.ids ?? []), ...(mine?.ids ?? [])]);
+      if (oldId && oldId !== d.online.id) ids.add(oldId);
+      ids.delete(d.online.id);
+      if (ids.size) s.ids = [...ids].slice(-6);
+    }
     this.data = d;
     this.save();
     return true;
@@ -457,6 +491,16 @@ export class Profile {
       this.save();
     }
     return Math.max(0, Math.floor((now - this.data.since) / 864e5));
+  }
+
+  /** Every player id whose purchases belong to this save (current first). */
+  buyerIds(): string[] {
+    return [this.playerId(), ...(this.data.shop?.ids ?? [])].slice(0, 8);
+  }
+
+  /** Bought Skip Ads: rewarded ads pay out without being shown. */
+  adFree() {
+    return !!this.data.shop?.adfree;
   }
 
   /** Stable anonymous player id (created on first use). */

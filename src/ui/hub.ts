@@ -13,7 +13,7 @@ import {
 } from '../meta/gear';
 import { RELAY_CAP_H, type Profile } from '../meta/profile';
 import { LOGIN_DAYS, loginReward } from '../meta/login';
-import { ads, adsOn, type Placement } from '../ads/ads';
+import { adWord, ads, adsOn, type Placement } from '../ads/ads';
 import { DAILY_TIERS, ENDLESS_BOSS_EVERY, dailyChallenge, type RunMode } from '../sim/modes';
 import { MILESTONES, accountXpNeed, type TrackId } from '../meta/talents';
 import { drawHero } from '../render/art';
@@ -21,6 +21,7 @@ import { setHeroSkin } from '../render/hero';
 import { CHARACTERS, charById } from '../meta/characters';
 import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../meta/pass';
 import { cleanName } from '../net/names';
+import { PRODUCTS, offers, price, type Product, type ProductId } from '../meta/shop';
 import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
 import { gearIcon, skillIcon } from '../render/icons';
 import { BOSSES, GUN_IDS, WEAPONS, gunUnlock, isGun, runLengthFor, starTimes } from '../sim/data';
@@ -97,6 +98,9 @@ export class Hub {
   mode: RunMode = 'campaign';
   /** Called after the player ascends (for analytics). */
   onAscended: (rank: number, cores: number) => void = () => {};
+  /** Web shop: shown once Stripe is live (or with ?shop=1); onBuy goes to Stripe Checkout. */
+  shopOn = false;
+  onBuy: (id: ProductId) => Promise<void> = async () => {};
 
   constructor(private p: Profile, private onDeploy: (sector: number, mode: RunMode) => void, private onSettings: () => void) {
     this.sector = p.data.unlocked;
@@ -348,6 +352,7 @@ export class Hub {
             ? rail('missions', 'Missions', () => this.setTab('missions'), null, null, '.locked')
             : rail('pass', 'Pass', () => this.passSheet(), p.passClaimable() || null, passRing),
           rail('crate', 'Crates', () => this.setTab('supply'), d.keys || null),
+          this.shopOn && d.stats.runs >= 1 ? rail('shop', 'Shop', () => this.shopSheet(), p.data.shop?.starter ? null : '!', null, '.shop-rail') : null,
           adsOn() && d.stats.runs >= 3 ? rail('speed', p.speedActive() ? `${p.speedLeftMin()}m` : '2× Speed', () => this.speedSheet(), null, null, p.speedActive() ? '.speed-on' : '') : null,
         ),
       ),
@@ -509,7 +514,7 @@ export class Hub {
                 this.toastReward(got.reward, '#ffd34d');
                 this.passSheet();
               }
-            } else if (locked) toast('Signal Pass+ arrives with the app store release', '#8d97ab');
+            } else if (locked) this.shopOn ? this.buy('pass') : toast('Signal Pass+ arrives with the app store release', '#8d97ab');
             else if (!done) toast(`Reach tier ${i + 1} to claim`, '#8d97ab');
           },
         },
@@ -536,10 +541,55 @@ export class Hub {
       h('div.help', { style: { margin: '2px 0 8px' } }, 'Earn Signal Points from every run, daily missions and Daily Challenge tiers.'),
       h('div.ps-cols', h('span', 'FREE'), h('span'), h('span.prem', 'PASS+')),
       h('div.ps-list', rows),
-      ps.premium ? null : h('button.btn.big', { style: { width: '100%', marginTop: '10px' }, disabled: true }, 'Signal Pass+ · coming with the app'),
+      ps.premium
+        ? null
+        : this.shopOn
+          ? h('button.btn.primary.big', { style: { width: '100%', marginTop: '10px' }, onclick: () => this.buy('pass') }, `Unlock Signal Pass+ · ${price(PRODUCTS.pass)}`)
+          : h('button.btn.big', { style: { width: '100%', marginTop: '10px' }, disabled: true }, 'Signal Pass+ · coming with the app'),
       h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
     );
     if (this.present(sheet, 'pass')) requestAnimationFrame(() => sheet.querySelector('.ps-cell.ready, .ps-row:not(.reached)')?.scrollIntoView({ block: 'center' }));
+  }
+
+  /** Web shop sheet (Stripe Checkout). */
+  shopSheet() {
+    this.onFeature('shop');
+    const card = (o: { product: Product; owned: boolean }) => {
+      const pr = o.product;
+      return h(
+        'div.shop-card.' + pr.id + (o.owned ? '.owned' : ''),
+        h('div.shop-top', h('b', pr.name), h('span.shop-price', o.owned ? 'Owned ✓' : price(pr))),
+        h('div.shop-blurb', pr.blurb),
+        h('ul.shop-lines', pr.lines.map((l) => h('li', l))),
+        o.owned ? null : h('button.btn.primary', { style: { width: '100%' }, onclick: () => this.buy(pr.id) }, `Buy · ${price(pr)}`),
+      );
+    };
+    const sheet = h(
+      'div.sheet.shop',
+      { onclick: (e: Event) => e.stopPropagation() },
+      h('div.ps-head', h('small', 'SUPPLY DROP'), h('h2', 'Shop')),
+      h('div.shop-list', offers(this.p, adsOn()).map(card)),
+      h(
+        'div.help.shop-foot',
+        'Secure checkout by Stripe. Items arrive in the game as soon as you return. ',
+        h('a', { href: './legal.html', target: '_blank', rel: 'noopener' }, 'Terms & refunds'),
+      ),
+      h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
+    );
+    this.present(sheet, 'shop');
+  }
+
+  private buying = false;
+  private async buy(id: ProductId) {
+    if (this.buying) return;
+    this.buying = true;
+    audio.click();
+    toast('Opening secure checkout…', '#8d97ab');
+    try {
+      await this.onBuy(id);
+    } finally {
+      this.buying = false;
+    }
   }
 
   private lbButton(mode: 'daily' | 'endless') {
@@ -1165,7 +1215,7 @@ export class Hub {
           h('div.asc-cores', h('b', a?.cores ?? 0), h('small', 'Cores')),
         ),
         adsOn() && p.ascendBonus()
-          ? this.adButton(`Watch ad · +${p.ascendBonus()} bonus cores`, 'ascend', () => {
+          ? this.adButton(`${adWord()} · +${p.ascendBonus()} bonus cores`, 'ascend', () => {
               const n = p.claimAscendBonus();
               if (n) toast(`+${n} Signal Cores`, '#b18cff');
             })
@@ -1208,7 +1258,7 @@ export class Hub {
   speedSheet() {
     const p = this.p;
     const on = p.speedActive();
-    const btn = h('button.btn.primary', { style: { width: '100%', marginTop: '14px' } }, h('span.ad-play', '▶'), on ? 'Watch ad · +30 minutes' : 'Watch ad · 30 minutes of 2×');
+    const btn = h('button.btn.primary', { style: { width: '100%', marginTop: '14px' } }, h('span.ad-play', '▶'), on ? `${adWord()} · +30 minutes` : `${adWord()} · 30 minutes of 2×`);
     btn.onclick = () => {
       btn.setAttribute('disabled', '');
       ads.showRewarded('speed').then((ok) => {
@@ -1285,7 +1335,7 @@ export class Hub {
       h('div.help', { style: { marginTop: 0 } }, `+${cores} Signal Cores · +${keys} crate keys`),
       h('div.help', 'Spend your cores in the Signal Lab, then retake Sector 1. Your gear came with you.'),
       adsOn() && this.p.ascendBonus()
-        ? this.adButton(`Watch ad · +${this.p.ascendBonus()} bonus cores`, 'ascend', () => {
+        ? this.adButton(`${adWord()} · +${this.p.ascendBonus()} bonus cores`, 'ascend', () => {
             const n = this.p.claimAscendBonus();
             if (n) toast(`+${n} Signal Cores`, '#b18cff');
             this.ascendedSheet(rank, cores + n, keys);
@@ -1382,7 +1432,7 @@ export class Hub {
                   }),
               },
               h('span.ad-play', '▶'),
-              p.adKeysLeft() > 0 ? `Watch ad · Free key (${p.adKeysLeft()} left today)` : 'Free keys: back tomorrow',
+              p.adKeysLeft() > 0 ? `${adWord()} · Free key (${p.adKeysLeft()} left today)` : 'Free keys: back tomorrow',
             )
           : null,
         d.keys > 1
@@ -1430,7 +1480,7 @@ export class Hub {
           'Claim',
         ),
         adsOn() && relay.gold >= 1
-          ? this.adButton(`Watch ad · Claim ×2 (+${fmtNum(relay.gold * 2)} gold)`, 'relay', () => {
+          ? this.adButton(`${adWord()} · Claim ×2 (+${fmtNum(relay.gold * 2)} gold)`, 'relay', () => {
               const r = p.claimRelay(Date.now(), 2);
               audio.pickup('gold');
               toast(`+${fmtNum(r.gold)} gold, +${r.scrap} scrap`, '#ffd34d');
@@ -1509,7 +1559,7 @@ export class Hub {
           can ? `Claim Day ${today + 1}` : `Next reward in ${Math.floor(left / 3.6e6)}h ${Math.floor((left % 3.6e6) / 6e4)}m`,
         ),
         adsOn() && p.canDoubleDaily()
-          ? this.adButton('Watch ad · Double today’s reward', 'daily', () => {
+          ? this.adButton(`${adWord()} · Double today’s reward`, 'daily', () => {
               const r = p.doubleDaily();
               if (!r) return;
               audio.pickup('chest');

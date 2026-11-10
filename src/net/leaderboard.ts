@@ -3,9 +3,9 @@
  * submit_score (keeps each player's best per board) and get_board (top N + your own row).
  * Everything here fails soft: offline or blocked → null, and the game carries on.
  */
-const BASE = 'https://lxrioefrlncjequyjifk.supabase.co/rest/v1/rpc/';
+export const BASE = 'https://lxrioefrlncjequyjifk.supabase.co/rest/v1/rpc/';
 // Publishable key: safe to ship in the client (it can only reach the RPCs granted to anon).
-const KEY = 'sb_publishable_ofX3qAaBOs0U-RpjOCpdAw_7pumR46t';
+export const KEY = 'sb_publishable_ofX3qAaBOs0U-RpjOCpdAw_7pumR46t';
 
 export interface BoardRow {
   rnk: number;
