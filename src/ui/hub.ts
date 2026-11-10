@@ -21,7 +21,8 @@ import { setHeroSkin } from '../render/hero';
 import { CHARACTERS, charById } from '../meta/characters';
 import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../meta/pass';
 import { cleanName } from '../net/names';
-import { PRODUCTS, offers, price, type Product, type ProductId } from '../meta/shop';
+import { PRODUCTS, offers, price, priceOverride, type Product, type ProductId } from '../meta/shop';
+import { NATIVE } from '../native';
 import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
 import { gearIcon, skillIcon } from '../render/icons';
 import { BOSSES, GUN_IDS, WEAPONS, gunUnlock, isGun, runLengthFor, starTimes } from '../sim/data';
@@ -191,6 +192,7 @@ export class Hub {
         h('div.who', h('div.nm', charById(d.character).name), h('div.pw', coin('power'), fmtNum(this.p.power()))),
       ),
       h('div.wallet', pill('gold', fmtNum(d.gold), true), pill('scrap', fmtNum(d.scrap), false), pill('key', String(d.keys), true)),
+      ...(this.shopOn ? [h('button.icon-btn.shop-btn' + (d.shop?.starter ? '' : '.hot'), { onclick: () => this.shopSheet(), 'aria-label': 'Shop' }, h('span', { html: icon('shop', 18) }), h('small', 'SHOP'))] : []),
       h('button.icon-btn', { onclick: this.onSettings, 'aria-label': 'Settings', html: icon('settings', 20) }),
     );
   }
@@ -352,7 +354,7 @@ export class Hub {
             ? rail('missions', 'Missions', () => this.setTab('missions'), null, null, '.locked')
             : rail('pass', 'Pass', () => this.passSheet(), p.passClaimable() || null, passRing),
           rail('crate', 'Crates', () => this.setTab('supply'), d.keys || null),
-          this.shopOn && d.stats.runs >= 1 ? rail('shop', 'Shop', () => this.shopSheet(), p.data.shop?.starter ? null : '!', null, '.shop-rail') : null,
+          this.shopOn ? rail('shop', 'Shop', () => this.shopSheet(), p.data.shop?.starter ? null : '!', null, '.shop-rail') : null,
           adsOn() && d.stats.runs >= 3 ? rail('speed', p.speedActive() ? `${p.speedLeftMin()}m` : '2× Speed', () => this.speedSheet(), null, null, p.speedActive() ? '.speed-on' : '') : null,
         ),
       ),
@@ -568,10 +570,10 @@ export class Hub {
       'div.sheet.shop',
       { onclick: (e: Event) => e.stopPropagation() },
       h('div.ps-head', h('small', 'SUPPLY DROP'), h('h2', 'Shop')),
-      h('div.shop-list', offers(this.p, adsOn()).map(card)),
+      h('div.shop-list', offers(this.p, adsOn()).filter((o) => !NATIVE || priceOverride[o.product.id]).map(card)),
       h(
         'div.help.shop-foot',
-        'Secure checkout by Stripe. Items arrive in the game as soon as you return. ',
+        NATIVE ? 'Paid through Google Play. Items arrive right away. ' : 'Secure checkout by Stripe. Items arrive in the game as soon as you return. ',
         h('a', { href: './legal.html', target: '_blank', rel: 'noopener' }, 'Terms & refunds'),
       ),
       h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
@@ -1395,8 +1397,18 @@ export class Hub {
     const d = p.data;
     const relay = p.relayPending();
     const rates = p.relayRates();
+    const featured = this.shopOn ? offers(p, adsOn()).filter((o) => !o.owned && (!NATIVE || priceOverride[o.product.id]))[0] : undefined;
     return h(
       'div',
+      featured
+        ? h(
+            'button.shop-banner.' + featured.product.id,
+            { onclick: () => this.shopSheet() },
+            h('span.sb-ico', { html: icon('shop', 26) }),
+            h('span.sb-txt', h('small', 'SHOP'), h('b', featured.product.name), h('span', featured.product.lines.slice(0, 2).join(' · '))),
+            h('span.sb-price', price(featured.product)),
+          )
+        : null,
       h(
         'div.crate-card',
         h('div.section-h', { style: { justifyContent: 'center', margin: '0' } }, 'Supply Crate'),

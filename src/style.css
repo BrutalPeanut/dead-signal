@@ -4881,3 +4881,98 @@ textarea {
 .shop-foot a {
   color: inherit;
 }
+
+/* shop entry points: top-bar button and the Supply tab banner */
+.icon-btn.shop-btn {
+  width: auto;
+  padding: 0 9px;
+  gap: 1px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #43e08a;
+  border-color: rgba(67, 224, 138, 0.55);
+  background: linear-gradient(180deg, rgba(67, 224, 138, 0.18), rgba(14, 18, 27, 0.8));
+  position: relative;
+}
+.icon-btn.shop-btn small {
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1;
+}
+.icon-btn.shop-btn.hot::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff3b5c;
+  box-shadow: 0 0 0 2px #0b0d14;
+  animation: shop-pulse 1.6s ease-in-out infinite;
+}
+@keyframes shop-pulse {
+  50% {
+    transform: scale(1.35);
+  }
+}
+.shop-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1.5px solid #b46bff;
+  background: linear-gradient(100deg, rgba(180, 107, 255, 0.28), rgba(26, 32, 48, 0.95) 60%);
+  color: #fff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.shop-banner.pass {
+  border-color: #ffd34d;
+  background: linear-gradient(100deg, rgba(255, 211, 77, 0.22), rgba(26, 32, 48, 0.95) 60%);
+}
+.shop-banner.adfree {
+  border-color: #5ef2ff;
+  background: linear-gradient(100deg, rgba(94, 242, 255, 0.2), rgba(26, 32, 48, 0.95) 60%);
+}
+.shop-banner .sb-ico {
+  color: #43e08a;
+  flex: none;
+}
+.shop-banner .sb-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.shop-banner .sb-txt small {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #43e08a;
+}
+.shop-banner .sb-txt b {
+  font-size: 16px;
+}
+.shop-banner .sb-txt span {
+  font-size: 12px;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shop-banner .sb-price {
+  flex: none;
+  font-weight: 900;
+  font-size: 15px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #43e08a;
+  color: #08130d;
+}

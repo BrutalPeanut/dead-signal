@@ -1,0 +1,153 @@
+/**
+ * Store-app builds (Google Play now). `npm run build:android` compiles the same game with
+ * __NATIVE__ = 'android' into dist-android/, which Capacitor wraps as the Android app
+ * (see android/ and .github/workflows/android.yml). Differences from the site:
+ *  - ads: AdMob rewarded ads (still rewarded and opt-in only, same placements)
+ *  - shop: Google Play Billing instead of Stripe (Play requires it for digital items)
+ *  - Google Drive backup is hidden (Google sign-in doesn't run inside an app WebView);
+ *    cloud save codes, leaderboards and anonymous stats work as on the site
+ * The site build has __NATIVE__ = '' and never loads any of the plugins.
+ */
+declare const __NATIVE__: string;
+declare const __ADMOB_LIVE__: boolean;
+export const NATIVE: '' | 'android' = typeof __NATIVE__ !== 'undefined' && __NATIVE__ === 'android' ? 'android' : '';
+
+/** AdMob rewarded unit. Closed-test builds use Google's test unit so testers never tap real ads. */
+const REWARDED_LIVE = 'ca-app-pub-6900407641110608/2783161067';
+const REWARDED_TEST = 'ca-app-pub-3940256099942544/5224354917';
+/** AdMob app id (also in android/app/src/main/AndroidManifest.xml). */
+export const ADMOB_APP_ID = 'ca-app-pub-6900407641110608~8554362492';
+export const ADMOB_LIVE = typeof __ADMOB_LIVE__ !== 'undefined' && __ADMOB_LIVE__;
+const rewardedUnit = () => (ADMOB_LIVE ? REWARDED_LIVE : REWARDED_TEST);
+
+type AdMobMod = typeof import('@capacitor-community/admob');
+let admob: AdMobMod | null = null;
+let loaded = false;
+let loading: Promise<boolean> | null = null;
+
+/** Start AdMob (with Google's consent form where the law asks for one) and preload an ad. */
+export async function initNativeAds(): Promise<boolean> {
+  if (NATIVE !== 'android') return false;
+  try {
+    admob = await import('@capacitor-community/admob');
+    const { AdMob } = admob;
+    await AdMob.initialize({ initializeForTesting: !ADMOB_LIVE });
+    try {
+      const info = await AdMob.requestConsentInfo();
+      if (info.isConsentFormAvailable && info.status === admob.AdmobConsentStatus.REQUIRED) await AdMob.showConsentForm();
+    } catch {
+      /* consent service unreachable: AdMob falls back to non-personalized ads */
+    }
+    void preload();
+    return true;
+  } catch {
+    admob = null;
+    return false;
+  }
+}
+
+function preload(): Promise<boolean> {
+  if (!admob) return Promise.resolve(false);
+  if (loaded) return Promise.resolve(true);
+  loading ??= admob.AdMob.prepareRewardVideoAd({ adId: rewardedUnit(), isTesting: !ADMOB_LIVE })
+    .then(() => (loaded = true))
+    .catch(() => false)
+    .finally(() => (loading = null));
+  return loading;
+}
+
+export const nativeAdReady = () => loaded;
+
+/** Show a rewarded ad. Resolves true only if the player earned the reward. */
+export async function showNativeRewarded(onStart: () => void, onEnd: () => void): Promise<boolean | 'unfilled'> {
+  if (!admob) return 'unfilled';
+  if (!loaded && !(await preload())) return 'unfilled';
+  const { AdMob, RewardAdPluginEvents } = admob;
+  let rewarded = false;
+  const subs = [await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => (rewarded = true))];
+  try {
+    loaded = false;
+    onStart();
+    await AdMob.showRewardVideoAd();
+    rewarded = true; // the call resolves with the reward item once it's earned
+  } catch {
+    /* closed early or failed to show */
+  } finally {
+    for (const s of subs) void s.remove();
+    onEnd();
+    void preload(); // the next one is ready by the next offer
+  }
+  return rewarded;
+}
+
+// ------------------------------------------------------------------ Google Play Billing
+
+/** Play Console product ids (one-time products). Brian creates these in Play Console. */
+export const PLAY_IDS = { starter: 'starter_pack', pass: 'signal_pass_plus', adfree: 'skip_ads' } as const;
+type PlayKey = keyof typeof PLAY_IDS;
+const byPlayId = Object.fromEntries(Object.entries(PLAY_IDS).map(([k, v]) => [v, k])) as Record<string, PlayKey>;
+
+type PurchasesMod = typeof import('@capgo/native-purchases');
+let np: PurchasesMod | null = null;
+/** Localized prices from Play, e.g. { starter: '$2.99' }. Empty = billing unavailable. */
+export const playPrices: Partial<Record<PlayKey, string>> = {};
+
+export async function initBilling(): Promise<boolean> {
+  if (NATIVE !== 'android') return false;
+  try {
+    np = await import('@capgo/native-purchases');
+    const ok = await np.NativePurchases.isBillingSupported();
+    if (!ok.isBillingSupported) return false;
+    const { products } = await np.NativePurchases.getProducts({ productIdentifiers: Object.values(PLAY_IDS), productType: np.PURCHASE_TYPE.INAPP });
+    for (const p of products) {
+      const k = byPlayId[p.identifier];
+      if (k) playPrices[k] = p.priceString;
+    }
+    return Object.keys(playPrices).length > 0;
+  } catch {
+    np = null;
+    return false;
+  }
+}
+
+/** A Play purchase in the shape the shop's applyPurchases() takes (id = Play purchase token). */
+export interface PlayRow {
+  id: string;
+  product: PlayKey;
+  season: number | null;
+  fresh: boolean;
+}
+
+/** Buy one product. Signal Pass+ is consumed so it can be bought again next season. */
+export async function playBuy(product: PlayKey, playerId: string, season: number): Promise<PlayRow | 'cancelled' | 'error'> {
+  if (!np) return 'error';
+  try {
+    const t = await np.NativePurchases.purchaseProduct({
+      productIdentifier: PLAY_IDS[product],
+      productType: np.PURCHASE_TYPE.INAPP,
+      appAccountToken: playerId,
+      isConsumable: product === 'pass',
+    });
+    if (t.purchaseState && t.purchaseState !== '1') return 'error'; // pending (e.g. cash payment): delivered by restore later
+    return { id: t.purchaseToken ?? t.transactionId, product, season: product === 'pass' ? season : null, fresh: true };
+  } catch (e) {
+    return /cancel/i.test(String((e as Error)?.message ?? e)) ? 'cancelled' : 'error';
+  }
+}
+
+/** Owned one-time products (Starter Pack, Skip Ads) still on this Google account, for restores. */
+export async function playOwned(): Promise<PlayRow[]> {
+  if (!np) return [];
+  try {
+    const { purchases } = await np.NativePurchases.getPurchases({ productType: np.PURCHASE_TYPE.INAPP });
+    const out: PlayRow[] = [];
+    for (const t of purchases) {
+      const k = byPlayId[t.productIdentifier];
+      if (!k || k === 'pass' || (t.purchaseState && t.purchaseState !== '1')) continue;
+      out.push({ id: t.purchaseToken ?? t.transactionId, product: k, season: null, fresh: true });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
