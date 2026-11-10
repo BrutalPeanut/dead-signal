@@ -29,7 +29,7 @@ adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
 import { Stats, browserSaysNo } from './net/stats';
 import { Hud, chestModal, levelUpModal, lobbyCtx, pauseModal, reviveModal, showSkillInfo } from './ui/hud';
-import { introModal, resultsModal, settingsModal } from './ui/screens';
+import { resultsModal, settingsModal } from './ui/screens';
 
 type Mode = 'hub' | 'run';
 
@@ -184,18 +184,37 @@ class App {
       if (e.key === 'Escape' && this.mode === 'run') this.paused ? this.resume() : this.pause();
     });
 
-    if (!this.profile.data.seenIntro) {
-      this.showModal(
-        introModal(() => {
-          this.profile.data.seenIntro = true;
-          this.profile.save();
-          this.closeModal();
-        }),
-        'intro',
-      );
-    } else setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
     const pt = playtestSector();
+    // A brand-new player goes straight into the training run: no story screen to read, no lobby to
+    // figure out. The run waits for their first move, and the in-run tips teach the rest. Anyone
+    // who has never finished a run gets the same treatment on their next visit.
+    const firstTime = pt === null && this.profile.data.stats.runs === 0 && this.profile.data.unlocked === 0 && this.profile.rank() === 0;
+    if (firstTime) {
+      this.profile.data.seenIntro = true;
+      this.profile.save();
+      setTimeout(() => {
+        if (this.mode !== 'hub' || this.modalFor) return; // e.g. a cloud save arrived first
+        this.startRun(0, 'campaign');
+        // the "drag to move" tip owns the screen until they move; the story line follows it
+        this.renderer.fx.banners.length = 0;
+        this.storyPending = true;
+        this.stats.feature('instant-start');
+      }, 250);
+    } else {
+      this.profile.data.seenIntro = true;
+      setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
+    }
     if (pt !== null) setTimeout(() => this.startRun(pt, 'campaign'), 400);
+    // the page's loading splash goes once the game can draw
+    const boot = document.getElementById('boot');
+    if (boot) {
+      requestAnimationFrame(() =>
+        setTimeout(() => {
+          boot.style.opacity = '0';
+          setTimeout(() => boot.remove(), 400);
+        }, firstTime ? 320 : 60),
+      );
+    }
     this.trackSession();
     // cloud save: take a further-along save from another device (only between runs), else back up
     this.sync.onAdopted = () => this.reloadSynced();
@@ -240,6 +259,8 @@ class App {
   runMode: RunMode = 'campaign';
   tutorial = new Tutorial();
   tutorialOn = false;
+  /** First-ever run: show the one-line story once the player starts moving. */
+  private storyPending = false;
 
   startRun(sector: number, mode: RunMode = 'campaign') {
     audio.unlock();
@@ -805,6 +826,10 @@ class App {
     }
     if (this.mode === 'run') {
       this.hud.update(this.game, this.renderer.fx.banners);
+      if (this.storyPending && !this.game.waitingForMove) {
+        this.storyPending = false;
+        this.renderer.fx.banners.push({ text: '03:14 AM', sub: 'The signal changed everyone. Not you.', color: '#ff7ae6', t: 3.2 });
+      }
       if (this.tutorialOn) {
         if (!this.tutorial.el.isConnected) this.hud.el.append(this.tutorial.el);
         this.tutorial.controls = this.input.mode;
