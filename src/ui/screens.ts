@@ -152,6 +152,51 @@ export function resultsModal(
   );
 }
 
+/** Offer to add the game to the home screen (shown after a win, where the browser supports one-tap install). */
+export function installModal(keys: number, onInstall: () => void, onLater: () => void) {
+  return h(
+    'div.modal',
+    { onclick: onLater },
+    h(
+      'div.sheet',
+      { onclick: (e: Event) => e.stopPropagation(), style: { textAlign: 'center' } },
+      h('img', { src: './icon-192.png', alt: '', width: 84, height: 84, style: { borderRadius: '20px', boxShadow: '0 0 30px rgba(94,242,255,.35)' } }),
+      h('h2', { style: { fontSize: '22px', marginTop: '12px' } }, 'Keep Dead Signal one tap away'),
+      h('p', { style: { margin: '8px 0 4px', color: '#dfe6f2' } }, 'Add it to your home screen: opens full screen, loads faster, and your progress comes with you.'),
+      h('p', { style: { margin: '0 0 14px', fontWeight: '700', color: '#ffd34d' } }, `Bonus: ${keys} crate keys when you install`),
+      h('button.btn.primary.big', { style: { width: '100%' }, onclick: onInstall }, 'Add to Home Screen'),
+      h('button.btn.small', { style: { width: '100%', marginTop: '10px' }, onclick: onLater }, 'Not now'),
+    ),
+  );
+}
+
+/** Shown on return when the Signal Relay has been earning for a while: collect it in one tap. */
+export function welcomeBackModal(hours: number, gold: number, scrap: number, onCollect: () => void, onDoubleAd?: () => Promise<boolean>) {
+  const collect = h('button.btn.primary.big', { style: { width: '100%' }, onclick: onCollect }, 'Collect');
+  let ad: HTMLButtonElement | null = null;
+  if (onDoubleAd) {
+    ad = h('button.btn.ad-btn', { style: { width: '100%', marginTop: '10px' } }, h('span.ad-play', '▶'), `Watch ad · Collect ×2 (+${fmtNum(gold * 2)} gold)`) as HTMLButtonElement;
+    ad.onclick = () => {
+      ad!.disabled = true;
+      onDoubleAd().then((ok) => {
+        if (!ok) ad!.disabled = false;
+      });
+    };
+  }
+  return h(
+    'div.modal',
+    h(
+      'div.sheet',
+      { style: { textAlign: 'center' } },
+      h('h2', { style: { fontSize: '24px', color: '#43ffa4' } }, 'WELCOME BACK'),
+      h('p', { style: { margin: '8px 0 12px', color: '#dfe6f2' } }, `Your Signal Relay kept salvaging for ${hours >= 1 ? Math.floor(hours) + 'h' : Math.round(hours * 60) + 'm'} while you were away.`),
+      h('div.rewards', { style: { justifyContent: 'center', marginBottom: '14px' } }, h('div.reward', coin('gold'), `+${fmtNum(gold)}`), h('div.reward', coin('scrap'), `+${scrap}`)),
+      collect,
+      ad,
+    ),
+  );
+}
+
 export function settingsModal(
   s: { sfx: boolean; music: boolean; haptics: boolean; controls?: string },
   onToggle: (k: 'sfx' | 'music' | 'haptics') => void,

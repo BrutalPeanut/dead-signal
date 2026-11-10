@@ -108,6 +108,8 @@ export interface SaveData {
   adKeys?: { date: string; n: number };
   /** When this save was first started (ms). */
   since?: number;
+  /** Home-screen install offer: when it was last shown, how many times, and whether the thank-you was paid. */
+  install?: { asked: number; n: number; rewarded?: boolean };
   /** Day the sign-in reward was doubled by an ad. */
   dailyAd?: string;
   /** Chosen primary gun (replaces the Pulse Pistol). Unset = the newest one unlocked. */

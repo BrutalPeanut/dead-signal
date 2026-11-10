@@ -21,7 +21,7 @@ import { Interp } from './render/interp';
 import { CloudSync } from './meta/sync';
 import { cloudModal, protectModal, statusText } from './ui/cloud';
 import type { BaseStats, FxEvent } from './sim/types';
-import { haptic, setHaptics, toast } from './ui/dom';
+import { haptic, setHaptics, toast, fmtNum } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
 import { LEVELUP_TIP, Tutorial } from './ui/tutorial';
 import { adAudio, adListeners, ads, adsOn } from './ads/ads';
@@ -29,7 +29,7 @@ adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
 import { Stats, browserSaysNo } from './net/stats';
 import { Hud, chestModal, levelUpModal, lobbyCtx, pauseModal, reviveModal, showSkillInfo } from './ui/hud';
-import { resultsModal, settingsModal } from './ui/screens';
+import { installModal, resultsModal, settingsModal, welcomeBackModal } from './ui/screens';
 
 type Mode = 'hub' | 'run';
 
@@ -103,6 +103,20 @@ function makeProfile() {
 function utmSource(): string {
   const q = new URLSearchParams(location.search);
   return (q.get('utm_source') ?? q.get('src') ?? '').toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 32);
+}
+
+/** Chrome's deferred "Add to Home screen" offer. */
+interface InstallPromptEvent extends Event {
+  prompt(): Promise<unknown>;
+}
+const INSTALL_KEYS = 2;
+/** Running from the home screen (installed) rather than in a browser tab. */
+function isStandalone(): boolean {
+  try {
+    return !!(navigator as Navigator & { standalone?: boolean }).standalone || matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches;
+  } catch {
+    return false;
+  }
 }
 
 class App {
@@ -183,6 +197,21 @@ class App {
     };
     window.addEventListener('pointerdown', unlock, { once: false, passive: true });
     window.addEventListener('keydown', unlock);
+    // the first real tap or key press marks this visitor as a person (crawlers load the page too)
+    const human = (e: Event) => e.isTrusted && this.stats.feature('input');
+    window.addEventListener('pointerdown', human, { passive: true });
+    window.addEventListener('keydown', human);
+    // Android/desktop Chrome offers "install" through this event; keep it for after a first win
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.installEvt = e as InstallPromptEvent;
+    });
+    window.addEventListener('appinstalled', () => {
+      this.installEvt = null;
+      this.stats.feature('installed');
+      this.rewardInstall();
+    });
+    if (isStandalone()) setTimeout(() => this.rewardInstall(), 1500);
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.mode === 'run') this.paused ? this.resume() : this.pause();
     });
@@ -207,6 +236,7 @@ class App {
     } else {
       this.profile.data.seenIntro = true;
       if (!recovered) setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 700);
+      this.queueWelcomeBack();
     }
     if (pt !== null) setTimeout(() => this.startRun(pt, 'campaign'), 400);
     // the page's loading splash goes once the game can draw
@@ -368,6 +398,7 @@ class App {
     audio.bossMode = false;
     audio.intensity = 0.2;
     setTimeout(() => this.mode === 'hub' && this.hub.maybeCalendar(), 500);
+    this.queueInstall();
   }
 
   pause() {
@@ -476,6 +507,8 @@ class App {
         w: window.innerWidth,
         h: window.innerHeight,
         inApp: /FBAN|FBAV|FB_IAB|Messenger|Instagram/i.test(ua) ? 'facebook' : /; wv\)|WebView/i.test(ua) ? 'webview' : '',
+        os: /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'ios' : /Android/.test(ua) ? 'android' : 'other',
+        pwa: isStandalone(),
         ref,
         src: utmSource(),
         days: this.profile.daysPlayed(),
@@ -487,6 +520,74 @@ class App {
   }
 
   /** Show "Protect your progress" once nothing else is open (it waits behind the calendar etc.). */
+  private installEvt: InstallPromptEvent | null = null;
+
+  /** One-time thank-you for adding the game to the home screen. */
+  private rewardInstall() {
+    const d = this.profile.data;
+    if (d.install?.rewarded) return;
+    d.install = { ...(d.install ?? { asked: 0, n: 0 }), rewarded: true };
+    this.profile.grant({ keys: INSTALL_KEYS });
+    this.profile.save();
+    toast(`Installed! +${INSTALL_KEYS} crate keys`, '#43ffa4');
+  }
+
+  /**
+   * After a win, offer to put the game on the home screen (only where the browser can do it in
+   * one tap, and never more than twice, a week apart). Players who install come back far more.
+   */
+  private queueInstall(tries = 0) {
+    const d = this.profile.data;
+    const ask = d.install ?? { asked: 0, n: 0 };
+    if (!this.installEvt || isStandalone() || ask.n >= 2 || Date.now() - ask.asked < 7 * 864e5 || d.stats.wins < 2) return;
+    setTimeout(() => {
+      if (this.mode !== 'hub' || !this.installEvt) return;
+      if (this.modal || this.hub.busy) return tries < 30 && this.queueInstall(tries + 1);
+      d.install = { ...ask, asked: Date.now(), n: ask.n + 1 };
+      this.profile.save();
+      this.stats.feature('install-offer');
+      this.showModal(
+        installModal(
+          INSTALL_KEYS,
+          async () => {
+            const evt = this.installEvt;
+            this.installEvt = null;
+            this.closeModal();
+            try {
+              await evt?.prompt();
+            } catch {
+              /* the browser withdrew the offer */
+            }
+          },
+          () => this.closeModal(),
+        ),
+        'install',
+      );
+    }, tries ? 1000 : 1600);
+  }
+
+  /** Back after a few hours: hand over what the relay earned, front and centre. */
+  private queueWelcomeBack(tries = 0) {
+    setTimeout(() => {
+      if (this.mode !== 'hub') return;
+      const r = this.profile.relayPending();
+      if (r.hours < 2 || r.gold < 1 || this.profile.data.stats.runs < 1) return;
+      if (this.modal || this.hub.busy) return tries < 40 && this.queueWelcomeBack(tries + 1);
+      const collect = (mult: number) => {
+        const got = this.profile.claimRelay(Date.now(), mult);
+        audio.pickup('gold');
+        toast(`+${fmtNum(got.gold)} gold, +${got.scrap} scrap`, '#ffd34d');
+        this.stats.feature('relay');
+        this.closeModal();
+      };
+      if (adsOn()) this.adOffer('relay');
+      this.showModal(
+        welcomeBackModal(r.hours, r.gold, r.scrap, () => collect(1), adsOn() ? () => ads.showRewarded('relay').then((ok) => (ok && collect(2), ok)) : undefined),
+        'welcome',
+      );
+    }, tries ? 1000 : 1500);
+  }
+
   private queueProtect(tries = 0) {
     setTimeout(() => {
       if (this.mode !== 'hub' || !this.sync.needsReminder()) return;

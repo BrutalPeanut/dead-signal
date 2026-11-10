@@ -1,0 +1,6 @@
+-- Applied to Supabase project "dead-signal" as migration stats_v3_humans_only.
+-- stats.humans (players who sent feature 'input', started a run, or came from a touch device),
+-- stats.ev (their events), stats.traffic (people vs crawlers per day), stats.first_session
+-- (landed → started → finished → won → 3+ runs → came back). daily, exits, features, funnel,
+-- playtime, retention and sources now read stats.ev, so crawlers no longer dilute them.
+-- (Full SQL lives in the Supabase migration history.)

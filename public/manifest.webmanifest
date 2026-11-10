@@ -2,7 +2,7 @@
   "name": "Dead Signal",
   "short_name": "Dead Signal",
   "description": "A one-thumb sci-fi zombie survivor.",
-  "start_url": "./",
+  "start_url": "./?src=homescreen",
   "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#0b0d12",
