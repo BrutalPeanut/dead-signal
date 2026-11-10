@@ -20,6 +20,8 @@ const days = di > 0 ? Math.max(1, Number(process.argv[di + 1]) || 14) : 14;
 
 // Cohorts too young to have reached day N show "…" instead of a misleading 0%.
 const SECTIONS = [
+  ['First-session funnel (real people only)', `select * from stats.first_session`],
+  ['Traffic: people vs crawlers', `select * from stats.traffic where day > current_date - $1::int order by day desc`, true],
   ['Daily', `select day, players, sessions, runs, ads_watched, errors from stats.daily where day > current_date - $1::int order by day desc`, true],
   [
     'Retention by cohort (targets: D1 ≥ 35%, D7 ≥ 15%)',

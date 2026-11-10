@@ -60,7 +60,9 @@ a run on the autopilot.
 - `supabase/migrations/`: SQL for the `dead-signal` Supabase project (tables are locked; clients
   only call RPCs). Reporting views live in the `stats` schema (`stats.retention`, `stats.sectors`,
   `stats.funnel`, `stats.ads`, `stats.playtime`, `stats.exits`, `stats.features`, `stats.perf`,
-  `stats.sources`, `stats.run_quits`).
+  `stats.sources`, `stats.run_quits`, `stats.first_session`, `stats.traffic`). Views count only
+  real people (`stats.humans`: sent a first tap/key, started a run, or came from a touch
+  device); crawlers that load the page are in `stats.traffic` only.
 - `marketing/`: ad videos and kit. `scripts/admovie.mjs` records scenes; `scripts/admovie.py`
   edits them (see `marketing/README.md`).
 - `public/privacy.html`: keep it in sync with anything new the game collects.
