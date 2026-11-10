@@ -65,6 +65,10 @@ a run on the autopilot.
   `stats.sources`, `stats.run_quits`, `stats.first_session`, `stats.traffic`). Views count only
   real people (`stats.humans`: sent a first tap/key, started a run, or came from a touch
   device); crawlers that load the page are in `stats.traffic` only.
+- `src/portal.ts`: web-portal editions. `npm run build:crazygames` builds the same game with
+  `__PORTAL__ = 'crazygames'` (CrazyGames SDK for rewarded ads, saves and gameplay events; our
+  cloud sync, Drive backup, install offer and Google ads are off) into `dist-crazygames/` and
+  `dead-signal-crazygames.zip`. See `marketing/CRAZYGAMES.md`. The site build is unaffected.
 - `marketing/`: ad videos and kit. `scripts/admovie.mjs` records scenes; `scripts/admovie.py`
   edits them (see `marketing/README.md`).
 - `public/privacy.html`: keep it in sync with anything new the game collects.

@@ -6,3 +6,6 @@ screens/
 
 .cache/
 .env.local
+
+dist-*/
+dead-signal-*.zip

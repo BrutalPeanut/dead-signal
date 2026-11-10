@@ -28,6 +28,7 @@ import { adAudio, adListeners, ads, adsOn } from './ads/ads';
 adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
 import { Stats, browserSaysNo } from './net/stats';
+import { PORTAL, initPortal, portal } from './portal';
 import { Hud, chestModal, levelUpModal, lobbyCtx, pauseModal, reviveModal, showSkillInfo } from './ui/hud';
 import { installModal, resultsModal, settingsModal, welcomeBackModal } from './ui/screens';
 
@@ -49,7 +50,8 @@ function want3d(graphics: '3d' | '2d' | undefined) {
 /** Cloud save is for the real save only (not ?fresh, ?playtest or ?profile=name test saves). */
 function syncAllowed() {
   const q = new URLSearchParams(location.search);
-  return playtestSector() === null && !q.has('fresh') && !q.get('profile') && !q.has('nosync');
+  // portal editions save through the portal's own account sync instead
+  return !PORTAL && playtestSector() === null && !q.has('fresh') && !q.get('profile') && !q.has('nosync');
 }
 
 /** ?playtest=N (1-based sector), or null. */
@@ -66,7 +68,7 @@ function playtestSector(): number | null {
  */
 function makeProfile() {
   const q = new URLSearchParams(location.search);
-  const store = typeof localStorage !== 'undefined' ? localStorage : null;
+  const store = portal.storage() ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   const pt = playtestSector();
   if (pt !== null) {
     // ?playtest=8 drops straight into Sector 8 on a separate test save (your real save is untouched):
@@ -101,6 +103,7 @@ function makeProfile() {
 
 /** Where a player came from, for launch-channel comparisons: ?utm_source=… or ?src=… (short, lowercase). */
 function utmSource(): string {
+  if (PORTAL) return PORTAL;
   const q = new URLSearchParams(location.search);
   return (q.get('utm_source') ?? q.get('src') ?? '').toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 32);
 }
@@ -125,7 +128,7 @@ class App {
   profile = makeProfile();
   sync = new CloudSync(this.profile, syncAllowed());
   /** Anonymous gameplay stats (same rule as cloud save: never from test saves). */
-  stats = new Stats(() => this.profile.playerId(), syncAllowed() && !new URLSearchParams(location.search).has('nostats'));
+  stats = new Stats(() => this.profile.playerId(), (syncAllowed() || (!!PORTAL && playtestSector() === null && !new URLSearchParams(location.search).has('fresh'))) && !new URLSearchParams(location.search).has('nostats'));
   input = new Input(this.canvas);
   mode: Mode = 'hub';
   game: Game;
@@ -211,7 +214,7 @@ class App {
       this.stats.feature('installed');
       this.rewardInstall();
     });
-    if (isStandalone()) setTimeout(() => this.rewardInstall(), 1500);
+    if (!PORTAL && isStandalone()) setTimeout(() => this.rewardInstall(), 1500);
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.mode === 'run') this.paused ? this.resume() : this.pause();
     });
@@ -239,6 +242,7 @@ class App {
       this.queueWelcomeBack();
     }
     if (pt !== null) setTimeout(() => this.startRun(pt, 'campaign'), 400);
+    portal.loaded();
     // the page's loading splash goes once the game can draw
     const boot = document.getElementById('boot');
     if (boot) {
@@ -361,6 +365,7 @@ class App {
     }
     this.profile.stashRun(null);
     this.stashAt = performance.now();
+    this.profile.adEcon = adsOn();
     this.speedOk = !adsOn() || this.profile.speedActive();
     this.hud.setSpeed(this.speed, !this.tutorialOn, this.speedOk);
     this.game.adRevive = adsOn();
@@ -539,7 +544,7 @@ class App {
   private queueInstall(tries = 0) {
     const d = this.profile.data;
     const ask = d.install ?? { asked: 0, n: 0 };
-    if (!this.installEvt || isStandalone() || ask.n >= 2 || Date.now() - ask.asked < 7 * 864e5 || d.stats.wins < 2) return;
+    if (PORTAL || !this.installEvt || isStandalone() || ask.n >= 2 || Date.now() - ask.asked < 7 * 864e5 || d.stats.wins < 2) return;
     setTimeout(() => {
       if (this.mode !== 'hub' || !this.installEvt) return;
       if (this.modal || this.hub.busy) return tries < 30 && this.queueInstall(tries + 1);
@@ -668,6 +673,8 @@ class App {
     });
     this.retreated = false;
     if (rw.unlockedSector) this.stats.track('unlock', { s: this.profile.data.unlocked, d: { gun: rw.newGun ?? null, char: rw.newCharacter ?? null } });
+    // portal celebration for the two big ones only: finishing Act I and finishing the campaign
+    if (rw.unlockedSector && this.runMode === 'campaign' && (this.sector === 9 || this.sector === CHAPTER_COUNT - 1)) portal.happy();
     if (adsOn()) this.adOffer('double');
     void this.stats.flush();
     void this.sync.driveAuto();
@@ -958,6 +965,7 @@ class App {
     this.renderer.joystickFixed = padMode;
     this.renderer.padIdle = padMode && !this.input.stick ? this.input.padCenter() : null;
     const frozen = this.mode === 'run' && (this.paused || this.game.state !== 'play');
+    if (PORTAL) portal.gameplay(this.mode === 'run' && !frozen && !this.modal);
     // draw between the last two sim steps so motion is smooth on 120/144 Hz screens
     this.interp.apply(this.game, frozen ? 1 : Math.min(1, this.acc / DT));
     try {
@@ -989,25 +997,30 @@ class App {
   };
 }
 
-const app = new App();
+// Portal editions wait for the portal's SDK (saves and ads go through it) before the game starts.
+function start() {
+  const app = new App();
 
-// Test hook (used by the screenshot/playtest scripts): fast-forward the current run with the autopilot.
-(window as any).__ds = {
-  app,
-  /** The synthesizer class, so the ad recorder can render a run's sound offline. */
-  Audio,
-  botIntent: (g: Game) => botMove(g),
-  advance(seconds: number) {
-    const g = app.game;
-    const steps = Math.round(seconds / DT);
-    for (let i = 0; i < steps && g.state !== 'dead' && g.state !== 'won'; i++) {
-      if (g.state === 'levelup') g.choose(botChoose(g, g.offers));
-      else if (g.state === 'chest') g.closeChest();
-      else if (g.state === 'revive') g.revive(true);
-      const [mx, my] = botMove(g);
-      g.step(mx, my);
-      if (g.fx.length > 4000) g.fx.length = 0;
-    }
-    g.fx.splice(0, Math.max(0, g.fx.length - 300));
-  },
-};
+  // Test hook (used by the screenshot/playtest scripts): fast-forward the current run with the autopilot.
+  (window as any).__ds = {
+    app,
+    /** The synthesizer class, so the ad recorder can render a run's sound offline. */
+    Audio,
+    botIntent: (g: Game) => botMove(g),
+    advance(seconds: number) {
+      const g = app.game;
+      const steps = Math.round(seconds / DT);
+      for (let i = 0; i < steps && g.state !== 'dead' && g.state !== 'won'; i++) {
+        if (g.state === 'levelup') g.choose(botChoose(g, g.offers));
+        else if (g.state === 'chest') g.closeChest();
+        else if (g.state === 'revive') g.revive(true);
+        const [mx, my] = botMove(g);
+        g.step(mx, my);
+        if (g.fx.length > 4000) g.fx.length = 0;
+      }
+      g.fx.splice(0, Math.max(0, g.fx.length - 300));
+    },
+  };
+}
+if (PORTAL) void initPortal().then(start, start);
+else start();

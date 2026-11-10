@@ -19,6 +19,7 @@ const AD_CLIENT = 'ca-pub-6900407641110608';
 /** The game sets these so ads can silence and resume its audio. */
 export const adAudio = { mute: () => {}, unmute: () => {} };
 import { h, toast } from '../ui/dom';
+import { PORTAL, portal } from '../portal';
 
 export type Placement = 'revive' | 'double' | 'key' | 'speed' | 'relay' | 'daily' | 'ascend' | 'reroll';
 const AD_REWARD: Record<Placement, string> = {
@@ -197,6 +198,67 @@ class H5Ads implements AdProvider {
   }
 }
 
+/**
+ * CrazyGames portal ads (rewarded only; the portal's SDK decides fill, frequency and format).
+ * If the portal has ads switched off for this session (its "basic launch" phase, kids mode), the
+ * first request says so: that one reward is granted anyway, so no button is ever a dead end,
+ * and ads are then treated as off, which makes ad-gated rewards free like on the normal site.
+ */
+class CrazyAds implements AdProvider {
+  readonly name = 'crazygames';
+  off = false;
+  get available() {
+    return !this.off && !!portal.sdk;
+  }
+  isReady() {
+    return this.available;
+  }
+  showRewarded(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const sdk = portal.sdk;
+      if (!sdk || this.off) {
+        this.off = true;
+        return resolve(true);
+      }
+      let done = false;
+      let started = false;
+      const finish = (ok: boolean) => {
+        if (done) return;
+        done = true;
+        if (started) adAudio.unmute();
+        resolve(ok);
+      };
+      setTimeout(() => {
+        if (!started && !done) {
+          toast('No ad available right now. Try again in a bit', '#8d97ab');
+          finish(false);
+        }
+      }, 10000);
+      try {
+        sdk.ad.requestAd('rewarded', {
+          adStarted: () => {
+            started = true;
+            adAudio.mute();
+          },
+          adFinished: () => finish(true),
+          adError: (e) => {
+            const code = typeof e === 'string' ? e : ((e as { code?: string })?.code ?? '');
+            if (code === 'adsDisabled') {
+              this.off = true;
+              return finish(true);
+            }
+            toast(code === 'adblock' ? 'Ads are blocked, so this reward isn’t available' : 'No ad available right now. Try again in a bit', '#8d97ab');
+            finish(false);
+          },
+        });
+      } catch {
+        this.off = true;
+        finish(true);
+      }
+    });
+  }
+}
+
 class NoAds implements AdProvider {
   readonly name = 'none';
   isReady() {
@@ -208,6 +270,8 @@ class NoAds implements AdProvider {
 }
 
 function pick(): AdProvider {
+  // portal builds only ever use the portal's ads
+  if (PORTAL === 'crazygames') return new CrazyAds();
   try {
     const q = new URLSearchParams(location.search).get('ads');
     if (q === 'demo') return new DemoAds();
@@ -232,4 +296,4 @@ export const ads: AdProvider = {
     return ok;
   },
 };
-export const adsOn = () => ads.name !== 'none';
+export const adsOn = () => ads.name !== 'none' && !(provider instanceof CrazyAds && !provider.available);
