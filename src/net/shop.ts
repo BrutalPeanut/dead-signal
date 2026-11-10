@@ -23,7 +23,7 @@ export async function shopStatus(): Promise<ShopStatus | null> {
   }
 }
 
-export type CheckoutResult = { url: string } | { error: 'owned' | 'offline' | 'unavailable' };
+export type CheckoutResult = { url: string } | { error: 'owned' | 'offline' | 'unavailable' | 'not_ready' };
 
 export async function startCheckout(product: ProductId, player: string): Promise<CheckoutResult> {
   try {
@@ -34,7 +34,7 @@ export async function startCheckout(product: ProductId, player: string): Promise
     });
     const out = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
     if (out.url) return { url: out.url };
-    return { error: out.error === 'owned' ? 'owned' : 'unavailable' };
+    return { error: out.error === 'owned' ? 'owned' : out.error === 'not_configured' ? 'not_ready' : 'unavailable' };
   } catch {
     return { error: 'offline' };
   }

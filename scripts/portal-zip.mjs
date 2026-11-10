@@ -10,7 +10,7 @@ if (!portal || !existsSync(dir)) {
   console.error(`No ${dir}/ — run the portal build first`);
   process.exit(1);
 }
-for (const f of ['ads.txt', 'CNAME', 'manifest.webmanifest', 'robots.txt', 'sitemap.xml', 'og.png', 'og.jpg']) rmSync(join(dir, f), { force: true });
+for (const f of ['ads.txt', 'app-ads.txt', 'CNAME', 'manifest.webmanifest', 'robots.txt', 'sitemap.xml', 'og.png', 'og.jpg']) rmSync(join(dir, f), { force: true });
 for (const f of readdirSync(dir)) if (/^google[0-9a-f]+\.html$/.test(f)) rmSync(join(dir, f)); // Search Console verification
 const zip = `dead-signal-${portal}.zip`;
 rmSync(zip, { force: true });

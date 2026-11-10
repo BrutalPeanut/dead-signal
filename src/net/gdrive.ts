@@ -1,3 +1,4 @@
+import { NATIVE } from '../native';
 /**
  * Google Drive backup: the save goes into the player's own Drive, in the hidden app-data folder
  * (scope drive.appdata: the game can only see its own file, never the player's documents, and the
@@ -26,7 +27,8 @@ export function setDriveFetch(f: DriveFetch) {
   fx = f;
 }
 
-export const driveConfigured = () => !!GOOGLE_CLIENT_ID;
+// Google sign-in is blocked inside app WebViews, so the Play app leaves Drive backup out
+export const driveConfigured = () => !!GOOGLE_CLIENT_ID && !NATIVE;
 
 /** In-app browsers where Google refuses to show its sign-in page. */
 export function inAppBrowser(ua = typeof navigator !== 'undefined' ? navigator.userAgent : '') {

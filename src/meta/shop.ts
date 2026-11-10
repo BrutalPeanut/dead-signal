@@ -48,7 +48,9 @@ export const PRODUCTS: Record<ProductId, Product> = {
   },
 };
 
-export const price = (p: Product) => `$${(p.cents / 100).toFixed(2)}`;
+/** Store-localized price labels (the Play app fills these from Google Play). */
+export const priceOverride: Partial<Record<ProductId, string>> = {};
+export const price = (p: Product) => priceOverride[p.id] ?? `$${(p.cents / 100).toFixed(2)}`;
 
 /** One row from the shop_claim RPC. */
 export interface PurchaseRow {

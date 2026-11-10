@@ -20,6 +20,7 @@ const AD_CLIENT = 'ca-pub-6900407641110608';
 export const adAudio = { mute: () => {}, unmute: () => {} };
 import { h, toast } from '../ui/dom';
 import { PORTAL, portal } from '../portal';
+import { NATIVE, showNativeRewarded } from '../native';
 
 export type Placement = 'revive' | 'double' | 'key' | 'speed' | 'relay' | 'daily' | 'ascend' | 'reroll';
 const AD_REWARD: Record<Placement, string> = {
@@ -259,6 +260,22 @@ class CrazyAds implements AdProvider {
   }
 }
 
+/** Google Play app: AdMob rewarded ads through the Capacitor plugin (see src/native.ts). */
+class NativeAds implements AdProvider {
+  readonly name = 'admob';
+  isReady() {
+    return true;
+  }
+  async showRewarded(): Promise<boolean> {
+    const r = await showNativeRewarded(() => adAudio.mute(), () => adAudio.unmute());
+    if (r === 'unfilled') {
+      toast('No ad available right now. Try again in a bit', '#8d97ab');
+      return false;
+    }
+    return r;
+  }
+}
+
 class NoAds implements AdProvider {
   readonly name = 'none';
   isReady() {
@@ -272,6 +289,7 @@ class NoAds implements AdProvider {
 function pick(): AdProvider {
   // portal builds only ever use the portal's ads
   if (PORTAL === 'crazygames') return new CrazyAds();
+  if (NATIVE === 'android') return new NativeAds();
   try {
     const q = new URLSearchParams(location.search).get('ads');
     if (q === 'demo') return new DemoAds();

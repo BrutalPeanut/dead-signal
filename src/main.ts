@@ -25,7 +25,9 @@ import { haptic, setHaptics, toast, fmtNum } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
 import { LEVELUP_TIP, Tutorial } from './ui/tutorial';
 import { adAudio, adListeners, adSkip, ads, adsOn } from './ads/ads';
-import { PRODUCTS, applyPurchases, type Granted, type ProductId } from './meta/shop';
+import { PRODUCTS, applyPurchases, priceOverride, type Granted, type ProductId } from './meta/shop';
+import { NATIVE, initBilling, initNativeAds, playBuy, playOwned, playPrices } from './native';
+import { seasonOf } from './meta/pass';
 import { claimPurchases, shopStatus, startCheckout } from './net/shop';
 adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
@@ -106,6 +108,7 @@ function makeProfile() {
 /** Where a player came from, for launch-channel comparisons: ?utm_source=… or ?src=… (short, lowercase). */
 function utmSource(): string {
   if (PORTAL) return PORTAL;
+  if (NATIVE) return 'play';
   const q = new URLSearchParams(location.search);
   return (q.get('utm_source') ?? q.get('src') ?? '').toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 32);
 }
@@ -319,6 +322,7 @@ class App {
   private initShop() {
     if (PORTAL) return;
     adSkip.on = () => this.profile.adFree();
+    if (NATIVE) return this.initPlayShop();
     let q: string | null = null;
     try {
       q = new URLSearchParams(location.search).get('shop');
@@ -338,6 +342,11 @@ class App {
       /* private mode */
     }
     this.hub.onBuy = (id) => this.buy(id);
+    // the preview link always shows the shop, even before Stripe is connected
+    if (preview) {
+      this.hub.shopOn = true;
+      this.hub.refresh();
+    }
     void shopStatus().then((st) => {
       if (!st?.ready) return;
       this.hub.shopOn = st.live || preview;
@@ -348,6 +357,26 @@ class App {
     });
     if (q === 'done') toast('Payment received · delivering…', '#43e08a');
     if (q === 'cancel') setTimeout(() => toast('Checkout cancelled · nothing was charged', '#8d97ab'), 400);
+  }
+
+  /** Google Play app: AdMob, Play Billing, and a restore of owned items on every launch. */
+  private initPlayShop() {
+    void initNativeAds();
+    this.hub.onBuy = async (id) => {
+      const r = await playBuy(id, this.profile.playerId(), seasonOf().n);
+      if (r === 'cancelled') return;
+      if (r === 'error') return toast('The purchase didn’t go through. You weren’t charged', '#8d97ab');
+      this.stats.feature(`checkout:${id}`);
+      this.thank(applyPurchases(this.profile, [r]));
+    };
+    void initBilling().then(async (ok) => {
+      if (!ok) return;
+      Object.assign(priceOverride, playPrices);
+      this.hub.shopOn = true;
+      this.hub.refresh();
+      const owned = await playOwned();
+      if (owned.length) this.thank(applyPurchases(this.profile, owned));
+    });
   }
 
   private async buy(id: ProductId) {
@@ -361,7 +390,7 @@ class App {
     if (r.error === 'owned') {
       toast('You already own this · restoring it', '#43e08a');
       void this.deliver(1);
-    } else toast(r.error === 'offline' ? 'You’re offline · connect to buy' : 'The shop is unavailable right now. Try again in a bit', '#8d97ab');
+    } else toast(r.error === 'offline' ? 'You’re offline · connect to buy' : r.error === 'not_ready' ? 'Shop preview: checkout opens once Stripe is connected' : 'The shop is unavailable right now. Try again in a bit', '#8d97ab');
   }
 
   /** Pick up purchases (the webhook can lag a few seconds behind Stripe's redirect, so retry). */
