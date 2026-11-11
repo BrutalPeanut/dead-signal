@@ -29,14 +29,21 @@ jobs:
         run: npm run build:android
         env:
           ADMOB_LIVE: ${{ inputs.ads_live && '1' || '0' }}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      # GitHub's Ubuntu runners already include the Android SDK (ANDROID_HOME)
       - name: Upload key
-        run: echo "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+        # without the secrets the bundle is still built (unsigned) so the code gets checked
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_B64" ]; then
+            echo "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ANDROID_KEYSTORE_B64 secret not set: building an UNSIGNED bundle (Play won't accept it)"
+          fi
         env:
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
       - name: Version name
@@ -47,7 +54,6 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon bundleRelease
         env:
-          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: upload
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
