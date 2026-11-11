@@ -12,7 +12,7 @@ on:
         default: false
 
 permissions:
-  contents: read
+  contents: write # pushes the signed bundle to the android-builds branch
 
 jobs:
   bundle:
@@ -67,3 +67,17 @@ jobs:
           name: dead-signal-aab
           path: dead-signal-*.aab
           if-no-files-found: error
+      - name: Publish the bundle to the android-builds branch
+        # a stable download URL (raw.githubusercontent.com) for uploading to Play Console;
+        # the branch only ever holds the latest bundles, never source code
+        if: env.ANDROID_KEYSTORE_PATH != ''
+        run: |
+          f=$(ls dead-signal-*.aab)
+          mkdir -p /tmp/out && cp "$f" /tmp/out/ && cp "$f" /tmp/out/latest${{ inputs.ads_live && '' || '-testads' }}.aab
+          cd /tmp/out
+          git init -q -b android-builds
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -qm "Android bundle $f"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" android-builds
+          echo "Bundle: https://raw.githubusercontent.com/${{ github.repository }}/android-builds/$f" >> "$GITHUB_STEP_SUMMARY"
