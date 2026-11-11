@@ -1,0 +1,90 @@
+name: iOS app (TestFlight / App Store)
+
+# Builds the iPhone app on a GitHub Mac, signs it, and uploads it to App Store Connect, where it
+# shows up in TestFlight after Apple's processing (~10-30 min). Run it from the Actions tab.
+# Needs repository secrets: APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (the whole .p8 text).
+# ads_live = false uses Google's test ads; true needs the ADMOB_IOS_APP_ID repository variable.
+on:
+  workflow_dispatch:
+    inputs:
+      ads_live:
+        description: 'Real AdMob ads (true only for the App Store release)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Newest Xcode on the runner
+        run: |
+          x=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$x" && xcodebuild -version
+      - name: Build the game for the app
+        run: npm run build:ios
+        env:
+          ADMOB_LIVE: ${{ inputs.ads_live && '1' || '0' }}
+      - name: Live AdMob app id
+        if: ${{ inputs.ads_live }}
+        run: /usr/libexec/PlistBuddy -c "Set :GADApplicationIdentifier ${{ vars.ADMOB_IOS_APP_ID }}" ios/App/App/Info.plist
+      - name: App Store Connect API key
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      - name: Archive (signed automatically with the API key)
+        working-directory: ios/App
+        run: |
+          xcodebuild archive \
+            -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            MARKETING_VERSION="$(node -p "require('../../package.json').version")" \
+            | tail -40
+          test -d "$RUNNER_TEMP/App.xcarchive"
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      - name: Upload to App Store Connect
+        run: |
+          cat > "$RUNNER_TEMP/export.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "Uploaded build ${{ github.run_number }}. It appears in TestFlight once Apple finishes processing." >> "$GITHUB_STEP_SUMMARY"
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}

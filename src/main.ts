@@ -108,7 +108,7 @@ function makeProfile() {
 /** Where a player came from, for launch-channel comparisons: ?utm_source=… or ?src=… (short, lowercase). */
 function utmSource(): string {
   if (PORTAL) return PORTAL;
-  if (NATIVE) return 'play';
+  if (NATIVE) return NATIVE === 'ios' ? 'appstore' : 'play';
   const q = new URLSearchParams(location.search);
   return (q.get('utm_source') ?? q.get('src') ?? '').toLowerCase().replace(/[^a-z0-9_.-]/g, '').slice(0, 32);
 }

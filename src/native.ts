@@ -1,24 +1,30 @@
 /**
- * Store-app builds (Google Play now). `npm run build:android` compiles the same game with
- * __NATIVE__ = 'android' into dist-android/, which Capacitor wraps as the Android app
- * (see android/ and .github/workflows/android.yml). Differences from the site:
+ * Store-app builds. `npm run build:android` / `build:ios` compile the same game with
+ * __NATIVE__ = 'android' | 'ios' into dist-android/ or dist-ios/, which Capacitor wraps
+ * (see android/, ios/ and .github/workflows/android.yml, ios.yml). Differences from the site:
  *  - ads: AdMob rewarded ads (still rewarded and opt-in only, same placements)
- *  - shop: Google Play Billing instead of Stripe (Play requires it for digital items)
+ *  - shop: Google Play Billing / Apple in-app purchase instead of Stripe (the stores require it)
  *  - Google Drive backup is hidden (Google sign-in doesn't run inside an app WebView);
  *    cloud save codes, leaderboards and anonymous stats work as on the site
  * The site build has __NATIVE__ = '' and never loads any of the plugins.
  */
 declare const __NATIVE__: string;
 declare const __ADMOB_LIVE__: boolean;
-export const NATIVE: '' | 'android' = typeof __NATIVE__ !== 'undefined' && __NATIVE__ === 'android' ? 'android' : '';
+const RAW = typeof __NATIVE__ !== 'undefined' ? __NATIVE__ : '';
+export const NATIVE: '' | 'android' | 'ios' = RAW === 'android' || RAW === 'ios' ? RAW : '';
+/** "Google Play" / "the App Store", for player-facing text. */
+export const STORE_NAME = NATIVE === 'ios' ? 'the App Store' : 'Google Play';
 
-/** AdMob rewarded unit. Closed-test builds use Google's test unit so testers never tap real ads. */
-const REWARDED_LIVE = 'ca-app-pub-6900407641110608/2783161067';
-const REWARDED_TEST = 'ca-app-pub-3940256099942544/5224354917';
+/** AdMob rewarded units. Test builds use Google's test units so testers never tap real ads. */
+const REWARDED_LIVE = { android: 'ca-app-pub-6900407641110608/2783161067', ios: '' }; // ios: set once the iOS AdMob app exists
+const REWARDED_TEST = { android: 'ca-app-pub-3940256099942544/5224354917', ios: 'ca-app-pub-3940256099942544/1712485313' };
 /** AdMob app id (also in android/app/src/main/AndroidManifest.xml). */
 export const ADMOB_APP_ID = 'ca-app-pub-6900407641110608~8554362492';
 export const ADMOB_LIVE = typeof __ADMOB_LIVE__ !== 'undefined' && __ADMOB_LIVE__;
-const rewardedUnit = () => (ADMOB_LIVE ? REWARDED_LIVE : REWARDED_TEST);
+const rewardedUnit = () => {
+  const p = NATIVE === 'ios' ? 'ios' : 'android';
+  return (ADMOB_LIVE && REWARDED_LIVE[p]) || REWARDED_TEST[p];
+};
 
 type AdMobMod = typeof import('@capacitor-community/admob');
 let admob: AdMobMod | null = null;
@@ -27,11 +33,20 @@ let loading: Promise<boolean> | null = null;
 
 /** Start AdMob (with Google's consent form where the law asks for one) and preload an ad. */
 export async function initNativeAds(): Promise<boolean> {
-  if (NATIVE !== 'android') return false;
+  if (!NATIVE) return false;
   try {
     admob = await import('@capacitor-community/admob');
     const { AdMob } = admob;
     await AdMob.initialize({ initializeForTesting: !ADMOB_LIVE });
+    if (NATIVE === 'ios') {
+      // Apple's App Tracking Transparency prompt; ads still work (non-personalized) if declined
+      try {
+        const st = await AdMob.trackingAuthorizationStatus();
+        if (st.status === 'notDetermined') await AdMob.requestTrackingAuthorization();
+      } catch {
+        /* older iOS: no prompt needed */
+      }
+    }
     try {
       const info = await AdMob.requestConsentInfo();
       if (info.isConsentFormAvailable && info.status === admob.AdmobConsentStatus.REQUIRED) await AdMob.showConsentForm();
@@ -80,9 +95,9 @@ export async function showNativeRewarded(onStart: () => void, onEnd: () => void)
   return rewarded;
 }
 
-// ------------------------------------------------------------------ Google Play Billing
+// ------------------------------------------------------------------ store billing
 
-/** Play Console product ids (one-time products). Brian creates these in Play Console. */
+/** Store product ids (one-time products), the same in Play Console and App Store Connect. */
 export const PLAY_IDS = { starter: 'starter_pack', pass: 'signal_pass_plus', adfree: 'skip_ads' } as const;
 type PlayKey = keyof typeof PLAY_IDS;
 const byPlayId = Object.fromEntries(Object.entries(PLAY_IDS).map(([k, v]) => [v, k])) as Record<string, PlayKey>;
@@ -93,7 +108,7 @@ let np: PurchasesMod | null = null;
 export const playPrices: Partial<Record<PlayKey, string>> = {};
 
 export async function initBilling(): Promise<boolean> {
-  if (NATIVE !== 'android') return false;
+  if (!NATIVE) return false;
   try {
     np = await import('@capgo/native-purchases');
     const ok = await np.NativePurchases.isBillingSupported();

@@ -16,7 +16,8 @@
     "ascension": "vite-node scripts/ascension.ts",
     "stats": "node scripts/stats.mjs",
     "build:crazygames": "tsc --noEmit && VITE_PORTAL=crazygames vite build && node scripts/portal-zip.mjs crazygames",
-    "build:android": "tsc --noEmit && VITE_NATIVE=android vite build && cap sync android"
+    "build:android": "tsc --noEmit && VITE_NATIVE=android vite build && CAP_WEBDIR=dist-android cap sync android",
+    "build:ios": "tsc --noEmit && VITE_NATIVE=ios vite build && CAP_WEBDIR=dist-ios cap sync ios"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.6.0",
@@ -37,6 +38,7 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
     "@capgo/native-purchases": "^8.9.8",
     "@fontsource/chakra-petch": "^5.3.0",
     "@fontsource/saira-stencil-one": "^5.3.0",
