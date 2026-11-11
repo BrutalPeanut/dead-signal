@@ -289,7 +289,7 @@ class NoAds implements AdProvider {
 function pick(): AdProvider {
   // portal builds only ever use the portal's ads
   if (PORTAL === 'crazygames') return new CrazyAds();
-  if (NATIVE === 'android') return new NativeAds();
+  if (NATIVE) return new NativeAds();
   try {
     const q = new URLSearchParams(location.search).get('ads');
     if (q === 'demo') return new DemoAds();

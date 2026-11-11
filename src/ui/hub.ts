@@ -22,7 +22,7 @@ import { CHARACTERS, charById } from '../meta/characters';
 import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../meta/pass';
 import { cleanName } from '../net/names';
 import { PRODUCTS, offers, price, priceOverride, type Product, type ProductId } from '../meta/shop';
-import { NATIVE } from '../native';
+import { NATIVE, STORE_NAME } from '../native';
 import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
 import { gearIcon, skillIcon } from '../render/icons';
 import { BOSSES, GUN_IDS, WEAPONS, gunUnlock, isGun, runLengthFor, starTimes } from '../sim/data';
@@ -573,7 +573,7 @@ export class Hub {
       h('div.shop-list', offers(this.p, adsOn()).filter((o) => !NATIVE || priceOverride[o.product.id]).map(card)),
       h(
         'div.help.shop-foot',
-        NATIVE ? 'Paid through Google Play. Items arrive right away. ' : 'Secure checkout by Stripe. Items arrive in the game as soon as you return. ',
+        NATIVE ? `Paid through ${STORE_NAME}. Items arrive right away. ` : 'Secure checkout by Stripe. Items arrive in the game as soon as you return. ',
         h('a', { href: './legal.html', target: '_blank', rel: 'noopener' }, 'Terms & refunds'),
       ),
       h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Close'),
