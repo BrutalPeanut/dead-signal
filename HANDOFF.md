@@ -11,8 +11,8 @@ Read this first in a new session, then CLAUDE.md. Brian's prefs: always give dir
 - Android opt-in: https://play.google.com/apps/testing/info.deadsignal.game
 
 ## Builds in flight
-- Android: build 8 (all fixes incl. QA cloud-save fixes, leaner courier) submitted to Google review on the closed track. Build 7 already live to testers. Upload method: in Play Console page, JS `fetch` the AAB from `https://raw.githubusercontent.com/BrutalPeanut/dead-signal/android-builds/<file>.aab` (workflow android.yml publishes it), set it on the release page's `input[type=file]` via DataTransfer, add notes in `<en-US>…</en-US>`, Save, then Publishing overview → Submit → Send changes for review.
-- iOS: build 4 is still in Beta App Review (Apple reviews one at a time). Builds 7 and 9 uploaded and waiting. When 4 is approved: dispatch ios.yml with `distribute_build=9` (newest). New iOS builds auto-distribute to Public Beta when nothing is in review.
+- Android: build 8 (all fixes incl. QA cloud-save fixes, leaner courier) is APPROVED and live on the closed track (checked 2026-11-12 ~3 AM ET). Upload method: in Play Console page, JS `fetch` the AAB from `https://raw.githubusercontent.com/BrutalPeanut/dead-signal/android-builds/<file>.aab` (workflow android.yml publishes it), set it on the release page's `input[type=file]` via DataTransfer, add notes in `<en-US>…</en-US>`, Save, then Publishing overview → Submit → Send changes for review.
+- iOS: build 4 still in Beta App Review as of ~3 AM ET 2026-11-12 (distribute_build=9 tried; Apple said another build is in review; the distribute lane now exits cleanly in that case, PR 114) (Apple reviews one at a time). Builds 7 and 9 uploaded and waiting. When 4 is approved: dispatch ios.yml with `distribute_build=9` (newest). New iOS builds auto-distribute to Public Beta when nothing is in review.
 - Scheduled check at 8:47 AM ET (2026-11-12) will try `distribute_build=9` and upload Android build 8 if needed.
 
 ## Done tonight
