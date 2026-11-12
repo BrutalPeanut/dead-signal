@@ -11,6 +11,14 @@ on:
         description: 'Real AdMob ads (true only for the App Store release)'
         type: boolean
         default: false
+      distribute_build:
+        description: 'Only send this already-uploaded build number to Public Beta (skips building)'
+        type: string
+        default: ''
+      what_to_test:
+        description: 'What to Test note for testers (optional)'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -50,13 +58,15 @@ jobs:
         working-directory: ios/App
         run: |
           command -v fastlane >/dev/null || brew install fastlane
-          fastlane beta
+          if [ -n "$DISTRIBUTE_BUILD" ]; then fastlane distribute; else fastlane beta; fi
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_PATH: ${{ runner.temp }}/keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
           BUILD_NUMBER: ${{ github.run_number }}
+          DISTRIBUTE_BUILD: ${{ inputs.distribute_build }}
+          WHAT_TO_TEST: ${{ inputs.what_to_test || 'Play a few runs! Tell us what felt fun, what felt unfair or too hard, and anything that broke or looked wrong. Ads are test ads in this beta.' }}
           FASTLANE_SKIP_UPDATE_CHECK: '1'
           FASTLANE_HIDE_CHANGELOG: '1'
       - name: Summary
