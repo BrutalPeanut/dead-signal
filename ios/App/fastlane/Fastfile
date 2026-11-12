@@ -14,7 +14,8 @@ platform :ios do
       issuer_id: ENV.fetch('ASC_ISSUER_ID'),
       key_filepath: ENV.fetch('ASC_KEY_PATH')
     )
-    upload_to_testflight(
+    begin
+      upload_to_testflight(
       api_key: api_key,
       distribute_only: true,
       app_identifier: 'info.deadsignal.game',
@@ -25,7 +26,12 @@ platform :ios do
       distribute_external: true,
       notify_external_testers: true,
       changelog: ENV.fetch('WHAT_TO_TEST', DEFAULT_WHAT_TO_TEST)
-    )
+      )
+    rescue => e
+      # Apple reviews one beta build at a time; try again once the earlier review finishes.
+      raise unless e.to_s =~ /in review/i
+      UI.important("Build #{ENV['DISTRIBUTE_BUILD']} not sent yet: another build is still in Beta App Review. Run this again after it's approved.")
+    end
   end
 
   lane :beta do
