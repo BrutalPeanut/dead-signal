@@ -3419,15 +3419,25 @@ textarea {
   gap: 10px;
 }
 
-.cal-item {
+/* "?" item box (sign-in calendar, Signal Pass). The parent rules `.cal-rw > span` and
+   `.ps-cell > span` outrank a bare `.cal-item` and left-aligned the "?", so match them here. */
+.cal-item,
+.cal-rw > .cal-item,
+.ps-cell > .cal-item {
+  box-sizing: border-box;
+  flex: none;
   width: 36px;
   height: 36px;
   border-radius: 10px;
   border: 2px solid;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
   font-size: 20px;
   font-weight: 900;
+  text-align: center;
   background: rgba(0, 0, 0, 0.3);
 }
 
@@ -4078,7 +4088,7 @@ textarea {
   gap: 3px;
 }
 
-.ps-cell .cal-item {
+.ps-cell > .cal-item {
   width: 28px;
   height: 28px;
   font-size: 15px;
