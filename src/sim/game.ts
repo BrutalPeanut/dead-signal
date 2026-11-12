@@ -66,6 +66,8 @@ export interface RunResult {
   runLength?: number;
   /** What landed the final hit on a loss (enemy kind or boss attack), for the death tip. */
   killedBy?: string;
+  /** The player left the run from the pause menu (not a death). Set by the app, not the sim. */
+  retreated?: boolean;
   killedByBoss?: string;
 }
 

@@ -6,6 +6,9 @@ import { gearIcon, skillIcon } from '../render/icons';
 import { BOSSES, RUN_LENGTH, WEAPONS, starTimes, type BossKind } from '../sim/data';
 import { DAILY_TIERS } from '../sim/modes';
 
+/** Headline for a run that wasn't won: leaving from the pause menu is a retreat, not a death. */
+export const resultTitle = (r: { retreated?: boolean }) => (r.retreated ? 'RETREATED' : 'SIGNAL LOST');
+
 /** "What got me, and what do I do about it" — one line, shown on a loss. */
 export function deathTip(src?: string, boss?: string): [string, string] | null {
   if (!src) return null;
@@ -39,7 +42,7 @@ export function resultsModal(
   onDoubleAd?: () => Promise<boolean>,
   onGunInfo?: (id: string) => void,
 ) {
-  const title = rw.mode === 'endless' ? (rw.newBest ? 'NEW RECORD' : 'SIGNAL LOST') : rw.mode === 'daily' ? (r.won ? 'CHALLENGE CLEARED' : 'CHALLENGE OVER') : r.won ? 'SECTOR CLEARED' : 'SIGNAL LOST';
+  const title = rw.mode === 'endless' ? (rw.newBest ? 'NEW RECORD' : resultTitle(r)) : rw.mode === 'daily' ? (r.won ? 'CHALLENGE CLEARED' : 'CHALLENGE OVER') : r.won ? 'SECTOR CLEARED' : resultTitle(r);
   const color = r.won || (rw.mode === 'endless' && rw.newBest) ? '#43ffa4' : '#ff3b5c';
   const rewards: HTMLElement[] = [
     h('div.reward', coin('gold'), `+${fmtNum(rw.gold)}`),
@@ -138,6 +141,7 @@ export function resultsModal(
       : null,
     h('div.next-goal', next),
     (() => {
+      if (r.retreated && !r.won) return h('div.death-tip', h('small', 'You retreated'), h('span', 'Everything you earned this run is kept.'));
       const tip = r.won ? null : deathTip(r.killedBy, r.killedByBoss);
       return tip ? h('div.death-tip', h('small', `Downed by ${tip[0]}`), h('span', tip[1])) : null;
     })(),

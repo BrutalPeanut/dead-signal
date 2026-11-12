@@ -26,6 +26,27 @@ export function h(sel: string, attrs: Attrs | Child | Child[] = {}, ...children:
   return el;
 }
 
+/**
+ * Attributes that make a non-button element (an icon inside another button, a HUD slot) a real
+ * control: focusable with Tab, named for screen readers, and activated by Enter or Space as well
+ * as by tap/click. Touch behaviour is unchanged.
+ */
+export function pressable(label: string, onPress: (e: Event) => void): Attrs {
+  return {
+    role: 'button',
+    tabindex: 0,
+    title: label,
+    'aria-label': label,
+    onclick: onPress,
+    onkeydown: (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault(); // Space must not scroll, Enter must not also press the parent card
+      e.stopPropagation();
+      onPress(e);
+    },
+  };
+}
+
 export function clear(el: HTMLElement) {
   while (el.firstChild) el.removeChild(el.firstChild);
 }

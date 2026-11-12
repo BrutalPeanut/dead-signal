@@ -7,7 +7,7 @@ import type { PassiveId, WeaponId, WeaponLevel } from '../sim/data';
 import { weaponStats, withPartner } from '../sim/weapons';
 import type { Banner } from '../render/fx';
 import { skillIcon } from '../render/icons';
-import { coin, controlsPicker, fmtNum, fmtTime, h, moveHint } from './dom';
+import { coin, controlsPicker, fmtNum, fmtTime, h, moveHint, pressable } from './dom';
 
 /**
  * HUD values update at most when they change, and the skill row only rebuilds when the build
@@ -223,7 +223,7 @@ export function loadoutRows(
   maxP = MAX_PASSIVE_SLOTS,
   onTap?: (kind: 'weapon' | 'passive', id: string) => void,
 ) {
-  const tap = (kind: 'weapon' | 'passive', id: string) => (onTap ? { onclick: () => onTap(kind, id), role: 'button', title: 'Show stats' } : {});
+  const tap = (kind: 'weapon' | 'passive', id: string) => (onTap ? pressable(`Show stats: ${kind === 'weapon' ? WEAPONS[id as WeaponId].name : PASSIVES[id as PassiveId].name}`, () => onTap(kind, id)) : {});
   const cls = onTap ? 'div.sk.tap' : 'div.sk';
   const row = (kind: 'atk' | 'sup', label: string, filled: HTMLElement[]) => {
     const max = kind === 'atk' ? maxW : maxP;
@@ -284,14 +284,11 @@ export function offerCard(g: Game, o: Offer, onPick: (() => void) | null, onInfo
     onInfo && (o.type === 'weapon' || o.type === 'passive')
       ? h(
           'span.info-ico',
-          {
-            title: 'Show stats',
-            // the card itself is the pick button: tapping the icon only opens the stats
-            onclick: (e: Event) => {
-              e.stopPropagation();
-              onInfo();
-            },
-          },
+          // the card itself is the pick button: the icon (tap, or Tab + Enter) only opens the stats
+          pressable(`Show stats: ${offerTitle(o)}`, (e: Event) => {
+            e.stopPropagation();
+            onInfo();
+          }),
           h('img', { src: offerIcon(o), alt: '' }),
           h('i', 'i'),
         )
@@ -460,7 +457,7 @@ function combo(g: Game, o: Offer) {
     return h(
       'div.combo' + (has ? '.warm' : ''),
       h('i', '🔗'),
-      has ? `You have its partner ${pname}. Max this to evolve it into ${wd.evoName}` : `Pairs with ${pname} (support): max both to evolve into ${wd.evoName}`,
+      has ? `You have its partner ${pname}. Max this to evolve it into ${wd.evoName}` : `Pairs with ${pname} (support): max this weapon while holding it to evolve into ${wd.evoName}`,
     );
   }
   return null;
@@ -537,6 +534,7 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
  * The level-up screen must never need a scroll: once it is on screen, step it down through
  * tighter layouts (.fit1 → .fit3) until everything, Reroll included, fits the viewport.
  */
+let fitReset: (() => void) | null = null;
 function fitNoScroll(el: HTMLElement) {
   let step = 0;
   const check = () => {
@@ -548,14 +546,16 @@ function fitNoScroll(el: HTMLElement) {
     requestAnimationFrame(check);
   };
   requestAnimationFrame(check);
-  // rotating or resizing the window re-runs the fit from the roomiest layout
-  const reset = () => {
-    if (!el.isConnected) return removeEventListener('resize', reset);
+  // Rotating or resizing the window re-runs the fit from the roomiest layout. One window listener
+  // is shared by every level-up screen (it follows the newest one), so none pile up over a run.
+  const first = !fitReset;
+  fitReset = () => {
+    if (!el.isConnected) return;
     el.classList.remove('fit1', 'fit2', 'fit3');
     step = 0;
     requestAnimationFrame(check);
   };
-  addEventListener('resize', reset);
+  if (first) addEventListener('resize', () => fitReset?.());
 }
 
 export function chestModal(g: Game, onClose: () => void) {
@@ -568,7 +568,7 @@ export function chestModal(g: Game, onClose: () => void) {
         'div.card',
         { style: { borderColor: '#ffd34d' } },
         h('span.badge.evo', 'EVOLVED'),
-        h('span.info-ico', { title: 'Show stats', onclick: () => showSkillInfo(g, 'weapon', id) }, h('img', { src: skillIcon(id, true), alt: '' }), h('i', 'i')),
+        h('span.info-ico', pressable(`Show stats: ${WEAPONS[id].name}`, () => showSkillInfo(g, 'weapon', id)), h('img', { src: skillIcon(id, true), alt: '' }), h('i', 'i')),
         h('div', h('div.name', { style: { color: '#ffd34d' } }, w.evoName), h('div.desc', w.evoDesc)),
       ),
     );

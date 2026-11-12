@@ -241,6 +241,20 @@ export function progressOf(d: SaveData): number {
   return Math.min(d.asc?.rank ?? 0, 9000) * 1e11 + d.unlocked * 1e9 + Math.min(d.accountLevel, 9999) * 1e5 + Math.min(Math.max(0, d.accountXp | 0), 99999);
 }
 
+/**
+ * Is save `a` further along than save `b`? Progress first (rank, sector, level, XP); on a tie,
+ * whichever has had more happen on it: sign-in rewards claimed, runs played, kills, items found.
+ * These only ever go up, so two devices at the same sector/level/XP still order correctly
+ * (e.g. the one that claimed today's sign-in reward is ahead and is never overwritten).
+ */
+export function aheadOf(a: SaveData, b: SaveData): boolean {
+  const key = (d: SaveData) => [progressOf(d), d.login?.claimed ?? 0, d.stats?.runs ?? 0, d.stats?.kills ?? 0, d.uidSeq ?? 0];
+  const ka = key(a);
+  const kb = key(b);
+  for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] > kb[i];
+  return false;
+}
+
 export class Profile {
   data: SaveData;
   /** Playtest links only (never saved): floor for ATK/HP so a test save can hold its own deep in the campaign. */

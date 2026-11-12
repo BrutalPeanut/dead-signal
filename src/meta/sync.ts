@@ -1,5 +1,5 @@
 import { cloudGet, cloudList, cloudPull, cloudPush, newSyncCode, normalizeCode, type CloudVersion } from '../net/cloud';
-import { normalizeSave, progressOf, type Profile } from './profile';
+import { aheadOf, normalizeSave, progressOf, type Profile } from './profile';
 import { driveLoad, driveSave, signIn, signedIn } from '../net/gdrive';
 
 /**
@@ -8,6 +8,10 @@ import { driveLoad, driveSave, signIn, signedIn } from '../net/gdrive';
  * the cloud copy for this code is further along than this device (another device played on), it
  * is adopted. The local save always comes first: the game never waits on the network, and when
  * offline it just keeps playing and backs up later.
+ *
+ * Two devices on one code: every backup first looks at the newest cloud copy, and a device that
+ * is behind it (see aheadOf) takes that copy instead of overwriting it. So a phone left open on
+ * an old save can't wipe out what a second device did since.
  */
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'ok' | 'offline';
 
@@ -24,6 +28,8 @@ export class CloudSync {
   /** Backups wait until this device has been compared with the cloud at least once. */
   private checked = false;
   private canAdopt: () => boolean = () => true;
+  /** The player chose this save on purpose (restored an older backup): back it up even if the cloud is ahead. */
+  private force = false;
   /** Called whenever a save from the cloud replaced this device's (the app refreshes its UI). */
   onAdopted: () => void = () => {};
 
@@ -69,21 +75,22 @@ export class CloudSync {
       return 'offline';
     }
     this.checked = true;
-    if (remote && remote.progress > progressOf(this.p.data) && normalizeSave(remote.save)) {
+    const theirs = remote ? normalizeSave(remote.save) : null;
+    if (theirs && !this.force && aheadOf(theirs, this.p.data)) {
       if (!canAdopt()) {
         this.behind = true;
         this.set('idle');
         return 'later';
       }
       this.behind = false;
-      this.p.adopt(remote.save);
+      this.p.adopt(remote!.save);
       this.lastPushed = JSON.stringify(this.p.data);
       this.set('ok');
       this.onAdopted();
       return 'adopted';
     }
     this.behind = false;
-    return (await this.pushNow()) ? 'pushed' : 'offline';
+    return (await this.pushNow(true)) ? 'pushed' : 'offline';
   }
 
   private schedule() {
@@ -96,7 +103,7 @@ export class CloudSync {
   }
 
   /** Back up now (skipped if nothing changed since the last backup). */
-  async pushNow(): Promise<boolean> {
+  async pushNow(compared = false): Promise<boolean> {
     if (!this.enabled || this.behind) return false;
     if (!this.checked) {
       // never compared with the cloud yet (launched offline): check first, it pushes if we're ahead
@@ -111,6 +118,31 @@ export class CloudSync {
     if (json === this.lastPushed && this.status === 'ok') return true;
     this.busy = true;
     this.set('syncing');
+    // another device may have backed up since we last looked: never overwrite a save that is ahead
+    if (!compared && !this.force) {
+      const remote = await cloudPull(this.code());
+      if (remote === null) {
+        this.busy = false;
+        this.set('offline');
+        return false;
+      }
+      const theirs = remote ? normalizeSave(remote.save) : null;
+      if (theirs && aheadOf(theirs, this.p.data)) {
+        this.busy = false;
+        this.again = false;
+        if (!this.canAdopt()) {
+          this.behind = true; // mid-run: taken when the run ends (the app calls startup again)
+          this.set('idle');
+          return false;
+        }
+        this.p.adopt(remote!.save);
+        this.lastPushed = JSON.stringify(this.p.data);
+        this.set('ok');
+        this.onAdopted();
+        return true;
+      }
+    }
+    this.force = false;
     const d = this.p.data;
     const id = await cloudPush(this.code(), d.online.id || null, d.online.name || null, JSON.parse(json), d.unlocked, d.accountLevel, progressOf(d));
     this.busy = false;
@@ -179,6 +211,7 @@ export class CloudSync {
     if (!this.p.adopt(save)) return false;
     this.behind = false;
     this.lastPushed = '';
+    this.force = true;
     this.p.data.gdrive = { at: Date.now() };
     this.p.save();
     return true;
@@ -228,6 +261,7 @@ export class CloudSync {
     const v = await cloudGet(this.code(), id);
     if (!v || !this.p.adopt(v.save)) return false;
     this.lastPushed = '';
+    this.force = true;
     await this.pushNow();
     return true;
   }
