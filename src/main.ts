@@ -286,7 +286,11 @@ class App {
         this.trackLeave();
         void this.sync.pushNow();
         void this.stats.flush(true);
-      } else this.activeFrom = performance.now();
+      } else {
+        this.activeFrom = performance.now();
+        // back on this tab/app: another device may have played on meanwhile
+        void this.sync.startup(() => this.mode === 'hub');
+      }
     });
     try {
       if (sessionStorage.getItem('ds.synced')) {
@@ -787,6 +791,12 @@ class App {
     const g = this.game;
     if (g.state !== 'won') g.state = 'dead';
     const r = g.result();
+    if (this.retreated && !r.won) {
+      // a retreat is not a death: no "downed by" on the results screen or in stats
+      r.retreated = true;
+      r.killedBy = undefined;
+      r.killedByBoss = undefined;
+    }
     const mode = this.runMode;
     const rw = mode === 'daily' ? this.profile.applyDaily(r) : mode === 'endless' ? this.profile.applyEndless(this.sector, r) : this.profile.applyRun(this.sector, r);
     this.stats.track('run_end', {

@@ -211,4 +211,87 @@ describe('cloud save', () => {
     const b = progressOf({ ...p.data, unlocked: 4, accountLevel: 1 });
     expect(b).toBeGreaterThan(a);
   });
+
+  // ---- two devices open at once on one code (QA report, bugs 1 and 2)
+
+  /** Two devices sharing a code, both already launched and in sync. */
+  const pair = async () => {
+    const a = device();
+    play(a.p, 3);
+    await a.s.startup();
+    const b = device();
+    const f = await b.s.peek(a.s.code());
+    if (typeof f === 'string') throw new Error(f);
+    b.s.useCode(f.code, f.v);
+    await b.s.startup();
+    return { a, b };
+  };
+
+  it('an already-open device with old progress takes the newer save instead of overwriting it', async () => {
+    const { a, b } = await pair();
+    srv.now += 600_000;
+    play(b.p, 8); // the second device plays on
+    await b.s.pushNow();
+    // the first device, still open on sector 3, changes something small and backs up
+    a.p.data.gold += 5;
+    a.p.save();
+    await a.s.pushNow();
+    expect((srv.rows.at(-1)!.save as { unlocked: number }).unlocked).toBe(8); // cloud untouched
+    expect(a.p.data.unlocked).toBe(8); // and the stale device caught up
+  });
+
+  it('mid-run, a stale device holds its backup and takes the newer save when the run ends', async () => {
+    const { a, b } = await pair();
+    await a.s.startup(() => false); // a is in a run from here on
+    srv.now += 600_000;
+    play(b.p, 8);
+    await b.s.pushNow();
+    a.p.data.gold += 5;
+    a.p.save();
+    expect(await a.s.pushNow()).toBe(false);
+    expect(a.s.behind).toBe(true);
+    expect((srv.rows.at(-1)!.save as { unlocked: number }).unlocked).toBe(8);
+    expect(await a.s.startup()).toBe('adopted');
+    expect(a.p.data.unlocked).toBe(8);
+  });
+
+  it('a sign-in reward claimed on one device survives a backup from the other (same sector, level and XP)', async () => {
+    const { a, b } = await pair();
+    srv.now += 600_000;
+    const before = b.p.data.login.claimed;
+    expect(b.p.claimDaily(new Date('2026-11-12T12:00:00'))).toBeTruthy();
+    await b.s.pushNow();
+    expect(progressOf(b.p.data)).toBe(progressOf(a.p.data)); // identical by the old comparison
+    // the other device toggles a setting-like change and backs up
+    a.p.data.seenIntro = !a.p.data.seenIntro;
+    a.p.save();
+    await a.s.pushNow();
+    const cloud = srv.rows.at(-1)!.save as { login: { claimed: number } };
+    expect(cloud.login.claimed).toBe(before + 1);
+    expect(a.p.data.login.claimed).toBe(before + 1);
+  });
+
+  it('the device that is ahead still backs up normally when the other one is behind', async () => {
+    const { a, b } = await pair();
+    srv.now += 600_000;
+    play(b.p, 8);
+    await b.s.pushNow();
+    play(b.p, 9);
+    await b.s.pushNow();
+    expect((srv.rows.at(-1)!.save as { unlocked: number }).unlocked).toBe(9);
+    void a;
+  });
+
+  it('restoring an older backup on purpose still wins over the newer cloud copy', async () => {
+    const { p, s } = device();
+    play(p, 4);
+    await s.startup();
+    const old = srv.rows.at(-1)!.id;
+    srv.now += 600_000;
+    play(p, 9);
+    await s.pushNow();
+    expect(await s.restore(old)).toBe(true);
+    expect(p.data.unlocked).toBe(4);
+    expect((srv.rows.at(-1)!.save as { unlocked: number }).unlocked).toBe(4);
+  });
 });
