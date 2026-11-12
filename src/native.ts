@@ -16,10 +16,12 @@ export const NATIVE: '' | 'android' | 'ios' = RAW === 'android' || RAW === 'ios'
 export const STORE_NAME = NATIVE === 'ios' ? 'the App Store' : 'Google Play';
 
 /** AdMob rewarded units. Test builds use Google's test units so testers never tap real ads. */
-const REWARDED_LIVE = { android: 'ca-app-pub-6900407641110608/2783161067', ios: '' }; // ios: set once the iOS AdMob app exists
+const REWARDED_LIVE = { android: 'ca-app-pub-6900407641110608/2783161067', ios: 'ca-app-pub-6900407641110608/6108086570' };
 const REWARDED_TEST = { android: 'ca-app-pub-3940256099942544/5224354917', ios: 'ca-app-pub-3940256099942544/1712485313' };
-/** AdMob app id (also in android/app/src/main/AndroidManifest.xml). */
+/** AdMob app ids. Android's is also in android/app/src/main/AndroidManifest.xml; iOS's goes into
+ *  Info.plist (GADApplicationIdentifier) when the iOS workflow builds with ads_live. */
 export const ADMOB_APP_ID = 'ca-app-pub-6900407641110608~8554362492';
+export const ADMOB_IOS_APP_ID = 'ca-app-pub-6900407641110608~7477008563';
 export const ADMOB_LIVE = typeof __ADMOB_LIVE__ !== 'undefined' && __ADMOB_LIVE__;
 const rewardedUnit = () => {
   const p = NATIVE === 'ios' ? 'ios' : 'android';
