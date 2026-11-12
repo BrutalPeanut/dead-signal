@@ -345,7 +345,7 @@ export class Hub {
         h(
           'div.rails.left',
           rail('relay', 'Relay', () => this.setTab('supply'), relay.hours >= 1 ? '!' : null, relayRing),
-          rail('daily', 'Daily', () => this.calendar(), p.dailyAvailable() ? 1 : null),
+          rail('daily', 'Gifts', () => this.calendar(), p.dailyAvailable() ? 1 : null),
           p.canAscend() ? rail('ascend', 'Ascend', () => this.ascendSheet(), '!', null, '.asc-rail') : null,
         ),
         h(

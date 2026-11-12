@@ -7,7 +7,7 @@ import type { PassiveId, WeaponId, WeaponLevel } from '../sim/data';
 import { weaponStats, withPartner } from '../sim/weapons';
 import type { Banner } from '../render/fx';
 import { skillIcon } from '../render/icons';
-import { coin, controlsPicker, fmtNum, fmtTime, h } from './dom';
+import { coin, controlsPicker, fmtNum, fmtTime, h, moveHint } from './dom';
 
 /**
  * HUD values update at most when they change, and the skill row only rebuilds when the build
@@ -67,7 +67,7 @@ export class Hud {
     this.hint = h(
       'div.hint',
       touch ? h('div.hand') : null,
-      touch ? 'Drag anywhere to move' : 'Move with WASD or arrow keys · or drag with the mouse',
+      moveHint('drag'),
     );
     this.el = h(
       'div.hud',
@@ -262,7 +262,7 @@ function offerIcon(o: Offer) {
   return skillIcon(o.type === 'heal' ? 'medkit' : 'magnet');
 }
 
-export function offerCard(g: Game, o: Offer, onPick: (() => void) | null, onInfo?: () => void) {
+export function offerCard(g: Game, o: Offer, onPick: (() => void) | null, onInfo?: () => void, simple = false) {
   let badge: HTMLElement | null = null;
   if (o.type === 'weapon' && o.isNew) badge = h('span.badge', 'NEW');
   if (o.type === 'passive') {
@@ -296,7 +296,7 @@ export function offerCard(g: Game, o: Offer, onPick: (() => void) | null, onInfo
           h('i', 'i'),
         )
       : h('img', { src: offerIcon(o), alt: '' }),
-    h('div', h('div.ctag-row', ctag(g, o)), h('div.name', offerTitle(o)), h('div.desc', offerDesc(o)), combo(g, o), lvl),
+    h('div', h('div.ctag-row', ctag(g, o)), h('div.name', offerTitle(o)), h('div.desc', offerDesc(o)), simple ? null : combo(g, o), lvl),
   );
 }
 
@@ -479,7 +479,7 @@ function ctag(g: Game, o: Offer) {
   return h('span.ctag.misc', 'BONUS');
 }
 
-export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string, onCloseTip?: () => void, onAdReroll?: () => Promise<boolean>) {
+export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () => void, tip?: string, onCloseTip?: () => void, onAdReroll?: () => Promise<boolean>, simple = false) {
   // out of rerolls: offer one for a rewarded ad (opt-in, the run is already paused here)
   const adLeft = AD_REROLL_MAX - g.adRerolls;
   let adBtn: HTMLButtonElement | null = null;
@@ -495,10 +495,10 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
   const info = (kind: 'weapon' | 'passive', id: string, toLevel?: number) => showSkillInfo(g, kind, id, toLevel);
   const cards = h(
     'div.cards',
-    g.offers.map((o, i) => offerCard(g, o, () => onPick(i), o.type === 'weapon' || o.type === 'passive' ? () => info(o.type as 'weapon' | 'passive', o.id, o.level) : undefined)),
+    g.offers.map((o, i) => offerCard(g, o, () => onPick(i), o.type === 'weapon' || o.type === 'passive' ? () => info(o.type as 'weapon' | 'passive', o.id, o.level) : undefined, simple)),
   );
-  return h(
-    'div.modal',
+  const el = h(
+    'div.modal.lvlup',
     h('h2', { style: { color: '#5ef2ff', textShadow: '0 0 20px rgba(94,242,255,.6)' } }, 'LEVEL UP'),
     tip
       ? (() => {
@@ -529,6 +529,33 @@ export function levelUpModal(g: Game, onPick: (i: number) => void, onReroll: () 
       adBtn ?? h('button.btn.small', { onclick: onReroll, disabled: g.rerolls <= 0 }, `↻ Reroll (${g.rerolls})`),
     ),
   );
+  fitNoScroll(el);
+  return el;
+}
+
+/**
+ * The level-up screen must never need a scroll: once it is on screen, step it down through
+ * tighter layouts (.fit1 → .fit3) until everything, Reroll included, fits the viewport.
+ */
+function fitNoScroll(el: HTMLElement) {
+  let step = 0;
+  const check = () => {
+    if (!el.isConnected) return; // closed already
+    if (el.scrollHeight <= el.clientHeight + 1 || step >= 3) return;
+    el.classList.remove(`fit${step}`);
+    step++;
+    el.classList.add(`fit${step}`);
+    requestAnimationFrame(check);
+  };
+  requestAnimationFrame(check);
+  // rotating or resizing the window re-runs the fit from the roomiest layout
+  const reset = () => {
+    if (!el.isConnected) return removeEventListener('resize', reset);
+    el.classList.remove('fit1', 'fit2', 'fit3');
+    step = 0;
+    requestAnimationFrame(check);
+  };
+  addEventListener('resize', reset);
 }
 
 export function chestModal(g: Game, onClose: () => void) {
