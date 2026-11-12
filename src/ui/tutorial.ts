@@ -1,6 +1,6 @@
 import type { Game } from '../sim/game';
 import { starTimes } from '../sim/data';
-import { h } from './dom';
+import { h, moveHint, touchFirst } from './dom';
 
 /**
  * First-run coach for Sector 1. Short, one-at-a-time tips triggered by what is actually happening
@@ -119,7 +119,7 @@ export class Tutorial {
 
     // 0: nothing moves until you do
     if (g.waitingForMove) {
-      if (this.cur?.id !== 'move' && !this.shown.has('move-closed')) this.show({ id: 'move', icon: '👆', text: this.controls === 'drag' ? 'Drag anywhere to move. Try it!' : `Use the pad in the bottom ${this.controls} corner to move. Try it!`, until: 1e9, hand: this.controls === 'drag' }, g);
+      if (this.cur?.id !== 'move' && !this.shown.has('move-closed')) this.show({ id: 'move', icon: touchFirst() ? '👆' : '⌨️', text: `${moveHint(this.controls)}. Try it!`, until: 1e9, hand: this.controls === 'drag' && touchFirst() }, g);
       this.target = null;
       return;
     }
@@ -180,4 +180,7 @@ export class Tutorial {
 }
 
 /** Shown on the first level-up cards during the tutorial. */
-export const LEVELUP_TIP = 'Pick one! A = attack (new weapons fire on their own). S = support (boosts your weapons). 🔗 Each weapon pairs with one support: max the weapon while holding its partner to evolve it.';
+/** First level-up of a new player's run: keep it to one idea. */
+export const LEVELUP_TIP_FIRST = 'Pick one! New weapons fire on their own.';
+/** Later level-ups in the tutorial run: now teach supports and pairing. */
+export const LEVELUP_TIP = 'A = attack, S = support. 🔗 Each weapon pairs with one support: max the weapon while holding its partner to evolve it.';

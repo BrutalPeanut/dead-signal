@@ -91,3 +91,9 @@ export function controlsPicker(current: string, onPick: (m: 'drag' | 'left' | 'r
 export function coin(kind: 'gold' | 'scrap' | 'key' | 'xp' | 'power'): HTMLElement {
   return h(`i.cur.cur-${kind}`);
 }
+
+/** True on phones/tablets (a finger is the main pointer). Desktop players get keyboard wording. */
+export const touchFirst = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+/** How to move, in words that fit the player's device and control setting. */
+export const moveHint = (controls: 'drag' | 'left' | 'right') =>
+  controls !== 'drag' ? `Use the pad in the bottom ${controls} corner to move` : touchFirst() ? 'Drag anywhere to move' : 'Move with WASD or arrow keys, or drag with the mouse';

@@ -946,10 +946,26 @@ export class Profile {
     return out;
   }
 
-  /** New gear goes straight into an empty slot: an empty slot is pure lost power. */
+  /** Items this session equipped on its own, for the lobby to announce (not saved). */
+  autoEquipped: string[] = [];
+
+  /**
+   * New gear goes straight into an empty slot, and replaces what's there when it is strictly
+   * better: at least the same rarity and over 5% more stat (guns only within the same gun, so a
+   * play style is never swapped out). Players who never open the Armory still get stronger.
+   */
   autoEquip(it: GearItem) {
     const slot = GEAR[it.def].slot;
-    if (!this.data.equipped[slot]) this.data.equipped[slot] = it.uid;
+    const uid = this.data.equipped[slot];
+    if (!uid) {
+      this.data.equipped[slot] = it.uid;
+      return;
+    }
+    const cur = this.item(uid);
+    if (cur && it.rarity >= cur.rarity && this.upgradeFor(slot)?.uid === it.uid) {
+      this.data.equipped[slot] = it.uid;
+      this.autoEquipped.push(it.uid);
+    }
   }
 
   /** Strongest item for a slot by stat, preferring higher rarity on ties. */

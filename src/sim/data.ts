@@ -342,7 +342,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
   magnet: { id: 'magnet', name: 'Magnet Core', desc: '+30% pickup range', color: '#ff4fd8', partnerOf: 'disc' },
   gel: { id: 'gel', name: 'Thermal Gel', desc: '+12% duration, +8% projectile speed', color: '#ff9a1f', partnerOf: 'napalm' },
   boots: { id: 'boots', name: 'Thruster Boots', desc: '+8% move speed', color: '#ffe14d', partnerOf: 'drill' },
-  adrenal: { id: 'adrenal', name: 'Adrenal Pump', desc: 'Kills heal 0.06% max HP', color: '#ff5470', partnerOf: 'cleaver' },
+  adrenal: { id: 'adrenal', name: 'Adrenal Pump', desc: 'Kills heal you: +6% max HP per 100 kills', color: '#ff5470', partnerOf: 'cleaver' },
   // gun partners: tune their own gun (weapons.ts withPartner) + a little damage to everything.
   // Only offered while you carry that gun.
   extmag: { id: 'extmag', name: 'Extended Mag', desc: 'SMG fires 6% faster, +8% damage', color: '#ffd34d', partnerOf: 'smg' },

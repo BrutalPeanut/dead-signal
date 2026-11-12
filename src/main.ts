@@ -1,4 +1,5 @@
 // Fonts are self-hosted (bundled) so the game looks right offline, in app wrappers and in previews.
+import { GEAR, RARITIES, RARITY_COLORS, type GearItem } from './meta/gear';
 import '@fontsource/chakra-petch/latin-500.css';
 import '@fontsource/chakra-petch/latin-600.css';
 import '@fontsource/chakra-petch/latin-700.css';
@@ -21,9 +22,9 @@ import { Interp } from './render/interp';
 import { CloudSync } from './meta/sync';
 import { cloudModal, protectModal, statusText } from './ui/cloud';
 import type { BaseStats, FxEvent } from './sim/types';
-import { haptic, setHaptics, toast, fmtNum } from './ui/dom';
+import { h, haptic, setHaptics, toast, fmtNum, moveHint } from './ui/dom';
 import { Hub, useSkin } from './ui/hub';
-import { LEVELUP_TIP, Tutorial } from './ui/tutorial';
+import { LEVELUP_TIP, LEVELUP_TIP_FIRST, Tutorial } from './ui/tutorial';
 import { adAudio, adListeners, adSkip, ads, adsOn } from './ads/ads';
 import { PRODUCTS, applyPurchases, priceOverride, type Granted, type ProductId } from './meta/shop';
 import { NATIVE, initBilling, initNativeAds, playBuy, playOwned, playPrices } from './native';
@@ -270,6 +271,16 @@ class App {
     }
     if (this.profile.loadedFrom === 'backup') setTimeout(() => toast('Your save was damaged, so it was restored from a backup', '#ffd34d'), 800);
     void this.sync.startup(() => this.mode === 'hub');
+    // website on a phone turned sideways: a full-screen "turn your phone" card covers the game,
+    // so pause the run under it (the store apps lock portrait and never match this)
+    const rot = h('div.rotate-ask', h('div.phone'), 'Turn your phone upright', h('small', 'Dead Signal plays in portrait'));
+    document.body.append(rot);
+    const sideways = matchMedia('(orientation: landscape) and (max-height: 500px) and (pointer: coarse)');
+    const onTurn = () => {
+      if (sideways.matches) this.pause();
+    };
+    sideways.addEventListener?.('change', onTurn);
+    onTurn();
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         this.trackLeave();
@@ -444,7 +455,7 @@ class App {
     this.tutorialOn = false;
     this.tutorial.reset();
     this.hud.el.classList.toggle('pad', this.input.mode !== 'drag');
-    this.hud.setHintText(this.input.mode !== 'drag' ? `Use the pad in the bottom ${this.input.mode} corner to move` : 'Drag anywhere to move');
+    this.hud.setHintText(moveHint(this.input.mode));
     let title = getChapter(sector).name.toUpperCase();
     let sub = `Sector ${sector + 1} · survive 5:00`;
     if (mode === 'daily') {
@@ -494,6 +505,16 @@ class App {
     audio.intensity = 0;
   }
 
+  /** Say which drops replaced weaker gear on their own, so a stronger courier is no mystery. */
+  private announceAutoEquip() {
+    const p = this.profile;
+    const items = p.autoEquipped.splice(0).map((u) => p.item(u)).filter((it): it is GearItem => !!it && p.isEquipped(it.uid));
+    if (!items.length) return;
+    const best = items[items.length - 1];
+    const more = items.length > 1 ? ` and ${items.length - 1} more` : '';
+    setTimeout(() => toast(`Auto-equipped ${RARITIES[best.rarity]} ${GEAR[best.def].name}${more}`, RARITY_COLORS[best.rarity]), 600);
+  }
+
   private backToHub(goNext = false) {
     // the cloud was ahead when we launched mid-run: take it now that the run is over
     if (this.sync.behind) void this.sync.startup(() => this.mode === 'hub');
@@ -506,6 +527,7 @@ class App {
     this.hub.tab = 'deploy';
     this.hub.refresh();
     this.ui.append(this.hub.el);
+    this.announceAutoEquip();
     this.game = this.demoGame(this.hub.sector);
     this.renderer.setGame(this.game);
     audio.bossMode = false;
@@ -825,7 +847,7 @@ class App {
               () => {
                 if (g.reroll()) audio.click();
               },
-              this.tutorialOn && g.level <= 3 && !this.tutorial.levelTipOff ? LEVELUP_TIP : undefined,
+              this.tutorialOn && g.level <= 4 && !this.tutorial.levelTipOff ? (g.level <= 2 ? LEVELUP_TIP_FIRST : LEVELUP_TIP) : undefined,
               () => (this.tutorial.levelTipOff = true),
               adsOn() && !this.tutorialOn
                 ? () =>
@@ -834,6 +856,8 @@ class App {
                       return ok;
                     })
                 : undefined,
+              // a new player's first pick: no pairing lines yet, those come with the next tip
+              this.tutorialOn && g.level <= 2,
             ),
             key,
           );

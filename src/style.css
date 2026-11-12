@@ -2644,7 +2644,10 @@ textarea {
     width: 100vw;
     margin-left: calc(50% - 50vw);
     margin-right: 0;
-    height: clamp(320px, 52vh, 520px);
+    /* same budget as phones: leave room for the mode tabs, sector card, Power Up and BATTLE
+       above the nav (52vh pushed BATTLE under the nav on 768-800px-tall laptops) */
+    height: clamp(200px, calc(100vh - 440px), 520px);
+    height: clamp(200px, calc(100dvh - 440px), 520px);
   }
   .lobby-body .rails.left {
     left: calc(50vw - 300px);
@@ -4197,10 +4200,12 @@ textarea {
 
 /* ------------------------------------------------------------ tutorial coach */
 
+/* Tips sit below the player, so the top of the screen stays free for banners
+   ("Supply drop inbound"), kill-count pops and the 30-seconds-left callout. */
 .hud .tut {
   position: absolute;
   left: 50%;
-  top: calc(var(--safe-top) + 172px);
+  bottom: calc(var(--safe-bottom) + 18% + 58px);
   transform: translateX(-50%);
   width: min(92vw, 360px);
   display: flex;
@@ -4985,4 +4990,151 @@ textarea {
   border-radius: 10px;
   background: #43e08a;
   color: #08130d;
+}
+
+/* Bigger thumb targets without changing the look: the wallet chips (27px) and the
+   Campaign/Daily/Endless tabs (30px) get an invisible hit area of about 40px. */
+.wallet .w,
+.mode-tabs .mt {
+  position: relative;
+}
+.wallet .w::after {
+  content: '';
+  position: absolute;
+  inset: -7px -2px;
+}
+.mode-tabs .mt::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+
+/* Phones held sideways on the website: the lobby and runs are built for portrait,
+   so ask for a turn instead of showing a cut-off lobby. (The store apps lock portrait.) */
+.rotate-ask {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .rotate-ask {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px max(24px, env(safe-area-inset-right, 0px)) 24px max(24px, env(safe-area-inset-left, 0px));
+    background: #0b0d14;
+    color: #e8edf7;
+    text-align: center;
+    font-weight: 800;
+    font-size: 18px;
+  }
+  .rotate-ask small {
+    font-weight: 600;
+    font-size: 14px;
+    color: #8d97ab;
+  }
+  .rotate-ask .phone {
+    width: 44px;
+    height: 72px;
+    border: 3px solid #5ef2ff;
+    border-radius: 10px;
+    animation: rotateAsk 2.2s ease-in-out infinite;
+  }
+}
+@keyframes rotateAsk {
+  0%, 30% { transform: rotate(-90deg); }
+  60%, 100% { transform: rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rotate-ask .phone { animation: none; }
+}
+
+/* Level-up: never scroll. fitNoScroll() (hud.ts) adds .fit1-.fit3 until the whole screen fits. */
+.modal.lvlup {
+  justify-content: center;
+}
+.modal.lvlup.fit1,
+.modal.lvlup.fit2,
+.modal.lvlup.fit3 {
+  padding-top: calc(var(--safe-top) + 8px);
+  padding-bottom: calc(var(--safe-bottom) + 8px);
+}
+.modal.lvlup.fit1 h2,
+.modal.lvlup.fit2 h2,
+.modal.lvlup.fit3 h2 {
+  font-size: 24px;
+  margin: 0;
+}
+.modal.lvlup.fit1 .sub,
+.modal.lvlup.fit2 .sub,
+.modal.lvlup.fit3 .sub {
+  margin-bottom: 6px;
+}
+.modal.lvlup.fit1 .lvl-tip,
+.modal.lvlup.fit2 .lvl-tip,
+.modal.lvlup.fit3 .lvl-tip {
+  margin: 0 auto 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.modal.lvlup.fit1 .si-hint,
+.modal.lvlup.fit2 .si-hint,
+.modal.lvlup.fit3 .si-hint {
+  display: none;
+}
+.modal.lvlup.fit1 .loadout-big,
+.modal.lvlup.fit2 .loadout-big {
+  width: min(100%, 300px);
+  padding: 4px 6px;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.modal.lvlup.fit1 .loadout-big .line,
+.modal.lvlup.fit2 .loadout-big .line {
+  grid-template-columns: 68px repeat(6, 1fr);
+}
+.modal.lvlup.fit1 .cards,
+.modal.lvlup.fit2 .cards,
+.modal.lvlup.fit3 .cards {
+  gap: 7px;
+}
+.modal.lvlup.fit1 .card,
+.modal.lvlup.fit2 .card,
+.modal.lvlup.fit3 .card {
+  padding: 8px 10px;
+  gap: 10px;
+}
+.modal.lvlup.fit1 .card img,
+.modal.lvlup.fit2 .card img,
+.modal.lvlup.fit3 .card img {
+  width: 46px;
+  height: 46px;
+}
+.modal.lvlup.fit1 .card .name,
+.modal.lvlup.fit2 .card .name,
+.modal.lvlup.fit3 .card .name {
+  font-size: 15.5px;
+}
+.modal.lvlup .actions {
+  margin-top: 8px;
+}
+/* fit2: one line of description and pairing per card */
+.modal.lvlup.fit2 .card .desc,
+.modal.lvlup.fit2 .card .combo,
+.modal.lvlup.fit3 .card .desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.modal.lvlup.fit2 .card .combo i {
+  display: none;
+}
+/* fit3 (very short screens): drop the loadout grid and pairing lines; cards still say what they do */
+.modal.lvlup.fit3 .loadout-big,
+.modal.lvlup.fit3 .card .combo {
+  display: none;
 }
