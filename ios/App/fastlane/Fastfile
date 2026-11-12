@@ -4,7 +4,30 @@
 # revokes the certificate so they never pile up (builds already uploaded are unaffected).
 default_platform(:ios)
 
+DEFAULT_WHAT_TO_TEST = 'Play a few runs! Tell us what felt fun, what felt unfair or too hard, and anything that broke or looked wrong. Ads are test ads in this beta.'
+
 platform :ios do
+  # Send an already-uploaded build to the Public Beta group (no rebuild).
+  lane :distribute do
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch('ASC_KEY_ID'),
+      issuer_id: ENV.fetch('ASC_ISSUER_ID'),
+      key_filepath: ENV.fetch('ASC_KEY_PATH')
+    )
+    upload_to_testflight(
+      api_key: api_key,
+      distribute_only: true,
+      app_identifier: 'info.deadsignal.game',
+      app_platform: 'ios',
+      app_version: ENV.fetch('MARKETING_VERSION'),
+      build_number: ENV.fetch('DISTRIBUTE_BUILD'),
+      groups: ['Public Beta'],
+      distribute_external: true,
+      notify_external_testers: true,
+      changelog: ENV.fetch('WHAT_TO_TEST', DEFAULT_WHAT_TO_TEST)
+    )
+  end
+
   lane :beta do
     api_key = app_store_connect_api_key(
       key_id: ENV.fetch('ASC_KEY_ID'),
@@ -31,7 +54,16 @@ platform :ios do
         xcargs: "CURRENT_PROJECT_VERSION=#{ENV.fetch('BUILD_NUMBER')} MARKETING_VERSION=#{ENV.fetch('MARKETING_VERSION')}",
         output_directory: ENV.fetch('RUNNER_TEMP')
       )
-      upload_to_testflight(api_key: api_key, skip_waiting_for_build_processing: true)
+      # wait for Apple's processing, then hand the build to the public TestFlight group
+      # (Apple's beta review approves it; testers get it automatically)
+      upload_to_testflight(
+        api_key: api_key,
+        groups: ['Public Beta'],
+        distribute_external: true,
+        notify_external_testers: true,
+        changelog: ENV.fetch('WHAT_TO_TEST', DEFAULT_WHAT_TO_TEST),
+        wait_processing_timeout_duration: 2700
+      )
     ensure
       if cert_id
         begin
