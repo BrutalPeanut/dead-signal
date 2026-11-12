@@ -37,6 +37,8 @@ jobs:
       - name: Live AdMob app id
         if: ${{ inputs.ads_live }}
         run: /usr/libexec/PlistBuddy -c "Set :GADApplicationIdentifier ${{ vars.ADMOB_IOS_APP_ID }}" ios/App/App/Info.plist
+      - name: Version
+        run: echo "MARKETING_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
       - name: App Store Connect API key
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
@@ -44,47 +46,18 @@ jobs:
         env:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      - name: Archive (unsigned; the upload step signs it for the App Store)
-        # Signing at archive time needs a development profile, which needs a registered iPhone.
-        # Export signs with an App Store distribution profile instead, which needs no devices.
+      - name: Sign, build and upload to TestFlight (fastlane)
         working-directory: ios/App
         run: |
-          xcodebuild archive \
-            -project App.xcodeproj -scheme App -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- \
-            PROVISIONING_PROFILE_SPECIFIER= CODE_SIGNING_REQUIRED=NO \
-            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
-            MARKETING_VERSION="$(node -p "require('../../package.json').version")" \
-            | tail -40
-          test -d "$RUNNER_TEMP/App.xcarchive"
+          command -v fastlane >/dev/null || brew install fastlane
+          fastlane beta
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      - name: Upload to App Store Connect
-        run: |
-          cat > "$RUNNER_TEMP/export.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
-            <key>teamID</key><string>$APPLE_TEAM_ID</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>manageAppVersionAndBuildNumber</key><false/>
-          </dict></plist>
-          EOF
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-          echo "Uploaded build ${{ github.run_number }}. It appears in TestFlight once Apple finishes processing." >> "$GITHUB_STEP_SUMMARY"
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_PATH: ${{ runner.temp }}/keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+          BUILD_NUMBER: ${{ github.run_number }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
+      - name: Summary
+        run: echo "Uploaded build ${{ github.run_number }}. It appears in TestFlight once Apple finishes processing (~10-30 min)." >> "$GITHUB_STEP_SUMMARY"
