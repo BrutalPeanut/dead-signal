@@ -11,6 +11,8 @@ export interface HeroPose {
 /** On-screen height of the courier in world units, and where the feet sit relative to the sim position. */
 export const HERO_H = 52;
 export const HERO_FOOT = 13;
+/** How much higher the torso sits than the original chibi rig (the legs are this much longer). */
+const UPPER_LIFT = 9;
 
 const BOOT = mat('#24262c', '#0c0d10', '#4a4e58', null);
 const GLOVE = mat('#30343d', '#14161b', '#5a606c', null);
@@ -111,45 +113,46 @@ export function drawHero(ctx: C, pose: HeroPose) {
   const step = pose.moving ? 1 : 0;
   const legs = (side: -1 | 1, m: typeof PANTS) => {
     const sw = s * side * step;
-    const hipX = side * 4;
-    const kneeX = hipX + sw * 7;
-    const kneeY = -15 + Math.max(0, -sw) * 2.5;
+    const hipX = side * 3.5;
+    const kneeX = hipX + sw * 8;
+    const kneeY = -20 + Math.max(0, -sw) * 3;
     const footX = hipX + sw * 10;
     const footY = -3 + Math.max(0, -sw) * -3.5;
-    limb(ctx, hipX, -29 + bob, kneeX, kneeY + bob * 0.4, footX, footY, [7, 6, 5.2], m);
+    limb(ctx, hipX, -38 + bob, kneeX, kneeY + bob * 0.4, footX, footY, [6, 5, 4.3], m);
     // knee pad
-    ball(ctx, kneeX + 1.5, kneeY + bob * 0.4, 4, 3.4, mat('#59647c', '#2a3140', '#8592ad', null, 2));
+    ball(ctx, kneeX + 1.5, kneeY + bob * 0.4, 3.4, 3, mat('#59647c', '#2a3140', '#8592ad', null, 2));
     // boot
     paint(
       ctx,
       (c) => {
-        c.roundRect(footX - 6, footY - 6, 15, 8, [3, 5, 2, 2]);
+        c.roundRect(footX - 5, footY - 6, 13, 7.5, [3, 5, 2, 2]);
       },
       BOOT,
-      footX - 6,
+      footX - 5,
       footY - 6,
-      15,
-      8,
+      13,
+      7.5,
     );
     ctx.fillStyle = SKIN.accent;
-    ctx.fillRect(footX - 5, footY + 0.2, 13, 1.6);
+    ctx.fillRect(footX - 4, footY - 0.3, 11, 1.5);
   };
   legs(-1, PANTS_BACK);
 
   ctx.save();
   ctx.translate(0, bob);
   ctx.rotate(lean);
+  ctx.translate(0, -UPPER_LIFT); // longer legs: the upper body sits higher
 
   // ---- backpack + antenna (behind the torso)
-  paint(ctx, (c) => c.roundRect(-27, -68, 17, 36, 5), PACK, -27, -68, 17, 36);
+  paint(ctx, (c) => c.roundRect(-25, -68, 14, 34, 4), PACK, -25, -68, 14, 34);
   ctx.fillStyle = '#1b2029';
-  ctx.fillRect(-24, -60, 11, 3);
-  ctx.fillRect(-24, -52, 11, 3);
+  ctx.fillRect(-23, -60, 9, 3);
+  ctx.fillRect(-23, -52, 9, 3);
   ctx.save();
   ctx.shadowColor = SKIN.glow;
   ctx.shadowBlur = 6;
   ctx.fillStyle = SKIN.glow;
-  ctx.fillRect(-24, -44, 3, 7);
+  ctx.fillRect(-23, -44, 3, 7);
   ctx.restore();
   line(ctx, [-21, -68, -25, -86, -27, -110], 2.4, '#8e9ab0');
   line(ctx, [-21, -68, -25, -86, -27, -110], 0.9, '#cfd6e2');
@@ -160,19 +163,19 @@ export function drawHero(ctx: C, pose: HeroPose) {
 
   // ---- back arm (swings)
   const asw = pose.moving ? -s * 6 : Math.sin(pose.t * 2.4) * 1;
-  limb(ctx, -9, -57, -12 + asw * 0.6, -45, -9 + asw, -35, [5.5, 4.6, 4.2], JACKET_BACK);
-  ball(ctx, -9 + asw, -34, 4.6, 4.2, GLOVE);
+  limb(ctx, -12, -58, -14 + asw * 0.6, -45, -11 + asw, -33, [4.6, 3.9, 3.5], JACKET_BACK);
+  ball(ctx, -11 + asw, -32, 3.9, 3.6, GLOVE);
 
   // ---- torso
   const torso = (c: C) => {
-    c.moveTo(-15, -33);
-    c.quadraticCurveTo(-18, -48, -15, -59);
-    c.quadraticCurveTo(0, -65, 15, -59);
-    c.quadraticCurveTo(18, -46, 15, -33);
-    c.quadraticCurveTo(0, -27, -15, -33);
+    c.moveTo(-10, -33);
+    c.quadraticCurveTo(-12, -47, -17, -59);
+    c.quadraticCurveTo(0, -66, 17, -59);
+    c.quadraticCurveTo(12, -46, 10, -33);
+    c.quadraticCurveTo(0, -30, -10, -33);
     c.closePath();
   };
-  paint(ctx, torso, JACKET, -16, -64, 32, 36);
+  paint(ctx, torso, JACKET, -17, -64, 34, 36);
   // reflective tape, clipped to the jacket
   ctx.save();
   ctx.beginPath();
@@ -201,9 +204,9 @@ export function drawHero(ctx: C, pose: HeroPose) {
   line(ctx, [3, -59, 4, -33], 1.4, SKIN.zip);
   emblem(ctx, SKIN);
   // belt + pouches
-  paint(ctx, (c) => c.roundRect(-16, -35, 32, 5, 2), mat('#4a3626', '#22170e', '#6e5440', null, 2), -16, -35, 32, 5);
-  paint(ctx, (c) => c.roundRect(-14, -36, 8, 8, 2), mat('#5a4632', '#2a1e12', '#806650', null, 2), -14, -36, 8, 8);
-  paint(ctx, (c) => c.roundRect(6, -36, 8, 8, 2), mat('#5a4632', '#2a1e12', '#806650', null, 2), 6, -36, 8, 8);
+  paint(ctx, (c) => c.roundRect(-11, -35, 22, 4.5, 2), mat('#4a3626', '#22170e', '#6e5440', null, 2), -11, -35, 22, 4.5);
+  paint(ctx, (c) => c.roundRect(-11, -36, 6, 7, 2), mat('#5a4632', '#2a1e12', '#806650', null, 2), -11, -36, 6, 7);
+  paint(ctx, (c) => c.roundRect(5, -36, 6, 7, 2), mat('#5a4632', '#2a1e12', '#806650', null, 2), 5, -36, 6, 7);
   ctx.fillStyle = '#c9a66b';
   ctx.fillRect(-1, -34.5, 3, 4);
   // collar
@@ -223,11 +226,15 @@ export function drawHero(ctx: C, pose: HeroPose) {
     10,
   );
   // shoulder pad (front)
-  ball(ctx, 11, -58, 7, 5.5, mat('#59647c', '#2a3140', '#8592ad'), -0.3);
+  ball(ctx, 13, -58, 6.5, 4.6, mat('#59647c', '#2a3140', '#8592ad'), -0.35);
 
-  // ---- helmet
+  // ---- helmet (drawn at 0.72 scale about the chin: an adult head, not a bobblehead)
   const hx = 3;
   const hy = -80;
+  ctx.save();
+  ctx.translate(hx + 2, hy + 17);
+  ctx.scale(0.72, 0.74);
+  ctx.translate(-(hx + 2), -(hy + 17));
   ball(ctx, hx, hy, 21, 20, HELMET);
   // comms port on the back of the helmet: a flat plate, not a round 'eye'
   paint(ctx, (c) => c.roundRect(hx - 19, hy - 2, 7, 11, 2.5), mat('#9aa6b8', '#4a5466', '#d8dee8', null, 2), hx - 19, hy - 2, 7, 11);
@@ -286,6 +293,7 @@ export function drawHero(ctx: C, pose: HeroPose) {
   ctx.stroke();
   // chin guard
   paint(ctx, (c) => c.roundRect(hx + 4, hy + 11, 13, 5, 2.5), mat('#3a414e', '#1a1e26', '#5f6878', null, 2), hx + 4, hy + 11, 13, 5);
+  ctx.restore(); // helmet scale
 
   ctx.restore(); // torso lean/bob
 
@@ -298,12 +306,12 @@ export function drawHero(ctx: C, pose: HeroPose) {
   ctx.save();
   ctx.translate(0, HERO_FOOT);
   ctx.scale(k * facing, k);
-  ctx.translate(9, -57 + bob);
+  ctx.translate(12, -57 - UPPER_LIFT + bob);
   const local = facing > 0 ? pose.aim : Math.PI - pose.aim;
   ctx.rotate(local);
-  paint(ctx, taper(0, 0, 5.8, 13, 1, 4.8), JACKET, -6, -6, 22, 12);
-  ball(ctx, 13, 1, 4.4, 4.2, mat(SKIN.collar[0], SKIN.collar[1], SKIN.collar[2], null, 2));
-  paint(ctx, taper(13, 1, 4.4, 22, 1.5, 4.2), GLOVE, 9, -4, 16, 10);
+  paint(ctx, taper(0, 0, 4.8, 13, 1, 4), JACKET, -6, -6, 22, 12);
+  ball(ctx, 13, 1, 3.8, 3.6, mat(SKIN.collar[0], SKIN.collar[1], SKIN.collar[2], null, 2));
+  paint(ctx, taper(13, 1, 3.8, 22, 1.5, 3.6), GLOVE, 9, -4, 16, 10);
   gun2d(ctx, pose.gun ?? 'pistol');
   ctx.restore();
 }

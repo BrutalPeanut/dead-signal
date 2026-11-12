@@ -56,14 +56,21 @@ platform :ios do
       )
       # wait for Apple's processing, then hand the build to the public TestFlight group
       # (Apple's beta review approves it; testers get it automatically)
-      upload_to_testflight(
-        api_key: api_key,
-        groups: ['Public Beta'],
-        distribute_external: true,
-        notify_external_testers: true,
-        changelog: ENV.fetch('WHAT_TO_TEST', DEFAULT_WHAT_TO_TEST),
-        wait_processing_timeout_duration: 2700
-      )
+      begin
+        upload_to_testflight(
+          api_key: api_key,
+          groups: ['Public Beta'],
+          distribute_external: true,
+          notify_external_testers: true,
+          changelog: ENV.fetch('WHAT_TO_TEST', DEFAULT_WHAT_TO_TEST),
+          wait_processing_timeout_duration: 2700
+        )
+      rescue => e
+        # Apple reviews one beta build at a time: the upload itself worked, so don't fail the run.
+        # Send it later with the workflow's distribute_build input once the earlier review is done.
+        raise unless e.to_s =~ /in review/i
+        UI.important("Uploaded, but another build is still in Beta App Review. Distribute this one later (distribute_build=#{ENV['BUILD_NUMBER']}).")
+      end
     ensure
       if cert_id
         begin
