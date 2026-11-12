@@ -3,7 +3,7 @@ name: iOS app (TestFlight / App Store)
 # Builds the iPhone app on a GitHub Mac, signs it, and uploads it to App Store Connect, where it
 # shows up in TestFlight after Apple's processing (~10-30 min). Run it from the Actions tab.
 # Needs repository secrets: APPLE_TEAM_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (the whole .p8 text).
-# ads_live = false uses Google's test ads; true needs the ADMOB_IOS_APP_ID repository variable.
+# ads_live = false uses Google's test ads; true uses the real iOS AdMob app and rewarded unit.
 on:
   workflow_dispatch:
     inputs:
@@ -44,7 +44,7 @@ jobs:
           ADMOB_LIVE: ${{ inputs.ads_live && '1' || '0' }}
       - name: Live AdMob app id
         if: ${{ inputs.ads_live }}
-        run: /usr/libexec/PlistBuddy -c "Set :GADApplicationIdentifier ${{ vars.ADMOB_IOS_APP_ID }}" ios/App/App/Info.plist
+        run: /usr/libexec/PlistBuddy -c "Set :GADApplicationIdentifier ca-app-pub-6900407641110608~7477008563" ios/App/App/Info.plist
       - name: Version
         run: echo "MARKETING_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
       - name: App Store Connect API key
