@@ -211,22 +211,24 @@ function jacked(model: THREE.Object3D) {
         const t = THREE.MathUtils.clamp((v.y - 0.38) / 0.87, 0, 1);
         const cx = 0.05;
         // narrow from the belt up to the ribs, then flare into the chest and shoulders
-        const waist = 1 - 0.3 * (1 - smoothstep(t, 0.32, 0.72));
-        const chest = 1 + 0.22 * smoothstep(t, 0.58, 0.95);
-        v.x = cx + (v.x - cx) * waist * chest;
-        if (v.z > 0) v.z *= (1 - 0.3 * (1 - smoothstep(t, 0.35, 0.7))) * (1 + 0.12 * bump(t, 0.8, 0.13)); // flat gut, pecs
-        else v.z *= 1 - 0.14 * (1 - smoothstep(t, 0.35, 0.7)) + 0.07 * smoothstep(t, 0.6, 0.95); // lats
+        // lean build: the whole torso slimmer and shallower, a narrow waist, chest kept broad
+        const waist = 1 - 0.36 * (1 - smoothstep(t, 0.32, 0.72));
+        const chest = 1 + 0.14 * smoothstep(t, 0.58, 0.95);
+        v.x = cx + (v.x - cx) * waist * chest * 0.86;
+        if (v.z > 0) v.z *= (1 - 0.34 * (1 - smoothstep(t, 0.35, 0.7))) * (1 + 0.06 * bump(t, 0.8, 0.13)) * 0.88; // flat gut
+        else v.z *= (1 - 0.18 * (1 - smoothstep(t, 0.35, 0.7)) + 0.04 * smoothstep(t, 0.6, 0.95)) * 0.88;
       } else if (part === 'arm') {
         // arms lie along ±X at shoulder height; thicken around their axis, biggest at the biceps
         const ax = Math.abs(v.x);
-        const k = ax > 0.82 ? 1 : 1 + 0.32 * bump(ax, 0.38, 0.2) + 0.18 * bump(ax, 0.66, 0.12);
+        // slim, wiry arms (KayKit's are already chunky)
+        const k = ax > 0.82 ? 0.9 : 0.84 + 0.06 * bump(ax, 0.38, 0.2);
         v.y = 1.105 + (v.y - 1.105) * k;
         v.z *= k;
-        v.x += Math.sign(v.x) * 0.035 * smoothstep(ax, 0.1, 0.3); // sit on the wider shoulders
+        v.x += Math.sign(v.x) * 0.015 * smoothstep(ax, 0.1, 0.3); // sit on the shoulders
       } else {
-        // thighs: thicker toward the hip
+        // slim legs (they also get longer via LEG_SCALE)
         const cx = Math.sign(v.x) * 0.17;
-        const k = 1 + 0.16 * smoothstep(v.y, 0.15, 0.45);
+        const k = 0.86 + 0.04 * smoothstep(v.y, 0.15, 0.45);
         v.x = cx + (v.x - cx) * k;
         v.z = 0.06 + (v.z - 0.06) * k;
       }
@@ -243,9 +245,9 @@ const AIM_ARM = ['upperarmr', 'lowerarmr', 'wristr', 'handr', 'handslotr'];
  * the head shrinks and the legs grow, so the figure reads as a person in a helmet, not a bobblehead.
  * Uniform scales on the thigh bones (undone on the feet) lengthen the legs without shearing them.
  */
-const HEAD_SCALE = 0.47;
-const LEG_SCALE = 1.36;
-const ARM_SCALE = 1.12;
+const HEAD_SCALE = 0.39;
+const LEG_SCALE = 1.5;
+const ARM_SCALE = 1.16;
 
 export interface HeroState {
   moving: boolean;
@@ -379,14 +381,15 @@ export class AuthoredHero {
       this.chest.add(
         solid(
           new Part()
-            .box(0.42, 0.5, 0.2, s.pack[0], [0, 0.18, -0.33])
-            .box(0.44, 0.07, 0.22, s.pack[1], [0, 0.02, -0.33])
-            .box(0.44, 0.07, 0.22, s.pack[1], [0, 0.3, -0.33])
-            .cyl(0.02, 0.025, 0.7, '#1b2029', [0.16, 0.75, -0.42]),
+            // slim rig pack (a wide box read as a bulky silhouette from the top-down camera)
+            .box(0.3, 0.46, 0.16, s.pack[0], [0, 0.2, -0.3])
+            .box(0.32, 0.06, 0.18, s.pack[1], [0, 0.04, -0.3])
+            .box(0.32, 0.06, 0.18, s.pack[1], [0, 0.32, -0.3])
+            .cyl(0.02, 0.025, 0.7, '#1b2029', [0.12, 0.75, -0.38]),
         ),
       );
       const tip = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), glow);
-      tip.position.set(0.16, 1.12, -0.42);
+      tip.position.set(0.12, 1.12, -0.38);
       this.chest.add(tip);
       this.glows.push({ obj: this.chest, at: tip.position.clone(), size: 5, color: s.glow });
 
