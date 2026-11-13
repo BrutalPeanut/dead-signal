@@ -254,7 +254,7 @@ export function settingsModal(
         : null,
       controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),
-      h('div.help', `Dead Signal · v${__APP_VERSION__.replace(/\.0$/, '')} · ${cloud ? 'progress backs up to the cloud' : 'progress is saved on this device'}`, ' · ', h('a', { href: './privacy.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Privacy'), ' · ', h('a', { href: './legal.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Terms')),
+      h('div.help', `Dead Signal · v${__APP_VERSION__.replace(/\.0$/, '')} · ${cloud ? 'progress backs up to the cloud' : 'progress is saved on this device'}`, ' · ', h('a', { href: './guide.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Guide'), ' · ', h('a', { href: './privacy.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Privacy'), ' · ', h('a', { href: './legal.html', target: '_blank', rel: 'noopener', style: { color: 'inherit' } }, 'Terms')),
       h('button.btn', { style: { width: '100%', marginTop: '12px' }, onclick: onClose }, 'Done'),
     ),
   );
