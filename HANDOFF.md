@@ -35,3 +35,9 @@ Read this first in a new session, then CLAUDE.md. Brian's prefs: always give dir
 - iOS: one permanent distribution cert (stops the "certificate revoked" email each build) — needs Brian to paste a .p12 secret.
 - Google Play service account → one-click Android uploads without the browser.
 - App Store listing (screenshots, description, privacy labels, age rating) before an App Store release.
+
+## Ads audit (2026-11-12 evening)
+- PR 116: native rewarded ads no longer hang when closed early (plugin never resolves on dismiss); UMP before ATT; Settings → "Ad privacy choices"; privacy.html covers iOS.
+- PR 117: public/guide.html (How to Play, ~1,300 words), robots.txt, sitemap.xml. AdSense had rejected the site (14 words of text). Resubmitted + review requested 2026-11-12 ~7:40 PM ET. When approved: flip LIVE_ADS in src/ads/ads.ts via PR.
+- AdMob Privacy & messaging: "Dead Signal GDPR consent" (both apps, Do not consent ON) and "Dead Signal ATT explainer" (iOS) PUBLISHED.
+- Still: AdMob apps "limited ad serving" until linked to live store listings (launch day: Add store). Next store builds need ads_live=true. Consider Google's recommended SKAdNetwork list in Info.plist.
