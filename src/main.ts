@@ -34,6 +34,7 @@ adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
 import { Stats, browserSaysNo } from './net/stats';
 import { PORTAL, initPortal, portal } from './portal';
+import { framedByOtherSite, showFramedNotice } from './framing';
 import { Hud, chestModal, levelUpModal, lobbyCtx, pauseModal, reviveModal, showSkillInfo } from './ui/hud';
 import { installModal, resultsModal, settingsModal, welcomeBackModal } from './ui/screens';
 
@@ -1165,4 +1166,5 @@ function start() {
   };
 }
 if (PORTAL) void initPortal().then(start, start);
+else if (!NATIVE && framedByOtherSite()) showFramedNotice();
 else start();
