@@ -33,7 +33,8 @@ export async function startCheckout(product: ProductId, player: string): Promise
       body: JSON.stringify({ product, player }),
     });
     const out = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
-    if (out.url) return { url: out.url };
+    // only ever send the player to Stripe's own checkout page
+    if (out.url && isStripeCheckout(out.url)) return { url: out.url };
     return { error: out.error === 'owned' ? 'owned' : out.error === 'not_configured' ? 'not_ready' : 'unavailable' };
   } catch {
     return { error: 'offline' };
@@ -43,4 +44,14 @@ export async function startCheckout(product: ProductId, player: string): Promise
 /** Everything these player ids own; fresh rows are being delivered for the first time. */
 export function claimPurchases(ids: string[]): Promise<PurchaseRow[] | null> {
   return rpc<PurchaseRow[]>('shop_claim', { p_players: ids });
+}
+
+/** True for an https://checkout.stripe.com/... address (nothing else is followed after Buy). */
+export function isStripeCheckout(u: string): boolean {
+  try {
+    const x = new URL(u);
+    return x.protocol === 'https:' && x.hostname === 'checkout.stripe.com';
+  } catch {
+    return false;
+  }
 }

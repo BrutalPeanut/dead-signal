@@ -56,7 +56,8 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'bad_request' }, 400);
   }
-  const product = PRODUCTS[body.product ?? ''];
+  // own keys only: names like 'constructor' or '__proto__' must not count as products
+  const product = typeof body.product === 'string' && Object.hasOwn(PRODUCTS, body.product) ? PRODUCTS[body.product] : undefined;
   const player = body.player ?? '';
   if (!product || !UUID.test(player)) return json({ error: 'bad_request' }, 400);
   const s = season();
