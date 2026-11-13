@@ -31,6 +31,7 @@ export function deathTip(src?: string, boss?: string): [string, string] | null {
   return T[src] ?? ['the horde', 'Move in big loops so the horde trails behind you in one clump.'];
 }
 import { coin, controlsPicker, fmtNum, fmtTime, h } from './dom';
+import { nativePrivacyOptions, showNativePrivacyOptions } from '../native';
 
 export function resultsModal(
   r: RunResult,
@@ -247,6 +248,9 @@ export function settingsModal(
             const sw = h('span.sw' + (stats.on ? '.on' : ''));
             return h('button.toggle', { onclick: () => (stats.toggle(), sw.classList.toggle('on')) }, h('span', { style: { textAlign: 'left' } }, 'Share anonymous stats', h('small', { style: { display: 'block', fontSize: '11px', opacity: 0.65, fontWeight: 400 } }, 'Helps balance the game · no names, no ads tracking')), sw);
           })()
+        : null,
+      nativePrivacyOptions()
+        ? h('button.toggle', { onclick: () => void showNativePrivacyOptions() }, h('span', { style: { textAlign: 'left' } }, 'Ad privacy choices', h('small', { style: { display: 'block', fontSize: '11px', opacity: 0.65, fontWeight: 400 } }, 'Change how ads may use your data')), h('span.chev', '›'))
         : null,
       controlsPicker(s.controls ?? 'drag', onControls),
       h('div', { style: { textAlign: 'center' } }, reset),

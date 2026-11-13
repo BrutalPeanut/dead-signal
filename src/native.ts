@@ -32,6 +32,17 @@ type AdMobMod = typeof import('@capacitor-community/admob');
 let admob: AdMobMod | null = null;
 let loaded = false;
 let loading: Promise<boolean> | null = null;
+let privacyOptions = false;
+
+/** True when the law needs a way to change ad consent later (Settings shows "Ad privacy choices"). */
+export const nativePrivacyOptions = () => privacyOptions;
+export async function showNativePrivacyOptions(): Promise<void> {
+  try {
+    await admob?.AdMob.showPrivacyOptionsForm();
+  } catch {
+    /* form unavailable right now */
+  }
+}
 
 /** Start AdMob (with Google's consent form where the law asks for one) and preload an ad. */
 export async function initNativeAds(): Promise<boolean> {
@@ -40,20 +51,23 @@ export async function initNativeAds(): Promise<boolean> {
     admob = await import('@capacitor-community/admob');
     const { AdMob } = admob;
     await AdMob.initialize({ initializeForTesting: !ADMOB_LIVE });
+    // Google's consent form first (EEA/UK/Swiss players; set up under AdMob → Privacy & messaging)
+    try {
+      const info = await AdMob.requestConsentInfo();
+      if (info.isConsentFormAvailable && info.status === admob.AdmobConsentStatus.REQUIRED) await AdMob.showConsentForm();
+      privacyOptions = (await AdMob.requestConsentInfo()).privacyOptionsRequirementStatus === 'REQUIRED';
+    } catch {
+      /* consent service unreachable: AdMob falls back to non-personalized ads */
+    }
     if (NATIVE === 'ios') {
-      // Apple's App Tracking Transparency prompt; ads still work (non-personalized) if declined
+      // Apple's App Tracking Transparency prompt (if Google's form didn't already show it);
+      // ads still work (non-personalized) if declined
       try {
         const st = await AdMob.trackingAuthorizationStatus();
         if (st.status === 'notDetermined') await AdMob.requestTrackingAuthorization();
       } catch {
         /* older iOS: no prompt needed */
       }
-    }
-    try {
-      const info = await AdMob.requestConsentInfo();
-      if (info.isConsentFormAvailable && info.status === admob.AdmobConsentStatus.REQUIRED) await AdMob.showConsentForm();
-    } catch {
-      /* consent service unreachable: AdMob falls back to non-personalized ads */
     }
     void preload();
     return true;
@@ -81,14 +95,28 @@ export async function showNativeRewarded(onStart: () => void, onEnd: () => void)
   if (!loaded && !(await preload())) return 'unfilled';
   const { AdMob, RewardAdPluginEvents } = admob;
   let rewarded = false;
-  const subs = [await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => (rewarded = true))];
+  // The show call only resolves when the reward is earned (it never settles if the player closes
+  // the ad early), so the ad is over when it's dismissed or fails to show, not when the call returns.
+  let over: () => void = () => {};
+  const closed = new Promise<void>((r) => (over = r));
+  const subs = await Promise.all([
+    AdMob.addListener(RewardAdPluginEvents.Rewarded, () => (rewarded = true)),
+    AdMob.addListener(RewardAdPluginEvents.Dismissed, () => over()),
+    AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => over()),
+  ]);
+  loaded = false;
+  onStart();
   try {
-    loaded = false;
-    onStart();
-    await AdMob.showRewardVideoAd();
-    rewarded = true; // the call resolves with the reward item once it's earned
-  } catch {
-    /* closed early or failed to show */
+    await Promise.race([
+      AdMob.showRewardVideoAd().then(
+        () => {
+          rewarded = true; // resolves with the reward item once it's earned; wait for the close
+          return closed;
+        },
+        () => over(),
+      ),
+      closed,
+    ]);
   } finally {
     for (const s of subs) void s.remove();
     onEnd();
