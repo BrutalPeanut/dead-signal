@@ -196,3 +196,50 @@ export async function playOwned(): Promise<PlayRow[]> {
     return [];
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Save backup on phones. The app's web storage can be cleared by the OS (iOS does it under low
+// space), so every save is also mirrored to native app storage (Capacitor Preferences), which
+// survives that and app updates. On launch, if web storage came back empty, it's restored.
+// ---------------------------------------------------------------------------------------------
+type Prefs = typeof import('@capacitor/preferences').Preferences;
+let prefs: Prefs | null = null;
+
+/** Before the game starts: load the plugin and put back any save the OS threw away. */
+export async function restoreNativeSaves(keys: string[]): Promise<void> {
+  if (!NATIVE || typeof localStorage === 'undefined') return;
+  try {
+    prefs = (await import('@capacitor/preferences')).Preferences;
+    for (const k of keys) {
+      if (localStorage.getItem(k) !== null) continue;
+      const { value } = await prefs.get({ key: k });
+      if (value) localStorage.setItem(k, value);
+    }
+  } catch {
+    prefs = null; // plugin missing (older build): plain web storage, as before
+  }
+}
+
+/** localStorage, with every write also copied to native storage on phones. */
+export function nativeBackedStorage(base: Storage): Storage {
+  if (!NATIVE) return base;
+  return {
+    get length() {
+      return base.length;
+    },
+    key: (i: number) => base.key(i),
+    getItem: (k: string) => base.getItem(k),
+    setItem(k: string, v: string) {
+      base.setItem(k, v);
+      void prefs?.set({ key: k, value: v }).catch(() => {});
+    },
+    removeItem(k: string) {
+      base.removeItem(k);
+      void prefs?.remove({ key: k }).catch(() => {});
+    },
+    clear() {
+      base.clear();
+      void prefs?.clear().catch(() => {});
+    },
+  };
+}

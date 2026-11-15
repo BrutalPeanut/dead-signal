@@ -41,3 +41,8 @@ Read this first in a new session, then CLAUDE.md. Brian's prefs: always give dir
 - PR 117: public/guide.html (How to Play, ~1,300 words), robots.txt, sitemap.xml. AdSense had rejected the site (14 words of text). Resubmitted + review requested 2026-11-12 ~7:40 PM ET. When approved: flip LIVE_ADS in src/ads/ads.ts via PR.
 - AdMob Privacy & messaging: "Dead Signal GDPR consent" (both apps, Do not consent ON) and "Dead Signal ATT explainer" (iOS) PUBLISHED.
 - Still: AdMob apps "limited ad serving" until linked to live store listings (launch day: Add store). Next store builds need ads_live=true. Consider Google's recommended SKAdNetwork list in Info.plist.
+
+## Founders (2026-11-15)
+- Anyone who plays a run before launch (web, TestFlight, Play closed test) gets `founder` in their save + a gold star on the lobby avatar. Progress carries into the release automatically (same save / same app).
+- **At public launch: flip `LAUNCHED = true` in src/meta/founder.ts in the release PR.** Founders then get a one-time Founder's Pack (5 keys, 2,500 gold, 150 scrap) on their next lobby visit; nobody new becomes a Founder.
+- Phones: saves are mirrored to native storage (@capacitor/preferences) and restored if iOS clears web storage.

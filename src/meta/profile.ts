@@ -108,6 +108,8 @@ export interface SaveData {
   adKeys?: { date: string; n: number };
   /** When this save was first started (ms). */
   since?: number;
+  /** Played before launch (see meta/founder.ts); claimed = Founder's Pack paid out. */
+  founder?: { at: number; claimed?: boolean };
   /** Home-screen install offer: when it was last shown, how many times, and whether the thank-you was paid. */
   install?: { asked: number; n: number; rewarded?: boolean };
   /** Day the sign-in reward was doubled by an ad. */
@@ -200,6 +202,7 @@ export function normalizeSave(raw: unknown): SaveData | null {
   if (d.v !== 1 || typeof d.unlocked !== 'number' || !Array.isArray(d.gear)) return null;
   const f = fresh();
   if (!d.slotLv) migrateSlotLevels(d);
+  if (d.founder && (typeof d.founder !== 'object' || typeof d.founder.at !== 'number')) delete d.founder;
   if (d.streak && !(Number.isInteger(d.streak.sector) && Number.isInteger(d.streak.losses))) delete d.streak;
   if (d.shop !== undefined) d.shop = cleanShop(d.shop);
   if (!d.shop) delete d.shop;

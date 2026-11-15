@@ -27,8 +27,9 @@ import { Hub, useSkin } from './ui/hub';
 import { LEVELUP_TIP, LEVELUP_TIP_FIRST, Tutorial } from './ui/tutorial';
 import { adAudio, adListeners, adSkip, ads, adsOn } from './ads/ads';
 import { PRODUCTS, applyPurchases, priceOverride, type Granted, type ProductId } from './meta/shop';
-import { NATIVE, initBilling, initNativeAds, playBuy, playOwned, playPrices } from './native';
+import { NATIVE, nativeBackedStorage, restoreNativeSaves, initBilling, initNativeAds, playBuy, playOwned, playPrices } from './native';
 import { seasonOf } from './meta/pass';
+import { FOUNDER_PACK, founderStep } from './meta/founder';
 import { claimPurchases, shopStatus, startCheckout } from './net/shop';
 adAudio.mute = () => audio.muteForAd(true);
 adAudio.unmute = () => audio.muteForAd(false);
@@ -74,7 +75,7 @@ function playtestSector(): number | null {
  */
 function makeProfile() {
   const q = new URLSearchParams(location.search);
-  const store = portal.storage() ?? (typeof localStorage !== 'undefined' ? localStorage : null);
+  const store = portal.storage() ?? (typeof localStorage !== 'undefined' ? nativeBackedStorage(localStorage) : null);
   const pt = playtestSector();
   if (pt !== null) {
     // ?playtest=8 drops straight into Sector 8 on a separate test save (your real save is untouched):
@@ -222,6 +223,7 @@ class App {
       this.rewardInstall();
     });
     if (!PORTAL && isStandalone()) setTimeout(() => this.rewardInstall(), 1500);
+    setTimeout(() => this.mode === 'hub' && this.checkFounder(), 2000);
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.mode === 'run') this.paused ? this.resume() : this.pause();
     });
@@ -520,6 +522,25 @@ class App {
     setTimeout(() => toast(`Auto-equipped ${RARITIES[best.rarity]} ${GEAR[best.def].name}${more}`, RARITY_COLORS[best.rarity]), 600);
   }
 
+  /** Pre-launch players become Founders; at launch their Founder's Pack is paid out once. */
+  private checkFounder() {
+    const d = this.profile.data;
+    const step = founderStep(d);
+    if (!step) return;
+    if (step === 'reward') {
+      d.founder = { ...d.founder!, claimed: true };
+      this.profile.grant({ keys: FOUNDER_PACK.keys, gold: FOUNDER_PACK.gold, scrap: FOUNDER_PACK.scrap });
+      this.stats.feature('founder-pack');
+    }
+    this.profile.save();
+    this.hub.refresh();
+    const msg =
+      step === 'reward'
+        ? `🏅 Founder's Pack! +${FOUNDER_PACK.keys} crate keys, +${fmtNum(FOUNDER_PACK.gold)} gold, +${FOUNDER_PACK.scrap} scrap. Thanks for testing!`
+        : "🏅 You're a Founder! Your progress carries into the full release, plus a Founder's Pack at launch.";
+    setTimeout(() => toast(msg, '#ffcf4a'), 1100);
+  }
+
   private backToHub(goNext = false) {
     // the cloud was ahead when we launched mid-run: take it now that the run is over
     if (this.sync.behind) void this.sync.startup(() => this.mode === 'hub');
@@ -533,6 +554,7 @@ class App {
     this.hub.refresh();
     this.ui.append(this.hub.el);
     this.announceAutoEquip();
+    this.checkFounder();
     this.game = this.demoGame(this.hub.sector);
     this.renderer.setGame(this.game);
     audio.bossMode = false;
@@ -1166,5 +1188,6 @@ function start() {
   };
 }
 if (PORTAL) void initPortal().then(start, start);
+else if (NATIVE) void restoreNativeSaves([KEY]).then(start, start);
 else if (!NATIVE && framedByOtherSite()) showFramedNotice();
 else start();
