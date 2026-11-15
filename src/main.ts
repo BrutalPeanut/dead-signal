@@ -139,6 +139,8 @@ class App {
   stats = new Stats(() => this.profile.playerId(), (syncAllowed() || (!!PORTAL && playtestSector() === null && !new URLSearchParams(location.search).has('fresh'))) && !new URLSearchParams(location.search).has('nostats'));
   input = new Input(this.canvas);
   mode: Mode = 'hub';
+  /** Web checkout is open (live Stripe key, or the ?shop=1 preview). */
+  shopLive = false;
   game: Game;
   renderer: Renderer | Renderer3D;
   hud: Hud;
@@ -360,15 +362,13 @@ class App {
       /* private mode */
     }
     this.hub.onBuy = (id) => this.buy(id);
-    // the preview link always shows the shop, even before Stripe is connected
-    if (preview) {
-      this.hub.shopOn = true;
-      this.hub.refresh();
-    }
+    // The website shows the same shop as the apps. Checkout only opens with a live Stripe key
+    // (a test key would hand out items for Stripe's test card), or on the ?shop=1 preview.
+    this.hub.shopOn = true;
+    this.shopLive = preview;
     void shopStatus().then((st) => {
       if (!st?.ready) return;
-      this.hub.shopOn = st.live || preview;
-      if (this.hub.shopOn) this.hub.refresh();
+      this.shopLive = st.live || preview;
       // anyone who has bought before (or just did) gets their things checked on every visit
       if (q === 'done') void this.deliver(10);
       else if (this.profile.data.shop || this.hub.shopOn) void this.deliver(1);
@@ -398,6 +398,11 @@ class App {
   }
 
   private async buy(id: ProductId) {
+    if (!this.shopLive) {
+      toast('Web checkout opens at launch. Everything you earn now carries over!', '#8d97ab');
+      return;
+    }
+    toast('Opening secure checkout…', '#8d97ab');
     const r = await startCheckout(id, this.profile.playerId());
     if ('url' in r) {
       this.stats.feature(`checkout:${id}`);

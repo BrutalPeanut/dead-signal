@@ -4,8 +4,9 @@
  * the player taps "Watch ad" and gets something for it.
  *
  * Modes:
- *  - LIVE_ADS = false (until Google approves H5 Games Ads for deadsignal.info): ads OFF. Every
- *    ad-gated reward (like 2× speed) is simply free.
+ *  - LIVE_ADS = false (until Google approves H5 Games Ads for deadsignal.info): no ads, but the
+ *    website shows exactly the same buttons as the apps, labelled "Free", and pays out without an
+ *    ad (FreeAds). Same UI everywhere; nothing is a dead end.
  *  - LIVE_ADS = true: real rewarded ads through Google's H5 Games Ads (Ad Placement API).
  *  - `?ads=test`: the real H5 integration in Google's test mode (fake Google ads, no revenue),
  *    to check the wiring on the live site before approval.
@@ -286,6 +287,17 @@ class NoAds implements AdProvider {
   }
 }
 
+/** Website before its ads are approved: every ad button is shown and pays out with no ad. */
+class FreeAds implements AdProvider {
+  readonly name = 'free';
+  isReady() {
+    return true;
+  }
+  async showRewarded() {
+    return true;
+  }
+}
+
 function pick(): AdProvider {
   // portal builds only ever use the portal's ads
   if (PORTAL === 'crazygames') return new CrazyAds();
@@ -296,6 +308,7 @@ function pick(): AdProvider {
     if (q === 'test') return new H5Ads(true);
     if (q === 'off') return new NoAds();
     if (LIVE_ADS) return new H5Ads(false);
+    return new FreeAds();
   } catch {
     /* no window/location (tests) */
   }
@@ -305,7 +318,7 @@ function pick(): AdProvider {
 /** Skip Ads purchase (set by the game from the save): rewarded ads pay out without being shown. */
 export const adSkip = { on: () => false };
 /** Verb for ad buttons: "Watch ad" normally, "Free" for Skip Ads owners. */
-export const adWord = () => (adSkip.on() ? 'Free' : 'Watch ad');
+export const adWord = () => (adSkip.on() || provider.name === 'free' ? 'Free' : 'Watch ad');
 
 /** Listeners told about every rewarded ad (the stats module counts starts and completions). */
 export const adListeners: ((p: Placement, ok: boolean) => void)[] = [];
@@ -314,7 +327,8 @@ export const ads: AdProvider = {
   name: provider.name,
   isReady: (p) => provider.isReady(p),
   showRewarded: async (p) => {
-    if (adSkip.on()) return true;
+    // Skip Ads owners and the ad-free website: reward without an ad (and no ad stats)
+    if (adSkip.on() || provider.name === 'free') return true;
     const ok = await provider.showRewarded(p);
     for (const l of adListeners) l(p, ok);
     return ok;
