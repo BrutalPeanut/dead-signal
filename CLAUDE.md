@@ -63,8 +63,9 @@ a run on the autopilot.
 - Web shop (Stripe Checkout): `src/meta/shop.ts` (catalog + `applyPurchases`), `src/net/shop.ts`,
   `supabase/functions/shop-checkout` (prices live here; creates the Checkout session) and
   `supabase/functions/stripe-webhook` (records paid checkouts/refunds in `public.purchases`).
-  The game picks purchases up with the `shop_claim` RPC. The shop shows itself only when the
-  server has a **live** Stripe key (`?shop=1` previews it with a test key); off in portal builds.
+  The game picks purchases up with the `shop_claim` RPC. The shop is always shown on the web
+  (same UI as the apps); checkout opens only with a **live** Stripe key (`?shop=1` opens it with a
+  test key), otherwise it says "opens at launch". Off in portal builds.
   Skip Ads is only sold while ads are on. Sales report: `stats.sales`. Terms/refunds:
   `public/legal.html` (keep prices in sync).
 - `src/main.ts`: app loop, run lifecycle, stats wiring, test hooks (`window.__ds`), and the ad
