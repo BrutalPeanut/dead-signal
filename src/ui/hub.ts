@@ -186,6 +186,7 @@ export class Hub {
           'div.ava',
           h('img', { src: avatar(), alt: '' }),
           h('span.lvb', d.accountLevel),
+          d.founder ? h('span.fdb', { title: 'Founder: played before launch', 'aria-label': 'Founder' }, '★') : null,
           this.p.rank() ? h('span.ascb', romanRank(this.p.rank())) : null,
           h('span.ring', { html: `<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16.5" pathLength="100" stroke-dasharray="${Math.round((d.accountXp / need) * 100)} 100"/></svg>` }),
         ),
