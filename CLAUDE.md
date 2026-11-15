@@ -6,6 +6,8 @@ https://deadsignal.info. Owner: Brian (BShack).
 
 ## Ground rules
 
+- **All editions show the same UI** (website, iPhone, Android, CrazyGames). Never hide a feature on one edition because its ads or payments aren't live yet: show it and make it free or "opens at launch" instead.
+
 - **Every change goes through a PR.** Branch from `main`, open a PR, merge it. A push to `main`
   auto-deploys to GitHub Pages (`.github/workflows/deploy.yml` runs `npm test` and `npm run build`
   first; CI does not run on PRs, so run both locally before merging).
@@ -56,7 +58,7 @@ a run on the autopilot.
 - `src/net/`: Supabase leaderboards, cloud save, Google Drive backup (`drive.appdata` scope only),
   anonymous stats (`stats.ts`).
 - `src/ads/ads.ts`: rewarded-ad providers. `LIVE_ADS = false` until Google approves AdSense +
-  H5 Games Ads; then flip it in a PR. With ads on, `Profile.adEcon` trims base gold/scrap to
+  H5 Games Ads; then flip it in a PR. Until then the website shows every ad button labelled "Free" (FreeAds), so all editions have the same UI. With ads on, `Profile.adEcon` trims base gold/scrap to
   `FREE_ECON` (85%); ads off = no trim.
 - Web shop (Stripe Checkout): `src/meta/shop.ts` (catalog + `applyPurchases`), `src/net/shop.ts`,
   `supabase/functions/shop-checkout` (prices live here; creates the Checkout session) and

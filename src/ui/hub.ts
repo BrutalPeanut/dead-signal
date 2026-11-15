@@ -587,7 +587,7 @@ export class Hub {
     if (this.buying) return;
     this.buying = true;
     audio.click();
-    toast('Opening secure checkout…', '#8d97ab');
+    if (NATIVE) toast('Opening secure checkout…', '#8d97ab'); // the web shows it once checkout is really open
     try {
       await this.onBuy(id);
     } finally {
