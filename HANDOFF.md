@@ -46,3 +46,10 @@ Read this first in a new session, then CLAUDE.md. Brian's prefs: always give dir
 - Anyone who plays a run before launch (web, TestFlight, Play closed test) gets `founder` in their save + a gold star on the lobby avatar. Progress carries into the release automatically (same save / same app).
 - **At public launch: flip `LAUNCHED = true` in src/meta/founder.ts in the release PR.** Founders then get a one-time Founder's Pack (5 keys, 2,500 gold, 150 scrap) on their next lobby visit; nobody new becomes a Founder.
 - Phones: saves are mirrored to native storage (@capacitor/preferences) and restored if iOS clears web storage.
+
+## Full review (2026-11-18)
+- Shipped: PR 123 (site content for AdSense), 124 (lobby: stable BATTLE/Power Up, rails wrap on short phones, shop shows on load, toasts off BATTLE, power on narrow phones), 125 (iOS 50 SKAdNetwork IDs), 126 (auto-2D on slow 3D runs).
+- Bots: COACH clears S20 in ~52 runs, NAIVE+NUDGE ~71; pure NAIVE (never upgrades) stalls at S6-7 — expected, Power Up is the casual player's path.
+- AdSense resubmit scheduled for 2026-11-23 (trig_01CeaRdu5v7rNE1kEWP6asmA). Sitemap submitted in Search Console.
+- Brian's cheat sheet (Claude Docs): "Dead Signal: Creator Cheat Sheet".
+- App Store Connect is signed out in the built-in browser (Brian must sign in for any ASC browser work).
