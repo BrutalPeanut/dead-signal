@@ -36,6 +36,7 @@ adAudio.unmute = () => audio.muteForAd(false);
 import { Stats, browserSaysNo } from './net/stats';
 import { PORTAL, initPortal, portal } from './portal';
 import { framedByOtherSite, showFramedNotice } from './framing';
+import { tooSlowFor3d } from './perf';
 import { Hud, chestModal, levelUpModal, lobbyCtx, pauseModal, reviveModal, showSkillInfo } from './ui/hud';
 import { installModal, resultsModal, settingsModal, welcomeBackModal } from './ui/screens';
 
@@ -157,6 +158,8 @@ class App {
   /** Real frame time spent in live runs, for the run_end frame-rate figure. */
   private runFrames = 0;
   private runMs = 0;
+  /** This device was too slow for 3D: switch to 2D when the player returns to the lobby. */
+  private gfxSwitched = false;
   /** Active time since the last 'leave' event (the tab being visible counts, background doesn't). */
   private activeFrom = performance.now();
   private retreated = false;
@@ -225,6 +228,14 @@ class App {
       this.rewardInstall();
     });
     if (!PORTAL && isStandalone()) setTimeout(() => this.rewardInstall(), 1500);
+    try {
+      if (sessionStorage.getItem('ds.auto2d')) {
+        sessionStorage.removeItem('ds.auto2d');
+        setTimeout(() => toast('Switched to classic 2D graphics for smoother play. Change it any time in Settings.', '#5ef2ff'), 900);
+      }
+    } catch {
+      /* private mode */
+    }
     setTimeout(() => this.mode === 'hub' && this.checkFounder(), 2000);
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.mode === 'run') this.paused ? this.resume() : this.pause();
@@ -548,6 +559,15 @@ class App {
   }
 
   private backToHub(goNext = false) {
+    if (this.gfxSwitched) {
+      try {
+        sessionStorage.setItem('ds.auto2d', '1');
+      } catch {
+        /* the reload still happens; only the explainer toast is lost */
+      }
+      location.reload();
+      return;
+    }
     // the cloud was ahead when we launched mid-run: take it now that the run is over
     if (this.sync.behind) void this.sync.startup(() => this.mode === 'hub');
     if (this.sync.needsReminder()) this.queueProtect();
@@ -841,6 +861,18 @@ class App {
       },
     });
     this.retreated = false;
+    // Slow device: a 3D run (15+ s of measured play) under 25 fps switches to the classic 2D art, unless the
+    // player picked 3D themselves in Settings. Applied on the way back to the lobby (needs a reload:
+    // a canvas that has had a WebGL context can't draw 2D).
+    {
+      const st = this.profile.data.settings;
+      if (tooSlowFor3d(this.renderer instanceof Renderer3D, st.graphics, this.runFrames, this.runMs)) {
+        st.graphics = '2d';
+        this.profile.save();
+        this.gfxSwitched = true;
+        this.stats.feature('auto-2d');
+      }
+    }
     if (rw.unlockedSector) this.stats.track('unlock', { s: this.profile.data.unlocked, d: { gun: rw.newGun ?? null, char: rw.newCharacter ?? null } });
     // portal celebration for the two big ones only: finishing Act I and finishing the campaign
     if (rw.unlockedSector && this.runMode === 'campaign' && (this.sector === 9 || this.sector === CHAPTER_COUNT - 1)) portal.happy();
