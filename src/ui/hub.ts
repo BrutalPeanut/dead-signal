@@ -703,7 +703,15 @@ export class Hub {
   private coachButton() {
     if (this.p.data.stats.runs < 1) return null;
     const c = this.p.coach();
-    if (!c) return null;
+    // Nothing to upgrade: keep the same-sized slot so BATTLE never jumps when you tap through upgrades.
+    if (!c)
+      return h(
+        'button.coach.done',
+        { disabled: true, 'aria-label': 'All caught up' },
+        h('span.ch-bolt', '✓'),
+        h('span.ch-t', h('small', 'POWER UP'), h('b', 'All caught up')),
+        h('span.ch-d', 'Play to earn more'),
+      );
     // two losses in a row here: make the coach impossible to miss before the next attempt
     const stuck = this.p.stuckOn(this.sector);
     return h(

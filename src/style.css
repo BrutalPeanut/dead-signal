@@ -3754,13 +3754,7 @@ textarea {
   }
 }
 
-@media (max-height: 640px) {
-  /* very short screens: one button per rail so the mode switcher never collides */
-  .lobby-body .rails.left .rail-btn:first-child,
-  .lobby-body .rails.right .rail-btn:last-child {
-    display: none;
-  }
-}
+
 
 /* ------------------------------------------------------------ character roster */
 
@@ -5149,3 +5143,120 @@ textarea {
 
 /* Founder badge (played before launch): gold star on the avatar */
 .acct .ava .fdb { position: absolute; top: -3px; left: -3px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; line-height: 1; color: #1a1205; background: linear-gradient(135deg, #ffe08a, #ffb53d); box-shadow: 0 0 0 2px #0b0d12, 0 0 8px rgba(255, 191, 64, 0.6); z-index: 2; }
+
+/* Lobby side rails never hide a button: they fill the space between the top bar and the mode tabs
+   (which overlap the stage by 48px) and wrap into extra columns toward the middle when a short
+   screen can't fit them in one. */
+.lobby-body .rails {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(auto-fill, 62px);
+  row-gap: 8px;
+  column-gap: 6px;
+  bottom: 52px;
+  align-content: start;
+}
+.lobby-body .rails.right {
+  direction: rtl; /* first column at the screen edge, overflow columns toward the middle */
+}
+.lobby-body .rails.right > * {
+  direction: ltr;
+}
+@media (max-height: 640px) {
+  .lobby-body .rails {
+    top: calc(var(--safe-top) + 52px);
+    bottom: 50px;
+    grid-template-rows: repeat(auto-fill, 46px);
+    row-gap: 6px;
+  }
+  .lobby-body .rail-btn .ri,
+  .lobby-body .rail-btn .rring {
+    width: 34px;
+    height: 34px;
+  }
+  .lobby-body .rail-btn .rl {
+    font-size: 8.5px;
+  }
+}
+
+/* Power Up keeps one fixed size, so tapping through upgrades never moves the BATTLE button:
+   one line of text (long labels are cut with an ellipsis), and a dimmed "All caught up" in the
+   same slot when there's nothing left to do. */
+.lobby-body .coach {
+  height: 44px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.lobby-body .coach .ch-t {
+  min-width: 0;
+  overflow: hidden;
+}
+.lobby-body .coach .ch-t b,
+.lobby-body .coach .ch-t small,
+.lobby-body .coach .ch-d {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lobby-body .coach .ch-t small {
+  flex: none;
+}
+.coach.done {
+  animation: none;
+  opacity: 0.55;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(14, 18, 28, 0.6);
+  box-shadow: none;
+  cursor: default;
+}
+.coach.done .ch-bolt {
+  filter: none;
+  color: #8d97ab;
+}
+/* Narrow phones: the name goes, but your power stays in the top bar (the sector card's power line is
+   hidden on short screens, so this is the only place it shows). */
+@media (max-width: 380px) {
+  .acct .who {
+    display: flex;
+  }
+  .acct .who .nm {
+    display: none;
+  }
+}
+
+/* In the lobby, toasts appear over the scene under the top bar, never on top of BATTLE. */
+body:has(.lobby-body) .toast {
+  bottom: auto;
+  top: calc(var(--safe-top) + 64px);
+}
+@media (max-width: 380px) {
+  /* keep the whole power number: the power block holds its size, the wallet chips tighten */
+  .hub .topbar .acct .who {
+    flex: none;
+    min-width: max-content;
+  }
+  .hub .topbar .wallet {
+    gap: 4px;
+    min-width: 0;
+  }
+  .hub .topbar .wallet .w {
+    padding-left: 5px;
+    padding-right: 5px;
+    gap: 3px;
+    font-size: 11.5px;
+  }
+  .hub .topbar .wallet .w svg,
+  .hub .topbar .wallet .w img {
+    width: 14px;
+    height: 14px;
+  }
+}
+@media (max-width: 380px) {
+  .hub .topbar .shop-btn small {
+    display: none; /* the bag icon (and the side SHOP button) say it; frees room for the wallet */
+  }
+  .hub .topbar .shop-btn {
+    width: 40px;
+    min-width: 40px;
+  }
+}

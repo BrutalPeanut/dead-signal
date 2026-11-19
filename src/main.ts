@@ -366,6 +366,7 @@ class App {
     // (a test key would hand out items for Stripe's test card), or on the ?shop=1 preview.
     this.hub.shopOn = true;
     this.shopLive = preview;
+    this.hub.refresh(); // the lobby has already drawn once without the shop
     void shopStatus().then((st) => {
       if (!st?.ready) return;
       this.shopLive = st.live || preview;
