@@ -53,3 +53,10 @@ Read this first in a new session, then CLAUDE.md. Brian's prefs: always give dir
 - AdSense resubmit scheduled for 2026-11-23 (trig_01CeaRdu5v7rNE1kEWP6asmA). Sitemap submitted in Search Console.
 - Brian's cheat sheet (Claude Docs): "Dead Signal: Creator Cheat Sheet".
 - App Store Connect is signed out in the built-in browser (Brian must sign in for any ASC browser work).
+
+## iOS App Store submission (2026-11-20)
+- Version 1.0.0 (build 15, ads_live=true) SUBMITTED to App Review 3:54 PM ET, auto-release on approval.
+- Availability: 146 countries (no EU 27 — no DSA trader declaration until the LLC exists; no China mainland; no South Korea — GRAC rating). Price Free. Age rating 13+ (12+ older OS; Brazil 16+). App Privacy published (Device ID linked + tracking; rest not linked).
+- Listing text in App Store Connect; screenshots in marketing/ios/screenshots (iPhone 6.3in 1206x2622, iPad 13in 2064x2752).
+- IAPs NOT in 1.0.0: Paid Apps Agreement still "New" (Brian: bank + tax). The iOS shop hides itself when StoreKit returns no products. Once the agreement is Active → submit the 3 IAPs with a 1.0.1 version (new build).
+- After approval: AdMob → Apps → iOS app → Add store (lifts limited ad serving). Founders: LAUNCHED stays false until the full multi-platform launch.
