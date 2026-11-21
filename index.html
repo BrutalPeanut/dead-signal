@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="google-adsense-account" content="ca-pub-6900407641110608" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0d12" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="Dead Signal is a free one-thumb sci-fi zombie survival game. Evolve your guns, beat the bosses and top the daily leaderboard, right in your browser on phone or PC." />
+    <title>Dead Signal · Free Zombie Survival Game</title>
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+    <!-- link previews (Messenger, Facebook, iMessage, Discord, X) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Dead Signal" />
+    <meta property="og:url" content="https://deadsignal.info/" />
+    <meta property="og:title" content="Dead Signal · Survive the zombie horde" />
+    <meta property="og:description" content="A free one-thumb sci-fi zombie survival game. Evolve your guns, beat the bosses, top the daily leaderboard. Plays in your browser on phone or PC." />
+    <meta property="og:image" content="https://deadsignal.info/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Dead Signal: a courier with a flamethrower fighting a zombie horde" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Dead Signal · Survive the zombie horde" />
+    <meta name="twitter:description" content="A free one-thumb sci-fi zombie survival game. Plays in your browser." />
+    <meta name="twitter:image" content="https://deadsignal.info/og.jpg" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <script type="module" crossorigin src="./assets/index-BTZS-kBt.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CNgpTngo.css">
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="ui"></div>
+    <!-- shown instantly while the game downloads; main.ts removes it once the first frame is ready -->
+    <div id="boot" style="position:fixed;inset:0;z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#0b0d12;color:#eaf0f8;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;transition:opacity .35s">
+      <img src="./icon-192.png" alt="" width="96" height="96" style="border-radius:22px;box-shadow:0 0 40px rgba(94,242,255,.35)" />
+      <div style="font-size:30px;font-weight:800;letter-spacing:.12em;color:#5ef2ff;text-shadow:0 0 18px rgba(94,242,255,.55)">DEAD SIGNAL</div>
+      <div style="width:160px;height:4px;border-radius:2px;background:#1c2433;overflow:hidden"><div style="width:40%;height:100%;border-radius:2px;background:#ff8a1f;animation:bootbar 1.1s ease-in-out infinite alternate"></div></div>
+      <div style="font-size:13px;color:#8d97ab">Tuning to a dead channel…</div>
+      <h1 style="margin:6px 0 0;font-size:15px;font-weight:600;color:#c9d2e0;text-align:center">Dead Signal: a free sci-fi zombie survival game</h1>
+      <p style="margin:0 24px;max-width:420px;font-size:13px;line-height:1.5;color:#8d97ab;text-align:center">Move with one thumb while your weapons fire on their own. Pick upgrades as you level up, evolve your guns, beat four bosses across 20 sectors and climb the daily leaderboard. Plays free in your browser on phone or PC, no account needed.</p>
+      <nav style="position:absolute;bottom:22px;font-size:13px"><a href="./guide.html" style="color:#8d97ab">How to play</a> <span style="color:#3a4356">·</span> <a href="./strategy.html" style="color:#8d97ab">Strategy</a> <span style="color:#3a4356">·</span> <a href="./devlog.html" style="color:#8d97ab">Devlog</a> <span style="color:#3a4356">·</span> <a href="./about.html" style="color:#8d97ab">About</a> <span style="color:#3a4356">·</span> <a href="./privacy.html" style="color:#8d97ab">Privacy</a> <span style="color:#3a4356">·</span> <a href="./legal.html" style="color:#8d97ab">Terms</a></nav>
+      <style>
+        @keyframes bootbar { from { transform: translateX(-40%) } to { transform: translateX(190%) } }
+      </style>
+    </div>
+  </body>
+</html>
