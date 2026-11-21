@@ -103,7 +103,7 @@ export interface SaveData {
   daily: { key: string; best: number; tiers: number; plays: number; bestEver: number };
   endless: { best: number; bestScore: number; runs: number };
   character: string;
-  online: { id: string; name: string; crew: string; pending: Submission[] };
+  online: { id: string; name: string; crew: string; pending: Submission[]; blocked?: string[] };
   pass: PassState;
   adKeys?: { date: string; n: number };
   /** When this save was first started (ms). */
@@ -206,7 +206,7 @@ export function normalizeSave(raw: unknown): SaveData | null {
   if (d.streak && !(Number.isInteger(d.streak.sector) && Number.isInteger(d.streak.losses))) delete d.streak;
   if (d.shop !== undefined) d.shop = cleanShop(d.shop);
   if (!d.shop) delete d.shop;
-  return { ...f, ...d, settings: { ...f.settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? f.daily, endless: d.endless ?? f.endless, character: d.character ?? 'courier', online: d.online ?? f.online, pass: d.pass ?? f.pass };
+  return { ...f, ...d, settings: { ...f.settings, ...d.settings }, starClaims: d.starClaims ?? {}, bestScore: d.bestScore ?? {}, login: d.login ?? freshLogin(), daily: d.daily ?? f.daily, endless: d.endless ?? f.endless, character: d.character ?? 'courier', online: { ...(d.online ?? f.online), blocked: Array.isArray(d.online?.blocked) ? d.online!.blocked.filter((t) => typeof t === 'string').slice(-500) : [] }, pass: d.pass ?? f.pass };
 }
 
 function cleanShop(raw: unknown): SaveData['shop'] {
@@ -527,6 +527,17 @@ export class Profile {
       this.save();
     }
     return this.data.online.id;
+  }
+
+  /** Hide a player's call sign on this device (block). */
+  blockTag(tag: string) {
+    const b = (this.data.online.blocked ??= []);
+    if (!b.includes(tag)) b.push(tag);
+    this.save();
+  }
+  unblockAll() {
+    this.data.online.blocked = [];
+    this.save();
   }
 
   setOnline(name: string, crew: string) {

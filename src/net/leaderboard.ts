@@ -15,6 +15,8 @@ export interface BoardRow {
   hero: string;
   crew: string | null;
   me: boolean;
+  /** Opaque per-player tag for report/block (never the player id). Missing on old servers. */
+  tag?: string;
 }
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<{ ok: boolean; json: () => Promise<unknown> }>;
@@ -66,6 +68,11 @@ export async function submitScore(player: string, name: string, crew: string, s:
 
 export async function getBoard(board: string, crew: string, player: string, limit = 50): Promise<BoardRow[] | null> {
   return rpc<BoardRow[]>('get_board', { p_board: board, p_crew: crew || null, p_player: player, p_limit: limit });
+}
+
+/** Report a call sign. 3 reports from different players hide it from everyone. */
+export async function reportName(player: string, tag: string, board: string): Promise<boolean> {
+  return (await rpc<boolean>('report_name', { p_player: player, p_tag: tag, p_board: board })) === true;
 }
 
 export const dailyBoard = (key: string) => `daily:${key}`;

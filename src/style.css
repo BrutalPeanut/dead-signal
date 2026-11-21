@@ -5260,3 +5260,8 @@ body:has(.lobby-body) .toast {
     min-width: 40px;
   }
 }
+.lb-row.tap { cursor: pointer; }
+.lb-row.tap:active { filter: brightness(1.25); }
+.lb-tip { font-size: 11px; opacity: 0.55; padding: 8px 0 2px; }
+.lb-terms { font-size: 11px; opacity: 0.7; margin-top: 10px; }
+.lb-terms a { color: inherit; }
