@@ -60,3 +60,10 @@ Read this first in a new session, then CLAUDE.md. Brian's prefs: always give dir
 - Listing text in App Store Connect; screenshots in marketing/ios/screenshots (iPhone 6.3in 1206x2622, iPad 13in 2064x2752).
 - IAPs NOT in 1.0.0: Paid Apps Agreement still "New" (Brian: bank + tax). The iOS shop hides itself when StoreKit returns no products. Once the agreement is Active → submit the 3 IAPs with a 1.0.1 version (new build).
 - After approval: AdMob → Apps → iOS app → Add store (lifts limited ad serving). Founders: LAUNCHED stays false until the full multi-platform launch.
+
+## Nov 21: App Review round 2 (Guideline 2.1 Information Needed)
+- Apple wants a physical-device screen recording + 6 answers in App Review Notes. Notes written (purpose, access, services: AdMob + Supabase, regions, no accounts/IAPs, UGC policy). Recording: Brian records on iPhone from build 17 TestFlight; upload via the version page's App Review "Attachment" (.mov/.mp4), then Update Review / resubmit.
+- Added leaderboard Report & block (Guideline 1.2 UGC): tap a name; `report_name` RPC; 3 reports hide a name (`get_board` filters, returns opaque `tag`); `stats.reports` view; device block list `online.blocked` (normalizeSave + tests/moderation.test.ts). Terms section `legal.html#boards`. **Check `stats.reports` within 24h of new reports** (promised to Apple).
+- Store release builds (`STORE_RELEASE` = native + live ads) skip the pre-launch "You're a Founder" toast.
+- Promo text rewritten (no "before launch"); description no longer mentions IAPs (none in 1.0.0). Version now uses build 17.
+- ITMS-90725 warning: from April 2027 builds need Xcode 27 / iOS 27 SDK. ios.yml picks the newest Xcode on the runner, so it should resolve itself; verify the first build after April 2027.
