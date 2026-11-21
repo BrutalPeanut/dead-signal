@@ -23,6 +23,8 @@ const REWARDED_TEST = { android: 'ca-app-pub-3940256099942544/5224354917', ios: 
 export const ADMOB_APP_ID = 'ca-app-pub-6900407641110608~8554362492';
 export const ADMOB_IOS_APP_ID = 'ca-app-pub-6900407641110608~7477008563';
 export const ADMOB_LIVE = typeof __ADMOB_LIVE__ !== 'undefined' && __ADMOB_LIVE__;
+/** A store release build (real ads), as opposed to a TestFlight / closed-test beta. */
+export const STORE_RELEASE = NATIVE !== '' && ADMOB_LIVE;
 const rewardedUnit = () => {
   const p = NATIVE === 'ios' ? 'ios' : 'android';
   return (ADMOB_LIVE && REWARDED_LIVE[p]) || REWARDED_TEST[p];
