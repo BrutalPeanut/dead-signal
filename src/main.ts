@@ -27,7 +27,7 @@ import { Hub, useSkin } from './ui/hub';
 import { LEVELUP_TIP, LEVELUP_TIP_FIRST, Tutorial } from './ui/tutorial';
 import { adAudio, adListeners, adSkip, ads, adsOn } from './ads/ads';
 import { PRODUCTS, applyPurchases, priceOverride, type Granted, type ProductId } from './meta/shop';
-import { NATIVE, nativeBackedStorage, restoreNativeSaves, initBilling, initNativeAds, playBuy, playOwned, playPrices } from './native';
+import { NATIVE, STORE_RELEASE, nativeBackedStorage, restoreNativeSaves, initBilling, initNativeAds, playBuy, playOwned, playPrices } from './native';
 import { seasonOf } from './meta/pass';
 import { FOUNDER_PACK, founderStep } from './meta/founder';
 import { claimPurchases, shopStatus, startCheckout } from './net/shop';
@@ -551,6 +551,8 @@ class App {
     }
     this.profile.save();
     this.hub.refresh();
+    // App Store / Play release builds are the launch for those players: no "before launch" wording there.
+    if (step === 'marked' && STORE_RELEASE) return;
     const msg =
       step === 'reward'
         ? `🏅 Founder's Pack! +${FOUNDER_PACK.keys} crate keys, +${fmtNum(FOUNDER_PACK.gold)} gold, +${FOUNDER_PACK.scrap} scrap. Thanks for testing!`
