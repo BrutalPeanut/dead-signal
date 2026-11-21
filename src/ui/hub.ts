@@ -23,7 +23,7 @@ import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../met
 import { cleanName } from '../net/names';
 import { PRODUCTS, offers, price, priceOverride, type Product, type ProductId } from '../meta/shop';
 import { NATIVE, STORE_NAME } from '../native';
-import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, validCrew, validName, type BoardRow } from '../net/leaderboard';
+import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, reportName, validCrew, validName, type BoardRow } from '../net/leaderboard';
 import { gearIcon, skillIcon } from '../render/icons';
 import { BOSSES, GUN_IDS, WEAPONS, gunUnlock, isGun, runLengthFor, starTimes } from '../sim/data';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
@@ -651,19 +651,49 @@ export class Hub {
         list.replaceChildren(h('div.lb-msg', mode === 'daily' ? 'No scores yet today. Be the first!' : 'No Endless runs yet. Set the record!'));
         return;
       }
-      list.replaceChildren(...rows.map((r) => this.lbRow(r, mode)));
+      const blocked = new Set(o.blocked ?? []);
+      const shown = rows.filter((r) => r.me || !r.tag || !blocked.has(r.tag));
+      list.replaceChildren(...shown.map((r) => this.lbRow(r, mode, board)), h('div.lb-msg.lb-tip', 'Tap a name to report or block it.'));
       list.querySelector('.me')?.scrollIntoView({ block: 'center' });
     });
   }
 
-  private lbRow(r: BoardRow, mode: 'daily' | 'endless') {
+  private lbRow(r: BoardRow, mode: 'daily' | 'endless', board: string) {
     const medal = r.rnk === 1 ? '🥇' : r.rnk === 2 ? '🥈' : r.rnk === 3 ? '🥉' : String(r.rnk);
+    const tag = r.tag;
+    const act = !r.me && tag ? { onclick: () => this.lbModerate(r.name, tag, board, mode), role: 'button', 'aria-label': `${r.name}: report or block` } : {};
     return h(
-      'div.lb-row' + (r.me ? '.me' : ''),
+      'div.lb-row' + (r.me ? '.me' : '') + (act.onclick ? '.tap' : ''),
+      act,
       h('b.lb-rk', medal),
       h('img', { src: portrait(CHARACTERS.some((c) => c.id === r.hero) ? r.hero : 'courier'), alt: '' }),
       h('div.lb-nm', h('span', r.name), h('small', mode === 'endless' ? `${fmtTime(r.run_time)} survived` : charById(r.hero).name)),
       h('b.lb-sc', r.score.toLocaleString()),
+    );
+  }
+
+  /** Report / block a call sign (App Store Guideline 1.2). */
+  private lbModerate(name: string, tag: string, board: string, mode: 'daily' | 'endless') {
+    const sheet = this.modal?.querySelector('.sheet');
+    if (!sheet) return;
+    const back = () => this.leaderboard(mode);
+    sheet.replaceChildren(
+      h('h2', name),
+      h('div.help', { style: { marginTop: 0 } }, 'Is this call sign offensive? Report it and we hide it from everyone once others agree. Block hides it on your device right away.'),
+      h(
+        'button.btn.primary.big',
+        {
+          style: { width: '100%', marginTop: '10px' },
+          onclick: () => {
+            this.p.blockTag(tag);
+            reportName(this.p.playerId(), tag, board).then((ok) => toast(ok ? 'Reported and blocked. Thanks!' : 'Blocked. Report will retry when online.', '#43ffa4'));
+            back();
+          },
+        },
+        'Report & block',
+      ),
+      h('button.btn.cyan', { style: { width: '100%', marginTop: '6px' }, onclick: () => (this.p.blockTag(tag), toast('Blocked', '#43ffa4'), back()) }, 'Block only'),
+      h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: back }, 'Cancel'),
     );
   }
 
@@ -694,7 +724,11 @@ export class Hub {
         },
         'Save',
       ),
+      (o.blocked?.length ?? 0) > 0
+        ? h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => (this.p.unblockAll(), toast('Unblocked everyone', '#43ffa4'), this.leaderboard(mode)) }, `Unblock ${o.blocked!.length} blocked player${o.blocked!.length === 1 ? '' : 's'}`)
+        : h('span'),
       h('button.btn.ghost', { style: { width: '100%', marginTop: '6px' }, onclick: () => this.closeModal() }, 'Not now'),
+      h('div.help.lb-terms', 'By joining you agree to the ', h('a', { href: './legal.html#boards', target: '_blank', rel: 'noopener' }, 'Terms'), ': no offensive or hateful names. Offensive names get removed and their players blocked.'),
     );
     setTimeout(() => name.focus(), 50);
   }
