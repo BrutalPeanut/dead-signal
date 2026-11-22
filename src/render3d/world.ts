@@ -182,10 +182,12 @@ const PROPS: Record<Biome, PropFn> = {
   biolab(p, rng, x, z, glows) {
     const r = rng.next();
     if (r < 0.35) {
-      // hazard drum
-      p.cyl(3.6, 3.6, 10, '#e6c63a', [x, 5, z]);
+      // hazard drum: steel, with a small yellow hazard label (an all-yellow ringed drum looked
+      // like a stack of gold coins that players tried to pick up)
+      p.cyl(3.6, 3.6, 10, '#5b6e7a', [x, 5, z]);
       p.cyl(3.7, 3.7, 1, '#2a2d33', [x, 7.5, z]);
       p.cyl(3.7, 3.7, 1, '#2a2d33', [x, 2.5, z]);
+      p.box(3, 3, 0.4, '#ffcf2a', [x, 5, z + 3.7]);
     } else if (r < 0.6) {
       // tipped lab crate
       p.box(12, 7, 9, '#e2e6ea', [x, 3.5, z], [0, rng.range(0, 3), 0]);
