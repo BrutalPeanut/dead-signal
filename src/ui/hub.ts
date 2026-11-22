@@ -20,10 +20,10 @@ import { drawHero } from '../render/art';
 import { setHeroSkin } from '../render/hero';
 import { CHARACTERS, charById } from '../meta/characters';
 import { PASS_TIERS, SP_PER_TIER, passLevel, passReward, seasonOf } from '../meta/pass';
-import { cleanName } from '../net/names';
+import { cleanCrew, nameProblem, randomName } from '../net/names';
 import { PRODUCTS, offers, price, priceOverride, type Product, type ProductId } from '../meta/shop';
 import { NATIVE, STORE_NAME } from '../native';
-import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, reportName, validCrew, validName, type BoardRow } from '../net/leaderboard';
+import { ENDLESS_BOARD, dailyBoard, getBoard, newCrewCode, reportName, validCrew, type BoardRow } from '../net/leaderboard';
 import { gearIcon, skillIcon } from '../render/icons';
 import { BOSSES, GUN_IDS, WEAPONS, gunUnlock, isGun, runLengthFor, starTimes } from '../sim/data';
 import { CHAPTER_COUNT, getChapter } from '../sim/chapters';
@@ -608,6 +608,10 @@ export class Hub {
     this.modal = h('div.modal', { onclick: this.backdrop }, sheet);
     document.getElementById('ui')!.append(this.modal);
     if (!o.name) return this.lbSetup(sheet, mode);
+    if (nameProblem(o.name)) {
+      toast('Please pick a new call sign: the old one isn’t allowed on the public boards', '#ff5c7a');
+      return this.lbSetup(sheet, mode, true);
+    }
     const sc = scope ?? (o.crew ? 'crew' : 'all');
     const board = mode === 'daily' ? dailyBoard(p.dailyState().key) : ENDLESS_BOARD;
     const list = h('div.lb-list', h('div.lb-msg', 'Loading…'));
@@ -699,12 +703,12 @@ export class Hub {
 
   private lbSetup(sheet: HTMLElement, mode: 'daily' | 'endless', editing = false) {
     const o = this.p.data.online;
-    const name = h('input.lb-in', { value: o.name, placeholder: 'Call sign (2–16 letters)', maxlength: '16' }) as HTMLInputElement;
+    const name = h('input.lb-in', { value: o.name || randomName(), placeholder: 'Call sign (2–16 letters)', maxlength: '16', autocomplete: 'off', spellcheck: 'false' }) as HTMLInputElement;
     const crew = h('input.lb-in', { value: o.crew, placeholder: 'Crew code', maxlength: '8', style: { textTransform: 'uppercase' } }) as HTMLInputElement;
     sheet.replaceChildren(
       h('h2', editing ? 'Your call sign' : 'Join the leaderboard'),
       h('div.help', { style: { marginTop: 0 } }, 'Pick a name for the boards. Share a crew code with family to get your own private ranking.'),
-      name,
+      h('div.lb-crewrow', name, h('button.btn.small.cyan', { title: 'Random call sign', 'aria-label': 'Random call sign', onclick: () => (name.value = randomName()) }, '🎲')),
       h('div.lb-crewrow', crew, h('button.btn.small.cyan', { onclick: () => (crew.value = newCrewCode()) }, 'New crew')),
       h(
         'button.btn.primary.big',
@@ -712,11 +716,11 @@ export class Hub {
           style: { width: '100%', marginTop: '10px' },
           onclick: () => {
             const c = crew.value.trim().toUpperCase();
-            if (!validName(name.value)) return toast('Call sign needs 2–16 characters', '#ff5c7a');
-            if (!cleanName(name.value)) return toast('Pick a different call sign: that one isn’t allowed on the public boards', '#ff5c7a');
+            const problem = nameProblem(name.value);
+            if (problem) return toast(problem, '#ff5c7a');
             if (!validCrew(c)) return toast('Crew codes are 4–8 letters/numbers', '#ff5c7a');
-            if (c && !cleanName(c)) return toast('Pick a different crew code', '#ff5c7a');
-            this.p.setOnline(name.value, c);
+            if (c && !cleanCrew(c)) return toast('Pick a different crew code', '#ff5c7a');
+            this.p.setOnline(name.value.trim().replace(/\s+/g, ' '), c);
             audio.levelUp();
             this.p.flushScores();
             this.leaderboard(mode);
