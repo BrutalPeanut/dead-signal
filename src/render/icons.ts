@@ -689,9 +689,15 @@ const GEAR_GLYPH: Record<string, (x: C, col: string) => void> = {
   riftcleaver: MOD_GLYPH.chip,
   optic(x, col) {
     SLOT_GLYPHS.visor(x, col);
+    // targeting lens on the visor band (amber, not red: a red dot in the corner reads as a
+    // "new" notification badge)
     x.beginPath();
-    x.arc(44, 20, 8, 0, Math.PI * 2);
-    glyph(x, '#ff3b5c');
+    x.arc(41, 32, 7, 0, Math.PI * 2);
+    glyph(x, '#ffb02e');
+    x.beginPath();
+    x.arc(41, 32, 2.6, 0, Math.PI * 2);
+    x.fillStyle = OUT;
+    x.fill();
   },
   hazmat(x, col) {
     SLOT_GLYPHS.vest(x, '#d8c23a');
@@ -727,7 +733,7 @@ const GEAR_GLYPH: Record<string, (x: C, col: string) => void> = {
     x.strokeStyle = OUT;
     x.stroke();
     x.lineWidth = 4;
-    x.strokeStyle = '#e8304f';
+    x.strokeStyle = '#ffb02e'; // amber: a red mark in the corner reads as a notification badge
     x.stroke();
   },
 };
