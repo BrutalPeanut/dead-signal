@@ -67,3 +67,7 @@ Read this first in a new session, then CLAUDE.md. Brian's prefs: always give dir
 - Store release builds (`STORE_RELEASE` = native + live ads) skip the pre-launch "You're a Founder" toast.
 - Promo text rewritten (no "before launch"); description no longer mentions IAPs (none in 1.0.0). Version now uses build 17.
 - ITMS-90725 warning: from April 2027 builds need Xcode 27 / iOS 27 SDK. ios.yml picks the newest Xcode on the runner, so it should resolve itself; verify the first build after April 2027.
+
+## Nov 22: call sign filter v2
+- `src/net/names.ts`: allowed chars only (A-Z 0-9 space _ - .), 2–16, no 5+ digit runs or links, `obscenity` package (raw + squashed), our STEMS/WORDS with a safe-word allow-list. `randomName()` + 🎲 button; name box pre-filled with a random name; players whose old name now fails are asked to pick a new one.
+- Server: `words_ok` / `name_ok` (migration `20261122_name_filter_v2.sql`, lists generated from names.ts; a test keeps them identical). Crew codes use `words_ok` only. Server lists are a subset of the client's, so the server never silently renames an accepted name.
